@@ -1,6 +1,12 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) return null;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+
   return (
     <div className="min-h-screen">
       {/* Navbar */}
@@ -12,14 +18,14 @@ const Home = () => {
           <Link to="/login" className="text-gray-800 no-underline font-medium hover:text-purple-600 transition-colors">
             Login
           </Link>
-          <Link to="/signup" className="bg-gradient-to-r from-purple-600 to-purple-800 text-white px-6 py-2.5 rounded-full no-underline font-semibold hover:-translate-y-0.5 hover:shadow-lg transition-all text-sm">
+          <Link to="/signup" className="bg-linear-to-r from-purple-600 to-purple-800 text-white px-6 py-2.5 rounded-full no-underline font-semibold hover:-translate-y-0.5 hover:shadow-lg transition-all text-sm">
             Sign Up
           </Link>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-purple-600 to-purple-800 text-white py-24 px-12 text-center">
+      <section className="bg-linear-to-r from-purple-600 to-purple-800 text-white py-24 px-12 text-center">
         <div>
           <h1 className="text-5xl mb-5 font-bold">Centralized Health Records for Everyone</h1>
           <p className="text-xl mb-10 max-w-3xl mx-auto leading-relaxed">
@@ -73,7 +79,7 @@ const Home = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-gradient-to-r from-purple-600 to-purple-800 text-white py-20 px-12 text-center">
+      <section className="bg-linear-to-r from-purple-600 to-purple-800 text-white py-20 px-12 text-center">
         <h2 className="text-4xl mb-5">Ready to Get Started?</h2>
         <p className="text-lg mb-8">Join thousands of healthcare professionals and patients using our system</p>
         <Link to="/signup" className="bg-white text-purple-600 px-12 py-4 rounded-full no-underline font-semibold text-lg inline-block hover:-translate-y-1 hover:shadow-xl transition-all">

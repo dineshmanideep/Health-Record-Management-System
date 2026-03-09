@@ -22,6 +22,11 @@ const hospitalAffiliationSchema = new mongoose.Schema(
     department: {
       type: String
     },
+    assignedDoctor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Doctor'
+      // Only relevant for nurse affiliations — which doctor this nurse assists
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],

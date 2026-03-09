@@ -1,0 +1,260 @@
+# Hospital Role – Functional Description
+
+---
+
+# 1. Overview of the Hospital Role
+
+The hospital represents a healthcare institution within the platform.
+
+Hospitals are responsible for managing the relationship between the institution and healthcare professionals such as doctors and medical assistants (nurses).
+
+Unlike earlier designs where hospitals directly created doctor and nurse accounts, in this system **doctors and nurses maintain their own independent profiles**.
+
+Hospitals do not create these profiles. Instead, hospitals **associate existing professionals with their institution using a unique hospital code**.
+
+This approach allows healthcare professionals to maintain a **single professional identity**, even if they change hospitals in the future.
+
+Hospitals therefore act as **organizational managers**, responsible for linking and managing healthcare staff who operate under their institution.
+
+Hospitals **do not have access to patient medical records**.
+
+Their role is strictly administrative and focused on **staff management and institutional organization**.
+
+---
+
+# 2. Hospital Registration
+
+Hospitals must first create an account on the platform.
+
+During registration, the hospital provides institutional details such as:
+
+Hospital name
+Email address
+Contact phone number
+Hospital address
+Medical license or registration number
+
+After submitting the registration form, the hospital account is created but remains **inactive until it is approved by the system administrator**.
+
+This approval process ensures that only legitimate healthcare institutions can operate within the platform.
+
+---
+
+# 3. Admin Approval
+
+To prevent unauthorized institutions from entering the platform, hospital accounts must go through an **admin approval process**.
+
+The process works as follows:
+
+1. The hospital submits the registration form.
+2. The system marks the account status as **Pending**.
+3. The administrator reviews the hospital registration information.
+4. The administrator either **approves or rejects** the request.
+
+Only approved hospitals can log in and access the hospital dashboard.
+
+---
+
+# 4. Hospital Login
+
+After the hospital account is approved, the hospital administrator can log in using the registered credentials.
+
+Once logged in, the hospital is redirected to the **Hospital Dashboard**.
+
+The hospital dashboard focuses on **managing healthcare professionals associated with the hospital**.
+
+---
+
+# 5. Hospital Dashboard Overview
+
+The hospital dashboard provides tools for managing institutional staff relationships.
+
+Typical sections of the hospital dashboard include:
+
+Hospital profile
+Hospital code management
+Connected doctors
+Connected nurses
+Doctor–nurse assignments
+Audit logs
+
+The dashboard should clearly display all healthcare professionals currently associated with the hospital.
+
+---
+
+# 6. Hospital Code System
+
+Each hospital can **generate a unique hospital code**.
+
+This hospital code is used by doctors and nurses to request association with the hospital.
+
+Hospitals may generate different codes depending on the purpose, for example:
+
+Doctor joining code
+Nurse joining code
+
+These codes act as **secure identifiers** that allow healthcare professionals to connect to the hospital.
+
+The hospital administrator may regenerate or invalidate codes when necessary.
+
+---
+
+# 7. Doctor and Nurse Profiles
+
+Doctors and nurses create **their own professional accounts** on the platform.
+
+These profiles are independent of hospitals.
+
+A professional profile may contain information such as:
+
+Name
+Email
+Role (Doctor or Nurse)
+Specialization (for doctors)
+
+Because these profiles are independent, a healthcare professional can maintain the same identity even if they move to a different hospital.
+
+This design prevents duplicate accounts and maintains consistent professional identity.
+
+---
+
+# 8. Joining a Hospital
+
+Doctors and nurses can join a hospital by using the hospital code provided by the institution.
+
+The joining process works as follows:
+
+1. The doctor or nurse logs into their account.
+2. The professional enters the hospital code.
+3. The system sends a **join request** to the hospital.
+4. The hospital administrator reviews the request.
+5. The hospital either **accepts or rejects** the request.
+
+If the request is approved, the doctor or nurse becomes **associated with that hospital**.
+
+This association allows them to participate in hospital workflows such as consultations and prescription digitization.
+
+---
+
+# 9. Connected Staff List
+
+The hospital dashboard should display a list of all healthcare professionals currently associated with the hospital.
+
+This list should include:
+
+Doctors connected to the hospital
+Nurses connected to the hospital
+
+For each staff member, the hospital should be able to see basic information such as:
+
+Name
+Role
+Specialization (for doctors)
+Connection status
+
+This section helps the hospital keep track of all professionals operating under its institution.
+
+---
+
+# 10. Assigning Nurses to Doctors
+
+In real-world healthcare environments, nurses often work under specific doctors or departments.
+
+The platform should allow hospitals to assign nurses to doctors.
+
+This assignment defines which nurse assists which doctor when creating patient treatment records.
+
+Hospitals should be able to perform the following actions:
+
+Assign a nurse to a doctor
+Change nurse assignments
+Remove nurse assignments
+
+These relationships help organize the workflow for creating prescriptions and medical records.
+
+---
+
+# 11. Revoking Hospital Association
+
+Hospitals must have the ability to remove healthcare professionals from their institution.
+
+This may happen in situations such as:
+
+A doctor leaving the hospital
+A nurse being transferred
+A professional contract ending
+
+The hospital administrator can revoke the association between the professional and the hospital.
+
+When this happens:
+
+The professional account still exists in the platform.
+
+However, the professional is **no longer associated with that hospital**.
+
+This allows professionals to continue working in the system while hospitals maintain control over institutional membership.
+
+---
+
+# 12. Hospital Restrictions
+
+Hospitals do not have access to patient medical records.
+
+Hospitals cannot:
+
+View patient health data
+Access prescriptions
+Download patient reports
+
+Hospitals are responsible only for **staff management**, not for handling patient medical information.
+
+This rule protects patient privacy and ensures that medical data remains accessible only to authorized healthcare professionals.
+
+---
+
+# 13. Audit Logging
+
+All administrative actions performed by the hospital must be recorded in the system's **audit log**.
+
+This ensures transparency and accountability.
+
+Examples of actions that should be logged include:
+
+Doctor joined hospital
+Nurse joined hospital
+Nurse assigned to doctor
+Hospital revoked doctor association
+Hospital revoked nurse association
+
+Each log entry should contain the following information:
+
+Action performed
+User performing the action
+Timestamp
+Additional details
+
+Example log entry:
+
+Doctor association approved
+Hospital: Yashoda Hospital
+Doctor: Dr. Ravi
+Time: 10:30 AM
+
+These logs help maintain a clear record of administrative activities within the hospital.
+
+---
+
+# 14. Role of Hospitals in the Overall System
+
+Hospitals act as the **organizational layer** within the platform.
+
+Their main purpose is to manage relationships between healthcare professionals and the institution.
+
+Hospitals ensure that doctors and nurses operate within a legitimate organizational structure.
+
+However, hospitals do not interact directly with medical records.
+
+Patient data remains controlled by patients and accessed only by authorized doctors.
+
+This design ensures a balance between **institutional management and patient privacy**.
+

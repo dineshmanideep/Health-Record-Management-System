@@ -30,7 +30,7 @@ const DashboardLayout = ({ children, title }) => {
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="w-64 bg-gradient-to-b from-purple-600 to-purple-800 text-white py-5 fixed h-screen overflow-y-auto">
+      <aside className="w-64 bg-linear-to-b from-purple-600 to-purple-800 text-white py-5 fixed h-screen overflow-y-auto">
         <div className="px-5 pb-5 border-b border-white/20 mb-5">
           <h2 className="text-2xl font-bold mb-1">HRMS</h2>
           <p className="text-sm opacity-90">{getRoleName(user?.role)}</p>
@@ -53,25 +53,34 @@ const DashboardLayout = ({ children, title }) => {
               <Link to="/patient/records" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
                 <span className="text-xl">📋</span> Medical Records
               </Link>
+              <Link to="/patient/health-analytics" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">📊</span> Health Analytics
+              </Link>
+              <Link to="/patient/activity-logs" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">📝</span> Activity Logs
+              </Link>
             </>
           )}
           {user?.role === 'doctor' && (
             <>
               <Link to="/doctor/patients" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">👥</span> Patients
+                <span className="text-xl">👥</span> My Patients
               </Link>
-              <Link to="/doctor/appointments" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">📅</span> Appointments
+              <Link to="/doctor/audit-logs" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">📋</span> Audit Logs
               </Link>
             </>
           )}
           {user?.role === 'nurse' && (
             <>
-              <Link to="/nurse/patients" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">👥</span> Assigned Patients
+              <Link to="/nurse/create-record" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">📝</span> Create Record
               </Link>
-              <Link to="/nurse/tasks" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">✓</span> Tasks
+              <Link to="/nurse/records" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">📋</span> My Records
+              </Link>
+              <Link to="/nurse/audit-logs" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">🔍</span> Audit Logs
               </Link>
             </>
           )}
@@ -83,8 +92,8 @@ const DashboardLayout = ({ children, title }) => {
               <Link to="/hospital/nurses" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
                 <span className="text-xl">👩‍⚕️</span> Nurses
               </Link>
-              <Link to="/hospital/departments" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">🏥</span> Departments
+              <Link to="/hospital/audit-logs" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">📋</span> Audit Logs
               </Link>
             </>
           )}

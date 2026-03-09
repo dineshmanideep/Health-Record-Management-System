@@ -1,6 +1,10 @@
 const express = require('express');
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 const router = express.Router();
+const { uploadSelfRecord } = require('../utils/upload');
+const Notification = require('../models/Notification');
 const User = require('../models/User');
 const MedicalRecord = require('../models/MedicalRecord');
 const SelfRecord = require('../models/SelfRecord');
@@ -81,18 +85,30 @@ router.get('/dashboard', async (req, res) => {
         .lean()
     ]);
 
-    const recentRecords = await MedicalRecord.find({ patient: patientId })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate('doctor', 'name specialization')
-      .populate('hospital', 'name')
-      .select('visitDate diagnosis doctor hospital createdAt')
-      .lean();
+    const [recentRecords, recentActivity, recentNotifications, unreadNotificationCount] = await Promise.all([
+      MedicalRecord.find({ patient: patientId })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate('doctor', 'name specialization')
+        .populate('hospital', 'name')
+        .select('visitDate diagnosis doctor hospital createdAt')
+        .lean(),
+      ActivityLog.find({ patient: patientId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+      Notification.find({ user: patientId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+      Notification.countDocuments({ user: patientId, read: false })
+    ]);
 
-    const recentActivity = await ActivityLog.find({ patient: patientId })
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
+    // Generate a unique, deterministic QR token for this patient
+    const qrToken = crypto
+      .createHmac('sha256', process.env.JWT_SECRET)
+      .update(patientId.toString())
+      .digest('hex');
 
     res.json({
       success: true,
@@ -102,7 +118,10 @@ router.get('/dashboard', async (req, res) => {
         trustedDoctorCount,
         upcomingReminders,
         recentRecords,
-        recentActivity
+        recentActivity,
+        recentNotifications,
+        unreadNotificationCount,
+        qrToken
       }
     });
   } catch (error) {
@@ -170,12 +189,13 @@ router.get('/self-records', async (req, res) => {
   }
 });
 
-// @route   POST /api/patient/self-records
-router.post('/self-records', async (req, res) => {
+// @route   POST /api/patient/self-records/link
+// @desc    Save a self-record using an external link (Google Drive, Dropbox, etc.) — JSON body
+router.post('/self-records/link', async (req, res) => {
   try {
     const { title, description, documentPath, recordDate } = req.body;
     if (!title || !documentPath) {
-      return res.status(400).json({ success: false, message: 'Title and document are required' });
+      return res.status(400).json({ success: false, message: 'Title and document link are required' });
     }
 
     const record = await SelfRecord.create({
@@ -186,12 +206,50 @@ router.post('/self-records', async (req, res) => {
       recordDate: recordDate || Date.now()
     });
 
-    logActivity(req.user._id, 'self_record_uploaded', { id: req.user._id, role: 'user', name: req.user.name }, `Uploaded self-record: ${title}`);
+    logActivity(req.user._id, 'self_record_uploaded', { id: req.user._id, role: 'user', name: req.user.name }, `Added self-record link: ${title}`);
 
     res.status(201).json({ success: true, data: record });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
+});
+
+// @route   POST /api/patient/self-records
+// Accepts multipart/form-data with fields: title, description, recordDate, and file: document
+router.post('/self-records', (req, res) => {
+  uploadSelfRecord(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    try {
+      const { title, description, recordDate } = req.body;
+      if (!title) {
+        return res.status(400).json({ success: false, message: 'Title is required' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'Document file is required' });
+      }
+
+      // Build a publicly accessible URL for the stored file
+      const protocol = req.protocol;
+      const host = req.get('host');
+      const documentPath = `${protocol}://${host}/uploads/self-records/${req.file.filename}`;
+
+      const record = await SelfRecord.create({
+        patient: req.user._id,
+        title,
+        description,
+        documentPath,
+        recordDate: recordDate || Date.now()
+      });
+
+      logActivity(req.user._id, 'self_record_uploaded', { id: req.user._id, role: 'user', name: req.user.name }, `Uploaded self-record: ${title}`);
+
+      res.status(201).json({ success: true, data: record });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message || 'Server error' });
+    }
+  });
 });
 
 // @route   DELETE /api/patient/self-records/:id
@@ -200,6 +258,13 @@ router.delete('/self-records/:id', async (req, res) => {
     const record = await SelfRecord.findOneAndDelete({ _id: req.params.id, patient: req.user._id });
     if (!record) {
       return res.status(404).json({ success: false, message: 'Record not found' });
+    }
+
+    // Remove the physical file from disk if it was an uploaded file
+    if (record.documentPath && record.documentPath.includes('/uploads/self-records/')) {
+      const filename = record.documentPath.split('/uploads/self-records/').pop();
+      const filePath = path.join(__dirname, '../uploads/self-records', filename);
+      fs.unlink(filePath, () => {}); // fire-and-forget, ignore errors
     }
 
     logActivity(req.user._id, 'self_record_deleted', { id: req.user._id, role: 'user', name: req.user.name }, `Deleted self-record: ${record.title}`);
@@ -259,6 +324,13 @@ router.patch('/revoke-access/:doctorId', async (req, res) => {
 
     logActivity(req.user._id, 'doctor_access_revoked', { id: req.user._id, role: 'user', name: req.user.name }, `Revoked access for Dr. ${access.doctor?.name}`);
 
+    await Notification.create({
+      user: req.user._id,
+      type: 'doctor_access_revoked',
+      title: 'Doctor Access Revoked',
+      message: `You revoked access for Dr. ${access.doctor?.name}.`
+    });
+
     res.json({ success: true, message: 'Doctor access revoked' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -314,6 +386,72 @@ router.get('/activity-logs', async (req, res) => {
       data: logs,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== NOTIFICATIONS ====================
+
+// @route   GET /api/patient/notifications
+router.get('/notifications', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const [notifications, total, unreadCount] = await Promise.all([
+      Notification.find({ user: req.user._id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Notification.countDocuments({ user: req.user._id }),
+      Notification.countDocuments({ user: req.user._id, read: false })
+    ]);
+
+    res.json({
+      success: true,
+      data: notifications,
+      unreadCount,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/patient/notifications/unread-count
+router.get('/notifications/unread-count', async (req, res) => {
+  try {
+    const count = await Notification.countDocuments({ user: req.user._id, read: false });
+    res.json({ success: true, data: { count } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/patient/notifications/:id/read
+router.patch('/notifications/:id/read', async (req, res) => {
+  try {
+    await Notification.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      { read: true }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/patient/notifications/mark-all-read
+router.patch('/notifications/mark-all-read', async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { user: req.user._id, read: false },
+      { read: true }
+    );
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

@@ -13,18 +13,29 @@ import Unauthorized from './pages/Unauthorized';
 import PatientDashboard from './pages/patient/PatientDashboard';
 import PatientProfile from './pages/patient/PatientProfile';
 import PatientMedicalRecords from './pages/patient/PatientMedicalRecords';
+import PatientHealthAnalytics from './pages/patient/PatientHealthAnalytics';
+import PatientActivityLogs from './pages/patient/PatientActivityLogs';
 
 // Doctor pages
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
 import DoctorProfile from './pages/doctor/DoctorProfile';
+import DoctorPatients from './pages/doctor/DoctorPatients';
+import DoctorPatientRecords from './pages/doctor/DoctorPatientRecords';
+import DoctorAuditLogs from './pages/doctor/DoctorAuditLogs';
 
 // Nurse pages
 import NurseDashboard from './pages/nurse/NurseDashboard';
 import NurseProfile from './pages/nurse/NurseProfile';
+import NurseCreateRecord from './pages/nurse/NurseCreateRecord';
+import NurseRecords from './pages/nurse/NurseRecords';
+import NurseAuditLogs from './pages/nurse/NurseAuditLogs';
 
 // Hospital pages
 import HospitalDashboard from './pages/hospital/HospitalDashboard';
 import HospitalProfile from './pages/hospital/HospitalProfile';
+import HospitalDoctors from './pages/hospital/HospitalDoctors';
+import HospitalNurses from './pages/hospital/HospitalNurses';
+import HospitalAuditLogs from './pages/hospital/HospitalAuditLogs';
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -79,6 +90,22 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/patient/health-analytics" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <PatientHealthAnalytics />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/patient/activity-logs" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <PatientActivityLogs />
+              </ProtectedRoute>
+            } 
+          />
 
           {/* Doctor Routes */}
           <Route 
@@ -94,6 +121,30 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['doctor']}>
                 <DoctorProfile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/doctor/patients" 
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorPatients />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/doctor/patient-records/:patientId" 
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorPatientRecords />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/doctor/audit-logs" 
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorAuditLogs />
               </ProtectedRoute>
             } 
           />
@@ -115,6 +166,30 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/nurse/create-record" 
+            element={
+              <ProtectedRoute allowedRoles={['nurse']}>
+                <NurseCreateRecord />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/nurse/records" 
+            element={
+              <ProtectedRoute allowedRoles={['nurse']}>
+                <NurseRecords />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/nurse/audit-logs" 
+            element={
+              <ProtectedRoute allowedRoles={['nurse']}>
+                <NurseAuditLogs />
+              </ProtectedRoute>
+            } 
+          />
 
           {/* Hospital Routes */}
           <Route 
@@ -130,6 +205,30 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['hospital']}>
                 <HospitalProfile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hospital/doctors" 
+            element={
+              <ProtectedRoute allowedRoles={['hospital']}>
+                <HospitalDoctors />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hospital/nurses" 
+            element={
+              <ProtectedRoute allowedRoles={['hospital']}>
+                <HospitalNurses />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hospital/audit-logs" 
+            element={
+              <ProtectedRoute allowedRoles={['hospital']}>
+                <HospitalAuditLogs />
               </ProtectedRoute>
             } 
           />

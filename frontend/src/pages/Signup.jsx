@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Signup = () => {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const { signup, isAuthenticated, loading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,6 +38,9 @@ const Signup = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingState, setPendingState] = useState({ isPending: false, message: '', role: '' });
+
+  if (authLoading) return null;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   const handleChange = (e) => {
     setFormData({
@@ -120,7 +123,7 @@ const Signup = () => {
       nurse: '👩‍⚕️'
     };
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-purple-800 p-5">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-purple-600 to-purple-800 p-5">
         <div className="bg-white rounded-xl shadow-2xl p-10 w-full max-w-lg text-center">
           <div className="text-6xl mb-4">{icons[pendingState.role] || '✅'}</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-3">Account Submitted!</h2>
@@ -144,7 +147,7 @@ const Signup = () => {
           </div>
           <Link
             to="/login"
-            className="inline-block w-full py-3 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+            className="inline-block w-full py-3 bg-linear-to-r from-purple-600 to-purple-800 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
           >
             Go to Login
           </Link>
@@ -154,7 +157,7 @@ const Signup = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-purple-800 p-5 py-10">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-purple-600 to-purple-800 p-5 py-10">
       <div className="bg-white rounded-xl shadow-2xl p-10 w-full max-w-2xl my-8">
         <div className="text-center mb-8">
           <h1 className="text-purple-600 text-3xl font-bold mb-2">Health Record Management System</h1>
@@ -657,7 +660,7 @@ const Signup = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg text-base font-semibold hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-3"
+            className="w-full py-3.5 bg-linear-to-r from-purple-600 to-purple-800 text-white rounded-lg text-base font-semibold hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-3"
           >
             {loading ? 'Creating Account...' : 'Sign Up'}
           </button>

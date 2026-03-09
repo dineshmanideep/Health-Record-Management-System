@@ -10,6 +10,8 @@ const PatientAccessOTP = require('../models/PatientAccessOTP');
 const DoctorAccess = require('../models/DoctorAccess');
 const MedicalRecord = require('../models/MedicalRecord');
 const ActivityLog = require('../models/ActivityLog');
+const Notification = require('../models/Notification');
+const HospitalAuditLog = require('../models/HospitalAuditLog');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'doctor' role.
@@ -22,6 +24,37 @@ router.use(authorize('doctor'));
 router.get('/profile', async (req, res) => {
   try {
     res.json({ success: true, data: req.user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/doctor/dashboard
+// @desc    Get dashboard summary for this doctor
+router.get('/dashboard', async (req, res) => {
+  try {
+    const patientCount = await DoctorAccess.countDocuments({ doctor: req.user._id, isActive: true });
+    const affiliationCount = await HospitalAffiliation.countDocuments({ staffId: req.user._id, staffRole: 'doctor', status: 'active' });
+    const recordCount = await MedicalRecord.countDocuments({ doctor: req.user._id });
+
+    // Recent patients (last 5)
+    const recentPatients = await DoctorAccess.find({ doctor: req.user._id, isActive: true })
+      .sort({ grantedAt: -1 })
+      .limit(5)
+      .populate('patient', 'name email phone dateOfBirth gender bloodGroup');
+
+    // Recent records
+    const recentRecords = await MedicalRecord.find({ doctor: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('patient', 'name')
+      .populate('hospital', 'name')
+      .lean();
+
+    res.json({
+      success: true,
+      data: { patientCount, affiliationCount, recordCount, recentPatients, recentRecords }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -104,6 +137,9 @@ router.post('/affiliate', async (req, res) => {
     await HospitalOTP.findByIdAndUpdate(otpRecord._id, { used: true, usedBy: req.user._id });
 
     const hospital = await Hospital.findById(otpRecord.hospitalId).select('name address');
+
+    HospitalAuditLog.create({ hospital: otpRecord.hospitalId, action: 'doctor_joined', performedBy: { id: req.user._id, role: 'doctor', name: req.user.name }, details: `Dr. ${req.user.name} joined the hospital` });
+
     res.status(201).json({ success: true, data: affiliation, hospital });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Server error' });
@@ -194,6 +230,14 @@ router.post('/patient-access/verify-otp', async (req, res) => {
       details: `Dr. ${req.user.name} granted access via OTP`
     }).catch(() => {});
 
+    // Notify patient
+    Notification.create({
+      user: patient._id,
+      type: 'doctor_access_granted',
+      title: 'Doctor Access Granted',
+      message: `Dr. ${req.user.name} now has access to your medical records.`
+    }).catch(() => {});
+
     res.json({ success: true, message: 'Access granted', data: { patientName: patient.name } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Server error' });
@@ -243,7 +287,115 @@ router.get('/my-patients', async (req, res) => {
       .populate('patient', 'name email phone dateOfBirth gender bloodGroup')
       .lean();
 
-    res.json({ success: true, data: accessList });
+    // For each patient, get last visit date
+    const enriched = await Promise.all(
+      accessList.map(async (a) => {
+        const lastRecord = await MedicalRecord.findOne({ patient: a.patient._id, doctor: req.user._id })
+          .sort({ visitDate: -1 })
+          .select('visitDate hospital')
+          .populate('hospital', 'name')
+          .lean();
+        return {
+          ...a,
+          lastVisitDate: lastRecord?.visitDate || null,
+          lastHospital: lastRecord?.hospital?.name || null
+        };
+      })
+    );
+
+    res.json({ success: true, data: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/doctor/patient-access/verify-qr
+// @desc    Doctor scans QR code to gain access to patient records
+router.post('/patient-access/verify-qr', async (req, res) => {
+  try {
+    const { qrToken } = req.body;
+    if (!qrToken) {
+      return res.status(400).json({ success: false, message: 'QR token is required' });
+    }
+
+    // Find the patient whose HMAC token matches
+    const users = await User.find({ role: 'user' }).select('_id name');
+    let matchedPatient = null;
+    const secret = process.env.JWT_SECRET || 'default_secret';
+
+    for (const u of users) {
+      const expectedToken = crypto.createHmac('sha256', secret).update(u._id.toString()).digest('hex');
+      if (expectedToken === qrToken) {
+        matchedPatient = u;
+        break;
+      }
+    }
+
+    if (!matchedPatient) {
+      return res.status(404).json({ success: false, message: 'Invalid QR code' });
+    }
+
+    // Create or reactivate DoctorAccess
+    let access = await DoctorAccess.findOne({ patient: matchedPatient._id, doctor: req.user._id });
+    if (access) {
+      access.isActive = true;
+      access.accessMethod = 'qr';
+      access.grantedAt = new Date();
+      access.revokedAt = undefined;
+      await access.save();
+    } else {
+      access = await DoctorAccess.create({
+        patient: matchedPatient._id,
+        doctor: req.user._id,
+        accessMethod: 'qr'
+      });
+    }
+
+    await Doctor.findByIdAndUpdate(req.user._id, { $addToSet: { patients: matchedPatient._id } });
+
+    ActivityLog.create({
+      patient: matchedPatient._id,
+      action: 'doctor_access_granted',
+      performedBy: { id: req.user._id, role: 'doctor', name: req.user.name },
+      details: `Dr. ${req.user.name} granted access via QR code`
+    }).catch(() => {});
+
+    Notification.create({
+      user: matchedPatient._id,
+      type: 'doctor_access_granted',
+      title: 'Doctor Access Granted',
+      message: `Dr. ${req.user.name} now has access to your medical records (via QR code).`
+    }).catch(() => {});
+
+    res.json({ success: true, message: 'Access granted via QR code', data: { patientName: matchedPatient.name } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+// @route   GET /api/doctor/audit-logs
+// @desc    Get activity logs related to this doctor's patients
+router.get('/audit-logs', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    // Get all patient IDs the doctor has access to
+    const accessList = await DoctorAccess.find({ doctor: req.user._id }).select('patient');
+    const patientIds = accessList.map((a) => a.patient);
+
+    const [logs, total] = await Promise.all([
+      ActivityLog.find({ patient: { $in: patientIds } })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('patient', 'name')
+        .lean(),
+      ActivityLog.countDocuments({ patient: { $in: patientIds } })
+    ]);
+
+    res.json({ success: true, data: logs, total, page, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

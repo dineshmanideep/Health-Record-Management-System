@@ -13,7 +13,10 @@ const PatientMedicalRecords = () => {
 
   // Self-record form state
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ title: '', description: '', documentPath: '', recordDate: '' });
+  const [formData, setFormData] = useState({ title: '', description: '', recordDate: '' });
+  const [formFile, setFormFile] = useState(null);
+  const [formLink, setFormLink] = useState('');
+  const [docMode, setDocMode] = useState('file'); // 'file' | 'link'
   const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
@@ -39,13 +42,32 @@ const PatientMedicalRecords = () => {
 
   const handleCreateSelfRecord = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.documentPath) return;
+    if (!formData.title) return;
+    if (docMode === 'file' && !formFile) { alert('Please select a file to upload.'); return; }
+    if (docMode === 'link' && !formLink.trim()) { alert('Please enter a document link.'); return; }
     setFormLoading(true);
     try {
-      const res = await patientService.createSelfRecord(formData);
+      let res;
+      if (docMode === 'file') {
+        const fd = new FormData();
+        fd.append('title', formData.title);
+        fd.append('description', formData.description);
+        fd.append('recordDate', formData.recordDate);
+        fd.append('document', formFile);
+        res = await patientService.createSelfRecord(fd);
+      } else {
+        res = await patientService.createSelfRecordLink({
+          title: formData.title,
+          description: formData.description,
+          recordDate: formData.recordDate,
+          documentPath: formLink.trim()
+        });
+      }
       if (res.success) {
         setSelfRecords([res.data, ...selfRecords]);
-        setFormData({ title: '', description: '', documentPath: '', recordDate: '' });
+        setFormData({ title: '', description: '', recordDate: '' });
+        setFormFile(null);
+        setFormLink('');
         setShowForm(false);
       }
     } catch {
@@ -130,6 +152,19 @@ const PatientMedicalRecords = () => {
                         <div>
                           <span className="font-semibold text-gray-600 block mb-1">Prescription Notes:</span>
                           <p className="bg-gray-50 p-3 rounded text-sm">{selectedRecord.prescriptionNotes}</p>
+                        </div>
+                      )}
+                      {selectedRecord.prescriptionDocument && (
+                        <div>
+                          <span className="font-semibold text-gray-600 block mb-1">Prescription Document:</span>
+                          <a
+                            href={selectedRecord.prescriptionDocument}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-800 font-medium text-sm bg-purple-50 px-4 py-2 rounded-lg"
+                          >
+                            📄 View / Download Document
+                          </a>
                         </div>
                       )}
                       {selectedRecord.medications?.length > 0 && (
@@ -269,15 +304,52 @@ const PatientMedicalRecords = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Document URL / Path *</label>
-                    <input
-                      type="text"
-                      value={formData.documentPath}
-                      onChange={(e) => setFormData({ ...formData, documentPath: e.target.value })}
-                      placeholder="e.g., https://example.com/report.pdf"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      required
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Document *</label>
+                    {/* Toggle */}
+                    <div className="flex gap-1 mb-3 bg-gray-200 rounded-lg p-1 w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setDocMode('file')}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors border-none cursor-pointer ${
+                          docMode === 'file' ? 'bg-white text-purple-700 shadow-sm' : 'bg-transparent text-gray-500'
+                        }`}
+                      >
+                        📁 Upload File
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDocMode('link')}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors border-none cursor-pointer ${
+                          docMode === 'link' ? 'bg-white text-purple-700 shadow-sm' : 'bg-transparent text-gray-500'
+                        }`}
+                      >
+                        🔗 Paste Link
+                      </button>
+                    </div>
+
+                    {docMode === 'file' ? (
+                      <div>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => setFormFile(e.target.files[0] || null)}
+                          className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG — max 5 MB</p>
+                        {formFile && <p className="text-xs text-green-600 mt-1">✓ {formFile.name}</p>}
+                      </div>
+                    ) : (
+                      <div>
+                        <input
+                          type="url"
+                          value={formLink}
+                          onChange={(e) => setFormLink(e.target.value)}
+                          placeholder="https://drive.google.com/... or any document URL"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Google Drive, Dropbox, OneDrive, or any public link</p>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Record Date</label>
@@ -309,7 +381,15 @@ const PatientMedicalRecords = () => {
                         {r.description && <p className="text-sm text-gray-500 mt-1">{r.description}</p>}
                         <p className="text-xs text-gray-400 mt-1">Uploaded: {formatDate(r.createdAt)} | Record Date: {formatDate(r.recordDate)}</p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-3">
+                        <a
+                          href={r.documentPath}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-purple-600 hover:text-purple-800 font-medium text-sm"
+                        >
+                          📄 View
+                        </a>
                         <button
                           onClick={() => handleDeleteSelfRecord(r._id)}
                           className="text-red-600 hover:text-red-800 font-medium bg-transparent border-none cursor-pointer text-sm"
