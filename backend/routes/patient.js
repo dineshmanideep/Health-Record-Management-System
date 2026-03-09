@@ -1,0 +1,322 @@
+const express = require('express');
+const crypto = require('crypto');
+const router = express.Router();
+const User = require('../models/User');
+const MedicalRecord = require('../models/MedicalRecord');
+const SelfRecord = require('../models/SelfRecord');
+const DoctorAccess = require('../models/DoctorAccess');
+const PatientAccessOTP = require('../models/PatientAccessOTP');
+const ActivityLog = require('../models/ActivityLog');
+const Doctor = require('../models/Doctor');
+const Hospital = require('../models/Hospital');
+const { protect, authorize } = require('../middleware/auth');
+
+// All routes below require a valid JWT AND the 'user' (patient) role.
+router.use(protect);
+router.use(authorize('user'));
+
+// ---------- helpers ----------
+function logActivity(patient, action, performedBy, details) {
+  ActivityLog.create({ patient, action, performedBy, details }).catch(() => {});
+}
+
+// ==================== PROFILE ====================
+
+// @route   GET /api/patient/profile
+router.get('/profile', async (req, res) => {
+  try {
+    res.json({ success: true, data: req.user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/patient/profile
+router.put('/profile', async (req, res) => {
+  try {
+    const allowed = ['name', 'phone', 'dateOfBirth', 'gender', 'address', 'bloodGroup', 'emergencyContact'];
+    const updates = {};
+    allowed.forEach((field) => {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    });
+
+    const updated = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    logActivity(req.user._id, 'profile_updated', { id: req.user._id, role: 'user', name: req.user.name }, 'Profile updated');
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+// ==================== DASHBOARD SUMMARY ====================
+
+// @route   GET /api/patient/dashboard
+router.get('/dashboard', async (req, res) => {
+  try {
+    const patientId = req.user._id;
+
+    const [recordCount, selfRecordCount, trustedDoctorCount, upcomingReminders] = await Promise.all([
+      MedicalRecord.countDocuments({ patient: patientId }),
+      SelfRecord.countDocuments({ patient: patientId }),
+      DoctorAccess.countDocuments({ patient: patientId, isActive: true }),
+      MedicalRecord.find({
+        patient: patientId,
+        nextVisitDate: { $gte: new Date() }
+      })
+        .sort({ nextVisitDate: 1 })
+        .limit(5)
+        .populate('doctor', 'name specialization')
+        .populate('hospital', 'name')
+        .select('nextVisitDate doctor hospital diagnosis')
+        .lean()
+    ]);
+
+    const recentRecords = await MedicalRecord.find({ patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('doctor', 'name specialization')
+      .populate('hospital', 'name')
+      .select('visitDate diagnosis doctor hospital createdAt')
+      .lean();
+
+    const recentActivity = await ActivityLog.find({ patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    res.json({
+      success: true,
+      data: {
+        recordCount,
+        selfRecordCount,
+        trustedDoctorCount,
+        upcomingReminders,
+        recentRecords,
+        recentActivity
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== MEDICAL RECORDS ====================
+
+// @route   GET /api/patient/records
+// @desc    Get all hospital-created medical records, grouped by hospital
+router.get('/records', async (req, res) => {
+  try {
+    const records = await MedicalRecord.find({ patient: req.user._id })
+      .sort({ visitDate: -1 })
+      .populate('doctor', 'name specialization')
+      .populate('nurse', 'name')
+      .populate('hospital', 'name')
+      .lean();
+
+    // Group by hospital
+    const grouped = {};
+    records.forEach((r) => {
+      const hId = r.hospital?._id?.toString() || 'unknown';
+      if (!grouped[hId]) {
+        grouped[hId] = { hospital: r.hospital, records: [] };
+      }
+      grouped[hId].records.push(r);
+    });
+
+    res.json({ success: true, data: Object.values(grouped) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/patient/records/:id
+router.get('/records/:id', async (req, res) => {
+  try {
+    const record = await MedicalRecord.findOne({ _id: req.params.id, patient: req.user._id })
+      .populate('doctor', 'name specialization qualification')
+      .populate('nurse', 'name')
+      .populate('hospital', 'name')
+      .lean();
+
+    if (!record) {
+      return res.status(404).json({ success: false, message: 'Record not found' });
+    }
+
+    res.json({ success: true, data: record });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== SELF-UPLOADED RECORDS ====================
+
+// @route   GET /api/patient/self-records
+router.get('/self-records', async (req, res) => {
+  try {
+    const records = await SelfRecord.find({ patient: req.user._id }).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, data: records });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/patient/self-records
+router.post('/self-records', async (req, res) => {
+  try {
+    const { title, description, documentPath, recordDate } = req.body;
+    if (!title || !documentPath) {
+      return res.status(400).json({ success: false, message: 'Title and document are required' });
+    }
+
+    const record = await SelfRecord.create({
+      patient: req.user._id,
+      title,
+      description,
+      documentPath,
+      recordDate: recordDate || Date.now()
+    });
+
+    logActivity(req.user._id, 'self_record_uploaded', { id: req.user._id, role: 'user', name: req.user.name }, `Uploaded self-record: ${title}`);
+
+    res.status(201).json({ success: true, data: record });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+// @route   DELETE /api/patient/self-records/:id
+router.delete('/self-records/:id', async (req, res) => {
+  try {
+    const record = await SelfRecord.findOneAndDelete({ _id: req.params.id, patient: req.user._id });
+    if (!record) {
+      return res.status(404).json({ success: false, message: 'Record not found' });
+    }
+
+    logActivity(req.user._id, 'self_record_deleted', { id: req.user._id, role: 'user', name: req.user.name }, `Deleted self-record: ${record.title}`);
+
+    res.json({ success: true, message: 'Record deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== DOCTOR ACCESS / TRUSTED DOCTORS ====================
+
+// @route   POST /api/patient/access/generate-otp
+// @desc    Generate OTP that patient shares with doctor to grant access
+router.post('/access/generate-otp', async (req, res) => {
+  try {
+    const plainOTP = String(Math.floor(100000 + Math.random() * 900000));
+    const otpHash = crypto.createHash('sha256').update(plainOTP).digest('hex');
+
+    await PatientAccessOTP.create({
+      patient: req.user._id,
+      otpHash,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    });
+
+    res.json({ success: true, data: { otp: plainOTP, expiresInMinutes: 10 } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/patient/trusted-doctors
+router.get('/trusted-doctors', async (req, res) => {
+  try {
+    const accessList = await DoctorAccess.find({ patient: req.user._id, isActive: true })
+      .populate('doctor', 'name specialization qualification email phone')
+      .lean();
+
+    res.json({ success: true, data: accessList });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/patient/revoke-access/:doctorId
+router.patch('/revoke-access/:doctorId', async (req, res) => {
+  try {
+    const access = await DoctorAccess.findOneAndUpdate(
+      { patient: req.user._id, doctor: req.params.doctorId, isActive: true },
+      { isActive: false, revokedAt: new Date() },
+      { new: true }
+    ).populate('doctor', 'name');
+
+    if (!access) {
+      return res.status(404).json({ success: false, message: 'Active access not found for this doctor' });
+    }
+
+    logActivity(req.user._id, 'doctor_access_revoked', { id: req.user._id, role: 'user', name: req.user.name }, `Revoked access for Dr. ${access.doctor?.name}`);
+
+    res.json({ success: true, message: 'Doctor access revoked' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== HEALTH ANALYTICS ====================
+
+// @route   GET /api/patient/health-analytics
+// @desc    Aggregate health metrics from all medical records for trend graphs
+router.get('/health-analytics', async (req, res) => {
+  try {
+    const records = await MedicalRecord.find({
+      patient: req.user._id,
+      $or: [
+        { 'healthMetrics.bloodSugar': { $exists: true } },
+        { 'healthMetrics.bloodPressureSystolic': { $exists: true } },
+        { 'healthMetrics.thyroidTSH': { $exists: true } },
+        { 'healthMetrics.heartRate': { $exists: true } },
+        { 'healthMetrics.weight': { $exists: true } }
+      ]
+    })
+      .sort({ visitDate: 1 })
+      .select('visitDate healthMetrics')
+      .lean();
+
+    res.json({ success: true, data: records });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== ACTIVITY LOGS ====================
+
+// @route   GET /api/patient/activity-logs
+router.get('/activity-logs', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const [logs, total] = await Promise.all([
+      ActivityLog.find({ patient: req.user._id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      ActivityLog.countDocuments({ patient: req.user._id })
+    ]);
+
+    res.json({
+      success: true,
+      data: logs,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+module.exports = router;

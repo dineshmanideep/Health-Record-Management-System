@@ -55,7 +55,7 @@ const hospitalSchema = new mongoose.Schema({
       required: true
     }
   },
-  type: {
+  hospitalType: {
     type: String,
     enum: ['Government', 'Private', 'Semi-Government'],
     required: true
@@ -86,14 +86,6 @@ const hospitalSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  doctors: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Doctor'
-  }],
-  nurses: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Nurse'
-  }],
   profileImage: {
     type: String,
     default: 'default-hospital.png'
@@ -110,9 +102,10 @@ const hospitalSchema = new mongoose.Schema({
     min: 0,
     max: 5
   },
-  isActive: {
-    type: Boolean,
-    default: true
+  accountStatus: {
+    type: String,
+    enum: ['pending_approval', 'active', 'rejected', 'suspended'],
+    default: 'pending_approval'
   }
 }, {
   timestamps: true

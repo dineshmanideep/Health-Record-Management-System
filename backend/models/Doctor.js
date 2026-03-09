@@ -45,10 +45,6 @@ const doctorSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  hospitalAffiliation: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Hospital'
-  },
   department: {
     type: String
   },
@@ -72,9 +68,10 @@ const doctorSchema = new mongoose.Schema({
     type: String,
     default: 'default-doctor.png'
   },
-  isActive: {
-    type: Boolean,
-    default: true
+  accountStatus: {
+    type: String,
+    enum: ['pending_verification', 'verified', 'suspended'],
+    default: 'pending_verification'
   },
   rating: {
     type: Number,

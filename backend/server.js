@@ -16,6 +16,13 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 
+// Role-protected routes — each file applies protect + authorize internally
+app.use('/api/patient', require('./routes/patient'));
+app.use('/api/doctor', require('./routes/doctor'));
+app.use('/api/nurse', require('./routes/nurse'));
+app.use('/api/hospital', require('./routes/hospital'));
+app.use('/api/admin', require('./routes/admin'));
+
 // Health check route
 app.get('/api/health', (req, res) => {
   res.json({ 

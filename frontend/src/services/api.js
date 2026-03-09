@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5001/api';
 
 // Create axios instance
 const api = axios.create({
@@ -10,7 +10,7 @@ const api = axios.create({
   }
 });
 
-// Add token to requests if available
+// Attach JWT to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -19,7 +19,26 @@ api.interceptors.request.use(
     }
     return config;
   },
+  (error) => Promise.reject(error)
+);
+
+// Handle 401 / 403 responses globally
+// 401 → token missing/expired → force logout and redirect to login
+// 403 → valid token but wrong role → redirect to /unauthorized
+//   (skipped for /auth/* endpoints so login can show user-friendly status messages)
+api.interceptors.response.use(
+  (response) => response,
   (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    const isAuthEndpoint = url.includes('/auth/');
+    if (status === 401 && !isAuthEndpoint) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    } else if (status === 403 && !isAuthEndpoint) {
+      window.location.href = '/unauthorized';
+    }
     return Promise.reject(error);
   }
 );
@@ -28,7 +47,8 @@ api.interceptors.request.use(
 export const authService = {
   signup: async (userData) => {
     const response = await api.post('/auth/signup', userData);
-    if (response.data.success && response.data.data.token) {
+    // Only persist token for patients (immediate active accounts)
+    if (response.data.success && !response.data.pending && response.data.data?.token) {
       localStorage.setItem('token', response.data.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.data));
     }
@@ -54,9 +74,91 @@ export const authService = {
     return userStr ? JSON.parse(userStr) : null;
   },
 
-  getToken: () => {
-    return localStorage.getItem('token');
+  getToken: () => localStorage.getItem('token'),
+
+  // Verify token is still valid and fetch fresh user data from the server
+  verifyToken: async () => {
+    const response = await api.get('/auth/me');
+    return response.data;
   }
+};
+
+// Profile API calls — each method is authorized by role on the backend
+export const profileService = {
+  patient: {
+    get: () => api.get('/patient/profile').then((r) => r.data),
+    update: (data) => api.put('/patient/profile', data).then((r) => r.data)
+  },
+  doctor: {
+    get: () => api.get('/doctor/profile').then((r) => r.data),
+    update: (data) => api.put('/doctor/profile', data).then((r) => r.data),
+    getAffiliations: () => api.get('/doctor/affiliations').then((r) => r.data),
+    affiliate: (otp, department) => api.post('/doctor/affiliate', { otp, department }).then((r) => r.data)
+  },
+  nurse: {
+    get: () => api.get('/nurse/profile').then((r) => r.data),
+    update: (data) => api.put('/nurse/profile', data).then((r) => r.data),
+    getAffiliations: () => api.get('/nurse/affiliations').then((r) => r.data),
+    affiliate: (otp, department) => api.post('/nurse/affiliate', { otp, department }).then((r) => r.data)
+  },
+  hospital: {
+    get: () => api.get('/hospital/profile').then((r) => r.data),
+    update: (data) => api.put('/hospital/profile', data).then((r) => r.data),
+    generateOTP: (targetRole) => api.post('/hospital/otp/generate', { targetRole }).then((r) => r.data),
+    getAffiliations: () => api.get('/hospital/affiliations').then((r) => r.data)
+  },
+  admin: {
+    get: () => api.get('/admin/profile').then((r) => r.data),
+    update: (data) => api.put('/admin/profile', data).then((r) => r.data),
+    listUsers: () => api.get('/admin/users').then((r) => r.data),
+    listDoctors: () => api.get('/admin/doctors').then((r) => r.data),
+    listHospitals: () => api.get('/admin/hospitals').then((r) => r.data),
+    listNurses: () => api.get('/admin/nurses').then((r) => r.data)
+  }
+};
+
+// Patient service — dashboard, records, self-records, doctor access, analytics, activity
+export const patientService = {
+  // Dashboard summary
+  getDashboard: () => api.get('/patient/dashboard').then((r) => r.data),
+  // Hospital medical records
+  getRecords: () => api.get('/patient/records').then((r) => r.data),
+  getRecord: (id) => api.get(`/patient/records/${id}`).then((r) => r.data),
+  // Self-uploaded records
+  getSelfRecords: () => api.get('/patient/self-records').then((r) => r.data),
+  createSelfRecord: (data) => api.post('/patient/self-records', data).then((r) => r.data),
+  deleteSelfRecord: (id) => api.delete(`/patient/self-records/${id}`).then((r) => r.data),
+  // Doctor access
+  generateAccessOTP: () => api.post('/patient/access/generate-otp').then((r) => r.data),
+  getTrustedDoctors: () => api.get('/patient/trusted-doctors').then((r) => r.data),
+  revokeDoctorAccess: (doctorId) => api.patch(`/patient/revoke-access/${doctorId}`).then((r) => r.data),
+  // Health analytics
+  getHealthAnalytics: () => api.get('/patient/health-analytics').then((r) => r.data),
+  // Activity logs
+  getActivityLogs: (page, limit) => api.get(`/patient/activity-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data)
+};
+
+// Admin approval / verification service
+export const adminService = {
+  // Hospitals
+  getAllHospitals: (status) => api.get(`/admin/hospitals${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  getPendingHospitals: () => api.get('/admin/pending/hospitals').then((r) => r.data),
+  approveHospital: (id) => api.patch(`/admin/hospitals/${id}/approve`).then((r) => r.data),
+  rejectHospital: (id) => api.patch(`/admin/hospitals/${id}/reject`).then((r) => r.data),
+  suspendHospital: (id) => api.patch(`/admin/hospitals/${id}/suspend`).then((r) => r.data),
+  reactivateHospital: (id) => api.patch(`/admin/hospitals/${id}/reactivate`).then((r) => r.data),
+  // Doctors
+  getAllDoctors: (status) => api.get(`/admin/doctors${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  getPendingDoctors: () => api.get('/admin/pending/doctors').then((r) => r.data),
+  verifyDoctor: (id) => api.patch(`/admin/doctors/${id}/verify`).then((r) => r.data),
+  suspendDoctor: (id) => api.patch(`/admin/doctors/${id}/suspend`).then((r) => r.data),
+  reinstateDoctor: (id) => api.patch(`/admin/doctors/${id}/reinstate`).then((r) => r.data),
+  // Nurses
+  getAllNurses: (status) => api.get(`/admin/nurses${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  getPendingNurses: () => api.get('/admin/pending/nurses').then((r) => r.data),
+  verifyNurse: (id) => api.patch(`/admin/nurses/${id}/verify`).then((r) => r.data),
+  suspendNurse: (id) => api.patch(`/admin/nurses/${id}/suspend`).then((r) => r.data),
+  reinstateNurse: (id) => api.patch(`/admin/nurses/${id}/reinstate`).then((r) => r.data)
 };
 
 export default api;

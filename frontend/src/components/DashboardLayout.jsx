@@ -7,7 +7,7 @@ const DashboardLayout = ({ children, title }) => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate('/login', { replace: true });
   };
 
   const getRoleName = (role) => {
@@ -53,9 +53,6 @@ const DashboardLayout = ({ children, title }) => {
               <Link to="/patient/records" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
                 <span className="text-xl">📋</span> Medical Records
               </Link>
-              <Link to="/patient/appointments" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">📅</span> Appointments
-              </Link>
             </>
           )}
           {user?.role === 'doctor' && (
@@ -93,11 +90,14 @@ const DashboardLayout = ({ children, title }) => {
           )}
           {user?.role === 'admin' && (
             <>
-              <Link to="/admin/users" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">👥</span> Manage Users
-              </Link>
               <Link to="/admin/hospitals" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">🏥</span> Hospitals
+                <span className="text-xl">🏥</span> Manage Hospitals
+              </Link>
+              <Link to="/admin/doctors" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">⚕️</span> Manage Doctors
+              </Link>
+              <Link to="/admin/nurses" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">👩‍⚕️</span> Manage Nurses
               </Link>
               <Link to="/admin/reports" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
                 <span className="text-xl">📊</span> Reports
@@ -118,7 +118,7 @@ const DashboardLayout = ({ children, title }) => {
             </div>
             <button
               onClick={handleLogout}
-              className="bg-red-500 text-white px-5 py-2.5 rounded-md font-semibold hover:bg-red-600 transition-colors border-none cursor-pointer"
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               Logout
             </button>

@@ -12,6 +12,7 @@ import Unauthorized from './pages/Unauthorized';
 // Patient pages
 import PatientDashboard from './pages/patient/PatientDashboard';
 import PatientProfile from './pages/patient/PatientProfile';
+import PatientMedicalRecords from './pages/patient/PatientMedicalRecords';
 
 // Doctor pages
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
@@ -28,6 +29,9 @@ import HospitalProfile from './pages/hospital/HospitalProfile';
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProfile from './pages/admin/AdminProfile';
+import AdminHospitals from './pages/admin/AdminHospitals';
+import AdminDoctors from './pages/admin/AdminDoctors';
+import AdminNurses from './pages/admin/AdminNurses';
 
 function App() {
   return (
@@ -64,6 +68,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['user']}>
                 <PatientProfile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/patient/records" 
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <PatientMedicalRecords />
               </ProtectedRoute>
             } 
           />
@@ -139,9 +151,40 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/admin/hospitals" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminHospitals />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/doctors" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDoctors />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/nurses" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminNurses />
+              </ProtectedRoute>
+            } 
+          />
 
-          {/* Catch all - redirect to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Catch-all: unknown paths within known role spaces → redirect to that role's dashboard */}
+          <Route path="/patient/*" element={<ProtectedRoute allowedRoles={['user']}><Navigate to="/patient/dashboard" replace /></ProtectedRoute>} />
+          <Route path="/doctor/*" element={<ProtectedRoute allowedRoles={['doctor']}><Navigate to="/doctor/dashboard" replace /></ProtectedRoute>} />
+          <Route path="/nurse/*" element={<ProtectedRoute allowedRoles={['nurse']}><Navigate to="/nurse/dashboard" replace /></ProtectedRoute>} />
+          <Route path="/hospital/*" element={<ProtectedRoute allowedRoles={['hospital']}><Navigate to="/hospital/dashboard" replace /></ProtectedRoute>} />
+          <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['admin']}><Navigate to="/admin/dashboard" replace /></ProtectedRoute>} />
+
+          {/* Final catch-all → role-aware redirect via /dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
     </Router>

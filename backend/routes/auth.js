@@ -6,11 +6,12 @@ const Doctor = require('../models/Doctor');
 const Hospital = require('../models/Hospital');
 const Nurse = require('../models/Nurse');
 const Admin = require('../models/Admin');
+const { protect } = require('../middleware/auth');
 
 // Generate JWT Token
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, {
-    expiresIn: '30d'
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h'
   });
 };
 
@@ -33,31 +34,31 @@ const getModelByRole = (role) => {
 };
 
 // @route   POST /api/auth/signup
-// @desc    Register a new user (any role)
+// @desc    Register a new user — patient, doctor, nurse, or hospital only
 // @access  Public
 router.post('/signup', async (req, res) => {
   try {
     const { role, ...userData } = req.body;
 
-    if (!role) {
-      return res.status(400).json({
+    // Admin accounts are pre-seeded — no public signup allowed
+    if (role === 'admin') {
+      return res.status(403).json({
         success: false,
-        message: 'Role is required'
+        message: 'Admin accounts cannot be created through public signup'
       });
     }
 
+    if (!role) {
+      return res.status(400).json({ success: false, message: 'Role is required' });
+    }
+
     const Model = getModelByRole(role);
-    
     if (!Model) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid role'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid role' });
     }
 
     // Check if user already exists
     const existingUser = await Model.findOne({ email: userData.email });
-    
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -65,24 +66,44 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    // Create new user
-    const user = await Model.create({
-      ...userData,
-      role
-    });
+    // Determine initial accountStatus based on role
+    const statusDefaults = {
+      hospital: { accountStatus: 'pending_approval' },
+      doctor:   { accountStatus: 'pending_verification' },
+      nurse:    { accountStatus: 'pending_verification' }
+    };
+    const extraFields = statusDefaults[role] || {};
+
+    const user = await Model.create({ ...userData, role, ...extraFields });
 
     if (user) {
-      const token = generateToken(user._id, role);
-      
-      res.status(201).json({
+      // Patient — immediately active, issue JWT
+      if (role === 'user') {
+        const token = generateToken(user._id, role);
+        return res.status(201).json({
+          success: true,
+          data: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            token
+          }
+        });
+      }
+
+      // Hospital / Doctor / Nurse — pending, no JWT issued
+      const pendingMessages = {
+        hospital: 'Your hospital registration has been submitted. An admin will review and approve your application. You will be able to log in once approved.',
+        doctor:   'Your account has been created. An admin will verify your medical license. You will be able to log in once verified.',
+        nurse:    'Your account has been created. An admin will verify your nursing license. You will be able to log in once verified.'
+      };
+
+      return res.status(201).json({
         success: true,
-        data: {
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          token
-        }
+        pending: true,
+        role,
+        message: pendingMessages[role]
       });
     }
   } catch (error) {
@@ -137,12 +158,47 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Check if user is active
-    if (user.isActive === false) {
-      return res.status(403).json({
-        success: false,
-        message: 'Account is deactivated. Please contact support.'
-      });
+    // Role-specific account status checks before issuing JWT
+    if (role === 'hospital') {
+      if (user.accountStatus === 'pending_approval') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your hospital registration is pending admin approval. You will be notified once approved.'
+        });
+      }
+      if (user.accountStatus === 'rejected') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your hospital registration was rejected. Please contact support.'
+        });
+      }
+      if (user.accountStatus === 'suspended') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your hospital account has been suspended. Please contact support.'
+        });
+      }
+    } else if (role === 'doctor' || role === 'nurse') {
+      if (user.accountStatus === 'pending_verification') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is pending admin verification. We will verify your license and notify you.'
+        });
+      }
+      if (user.accountStatus === 'suspended') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account has been suspended. Please contact support.'
+        });
+      }
+    } else {
+      // Patient and Admin use isActive boolean
+      if (user.isActive === false) {
+        return res.status(403).json({
+          success: false,
+          message: 'Account is deactivated. Please contact support.'
+        });
+      }
     }
 
     const token = generateToken(user._id, role);
@@ -167,9 +223,9 @@ router.post('/login', async (req, res) => {
 });
 
 // @route   GET /api/auth/me
-// @desc    Get current logged in user
-// @access  Private
-router.get('/me', async (req, res) => {
+// @desc    Get current logged in user (verified from DB, not just JWT payload)
+// @access  Private — requires valid JWT
+router.get('/me', protect, async (req, res) => {
   try {
     // This route would require auth middleware
     res.json({

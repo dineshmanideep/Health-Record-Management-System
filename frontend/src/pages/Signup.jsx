@@ -37,6 +37,7 @@ const Signup = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pendingState, setPendingState] = useState({ isPending: false, message: '', role: '' });
 
   const handleChange = (e) => {
     setFormData({
@@ -63,19 +64,94 @@ const Signup = () => {
 
     setLoading(true);
 
-    // Build role-specific data
-    const { confirmPassword: _, ...signupData } = formData;
-    
+    // Destructure all role-specific flat fields before building the payload
+    const {
+      confirmPassword: _,
+      address, city, state, zipCode,
+      emergencyContactName, emergencyContactPhone,
+      gender,
+      ...rest
+    } = formData;
+
+    let signupData;
+
+    if (formData.role === 'hospital') {
+      // Hospital needs nested address object
+      signupData = {
+        ...rest,
+        address: { street: address, city, state, zipCode, country: 'India' }
+      };
+    } else if (formData.role === 'user') {
+      // Patient: nested address + emergencyContact + lowercase gender
+      signupData = {
+        ...rest,
+        gender: gender ? gender.toLowerCase() : undefined,
+        address: { street: address, city, state, zipCode },
+        emergencyContact: {
+          name: emergencyContactName,
+          phone: emergencyContactPhone
+        }
+      };
+    } else {
+      // Doctor / Nurse — no address nesting needed
+      signupData = { ...rest };
+    }
+
     const result = await signup(signupData);
-    
+
     if (result.success) {
-      navigate('/dashboard');
+      if (result.pending) {
+        setPendingState({ isPending: true, message: result.message, role: formData.role });
+      } else {
+        navigate('/dashboard');
+      }
     } else {
       setError(result.message || 'Signup failed. Please try again.');
     }
-    
+
     setLoading(false);
   };
+
+  // Pending approval screen for hospital/doctor/nurse
+  if (pendingState.isPending) {
+    const icons = {
+      hospital: '🏥',
+      doctor: '👨‍⚕️',
+      nurse: '👩‍⚕️'
+    };
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-purple-800 p-5">
+        <div className="bg-white rounded-xl shadow-2xl p-10 w-full max-w-lg text-center">
+          <div className="text-6xl mb-4">{icons[pendingState.role] || '✅'}</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">Account Submitted!</h2>
+          <p className="text-gray-600 mb-6 leading-relaxed">{pendingState.message}</p>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-left">
+            <p className="text-amber-800 text-sm font-semibold">What happens next?</p>
+            {pendingState.role === 'hospital' && (
+              <ul className="text-amber-700 text-sm mt-2 space-y-1">
+                <li>• An admin will review your registration</li>
+                <li>• Once approved, you can log in and manage your staff</li>
+                <li>• You can then generate OTPs to invite doctors and nurses</li>
+              </ul>
+            )}
+            {(pendingState.role === 'doctor' || pendingState.role === 'nurse') && (
+              <ul className="text-amber-700 text-sm mt-2 space-y-1">
+                <li>• An admin will verify your license number</li>
+                <li>• Once verified, you can log in to your account</li>
+                <li>• Hospitals can then invite you to affiliate using an OTP</li>
+              </ul>
+            )}
+          </div>
+          <Link
+            to="/login"
+            className="inline-block w-full py-3 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+          >
+            Go to Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-purple-800 p-5 py-10">
@@ -108,7 +184,6 @@ const Signup = () => {
               <option value="doctor">Doctor</option>
               <option value="nurse">Nurse</option>
               <option value="hospital">Hospital</option>
-              <option value="admin">Admin</option>
             </select>
           </div>
 
@@ -544,27 +619,7 @@ const Signup = () => {
             </>
           )}
 
-          {/* Admin Specific Fields */}
-          {formData.role === 'admin' && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="accessLevel" className="block text-sm font-semibold text-gray-700">
-                  Access Level
-                </label>
-                <select
-                  id="accessLevel"
-                  name="accessLevel"
-                  value={formData.accessLevel}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="super-admin">Super Admin</option>
-                  <option value="moderator">Moderator</option>
-                </select>
-              </div>
-            </>
-          )}
+          {/* Admin Specific Fields — removed: admin accounts are pre-seeded */}
 
           {/* Password Fields */}
           <div className="space-y-2">
