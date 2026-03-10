@@ -158,13 +158,49 @@ const PatientMedicalRecords = () => {
                         <div>
                           <span className="font-semibold text-gray-600 block mb-1">Prescription Document:</span>
                           <a
-                            href={selectedRecord.prescriptionDocument}
+                            href={selectedRecord.prescriptionDocument.startsWith('http') ? selectedRecord.prescriptionDocument : `http://localhost:5001${selectedRecord.prescriptionDocument}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-800 font-medium text-sm bg-purple-50 px-4 py-2 rounded-lg"
                           >
                             📄 View / Download Document
                           </a>
+                        </div>
+                      )}
+                      {selectedRecord.prescriptionDocuments?.length > 0 && (
+                        <div>
+                          <span className="font-semibold text-gray-600 block mb-2">Prescription Documents:</span>
+                          <div className="space-y-2">
+                            {selectedRecord.prescriptionDocuments.map((doc, i) => (
+                              <a
+                                key={i}
+                                href={doc.startsWith('http') ? doc : `http://localhost:5001${doc}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-purple-600 hover:text-purple-800 font-medium text-sm bg-purple-50 px-4 py-2 rounded-lg"
+                              >
+                                📄 {doc.split('/').pop()}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedRecord.prescriptionLinks?.length > 0 && (
+                        <div>
+                          <span className="font-semibold text-gray-600 block mb-2">Prescription Links:</span>
+                          <div className="space-y-2">
+                            {selectedRecord.prescriptionLinks.map((link, i) => (
+                              <a
+                                key={i}
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium text-sm bg-blue-50 px-4 py-2 rounded-lg"
+                              >
+                                🔗 {link.length > 50 ? link.substring(0, 50) + '...' : link}
+                              </a>
+                            ))}
+                          </div>
                         </div>
                       )}
                       {selectedRecord.medications?.length > 0 && (
@@ -175,6 +211,19 @@ const PatientMedicalRecords = () => {
                               <div key={i} className="bg-blue-50 p-3 rounded text-sm">
                                 <p className="font-medium">{med.name}</p>
                                 <p className="text-gray-600">Dosage: {med.dosage} | {med.frequency} | {med.duration}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedRecord.customFields?.length > 0 && (
+                        <div>
+                          <span className="font-semibold text-gray-600 block mb-2">Additional Information:</span>
+                          <div className="space-y-2">
+                            {selectedRecord.customFields.map((cf, i) => (
+                              <div key={i} className="bg-gray-50 p-3 rounded text-sm flex justify-between">
+                                <span className="font-medium text-gray-700">{cf.fieldName}</span>
+                                <span>{cf.fieldValue}</span>
                               </div>
                             ))}
                           </div>
@@ -216,6 +265,31 @@ const PatientMedicalRecords = () => {
                             <p className="text-lg font-bold text-yellow-700">{selectedRecord.healthMetrics.weight} kg</p>
                           </div>
                         )}
+                        {selectedRecord.healthMetrics.height != null && (
+                          <div className="bg-indigo-50 p-3 rounded text-center">
+                            <p className="text-xs text-gray-500">Height</p>
+                            <p className="text-lg font-bold text-indigo-700">{selectedRecord.healthMetrics.height} cm</p>
+                          </div>
+                        )}
+                        {selectedRecord.healthMetrics.temperature != null && (
+                          <div className="bg-orange-50 p-3 rounded text-center">
+                            <p className="text-xs text-gray-500">Temperature</p>
+                            <p className="text-lg font-bold text-orange-700">{selectedRecord.healthMetrics.temperature} °F</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {selectedRecord.editHistory?.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="font-semibold text-gray-700 mb-3">Edit History</h3>
+                      <div className="space-y-2">
+                        {selectedRecord.editHistory.map((edit, i) => (
+                          <div key={i} className="bg-yellow-50 p-3 rounded text-sm">
+                            <p className="font-medium text-gray-700">{edit.summary}</p>
+                            <p className="text-gray-500 text-xs mt-1">{new Date(edit.editedAt).toLocaleString()}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

@@ -76,6 +76,9 @@ const DashboardLayout = ({ children, title }) => {
               <Link to="/nurse/create-record" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
                 <span className="text-xl">📝</span> Create Record
               </Link>
+              <Link to="/nurse/edit-record" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">✏️</span> Edit Record
+              </Link>
               <Link to="/nurse/records" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
                 <span className="text-xl">📋</span> My Records
               </Link>

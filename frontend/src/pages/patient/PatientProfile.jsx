@@ -157,6 +157,7 @@ const PatientProfile = () => {
               </form>
             ) : (
               <>
+                <Row label="Patient ID" value={profile.patientId} />
                 <Row label="Full Name" value={profile.name} />
                 <Row label="Email" value={profile.email} />
                 <Row label="Role" value="Patient" />

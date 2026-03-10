@@ -49,8 +49,17 @@ const medicalRecordSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Multiple prescription documents (file paths)
+  prescriptionDocuments: [{
+    type: String
+  }],
+  // Multiple prescription links (URLs)
+  prescriptionLinks: [{
+    type: String
+  }],
+  // Keep legacy single field for backward compat
   prescriptionDocument: {
-    type: String // file path for uploaded prescription PDF/image
+    type: String
   },
   nextVisitDate: {
     type: Date
@@ -64,7 +73,22 @@ const medicalRecordSchema = new mongoose.Schema({
     temperature: { type: Number },
     weight: { type: Number },
     height: { type: Number }
-  }
+  },
+  // Nurse-added custom fields (key-value pairs)
+  customFields: [{
+    fieldName: { type: String },
+    fieldValue: { type: String }
+  }],
+  // Edit history — tracks who edited and when (overwrites, not versions)
+  editHistory: [{
+    editedBy: {
+      id: { type: mongoose.Schema.Types.ObjectId },
+      role: { type: String },
+      name: { type: String }
+    },
+    editedAt: { type: Date, default: Date.now },
+    summary: { type: String }
+  }]
 }, {
   timestamps: true
 });

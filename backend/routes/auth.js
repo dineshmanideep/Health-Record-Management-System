@@ -87,6 +87,7 @@ router.post('/signup', async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            patientId: user.patientId,
             token
           }
         });
@@ -203,15 +204,18 @@ router.post('/login', async (req, res) => {
 
     const token = generateToken(user._id, role);
 
+    const responseData = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token
+    };
+    if (role === 'user') responseData.patientId = user.patientId;
+
     res.json({
       success: true,
-      data: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token
-      }
+      data: responseData
     });
   } catch (error) {
     console.error('Login error:', error);

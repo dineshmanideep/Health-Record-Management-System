@@ -27,6 +27,7 @@ import DoctorAuditLogs from './pages/doctor/DoctorAuditLogs';
 import NurseDashboard from './pages/nurse/NurseDashboard';
 import NurseProfile from './pages/nurse/NurseProfile';
 import NurseCreateRecord from './pages/nurse/NurseCreateRecord';
+import NurseEditRecord from './pages/nurse/NurseEditRecord';
 import NurseRecords from './pages/nurse/NurseRecords';
 import NurseAuditLogs from './pages/nurse/NurseAuditLogs';
 
@@ -171,6 +172,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['nurse']}>
                 <NurseCreateRecord />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/nurse/edit-record" 
+            element={
+              <ProtectedRoute allowedRoles={['nurse']}>
+                <NurseEditRecord />
               </ProtectedRoute>
             } 
           />

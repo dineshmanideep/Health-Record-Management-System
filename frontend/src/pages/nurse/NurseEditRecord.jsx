@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import { nurseService } from '../../services/api';
 
 const POLL_INTERVAL = 3000;
 
-const NurseCreateRecord = () => {
+const NurseEditRecord = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const recordIdParam = searchParams.get('recordId');
 
   // Step control: 'lookup' -> 'waiting' -> 'form'
   const [step, setStep] = useState('lookup');
@@ -18,6 +20,8 @@ const NurseCreateRecord = () => {
   const [patientInfo, setPatientInfo] = useState(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupMsg, setLookupMsg] = useState({ type: '', text: '' });
+  const [patientRecords, setPatientRecords] = useState([]);
+  const [selectedRecordId, setSelectedRecordId] = useState(recordIdParam || '');
 
   // Step 2: Waiting for doctor approval
   const [accessRequest, setAccessRequest] = useState(null);
@@ -36,7 +40,7 @@ const NurseCreateRecord = () => {
 
   // Form state
   const [form, setForm] = useState({
-    visitDate: new Date().toISOString().split('T')[0],
+    visitDate: '',
     diagnosis: '',
     symptoms: '',
     prescriptionNotes: '',
@@ -48,6 +52,7 @@ const NurseCreateRecord = () => {
   const [medications, setMedications] = useState([{ name: '', dosage: '', frequency: '', duration: '' }]);
   const [healthMetrics, setHealthMetrics] = useState({});
   const [customFields, setCustomFields] = useState([]);
+  const [existingDocuments, setExistingDocuments] = useState([]);
 
   // Fetch assigned doctors on mount
   useEffect(() => {
@@ -76,6 +81,10 @@ const NurseCreateRecord = () => {
     try {
       const res = await nurseService.lookupPatient(patientIdInput.trim(), selectedDoctorId);
       setPatientInfo(res.data.patient);
+      // Fetch patient records for this doctor
+      if (res.data.records) {
+        setPatientRecords(res.data.records);
+      }
       setLookupMsg({ type: 'success', text: `Patient found: ${res.data.patient.name}` });
     } catch (err) {
       setLookupMsg({ type: 'error', text: err?.response?.data?.message || 'Patient lookup failed' });
@@ -86,13 +95,14 @@ const NurseCreateRecord = () => {
   };
 
   const handleRequestAccess = async () => {
-    if (!patientInfo || !selectedDoctorId) return;
+    if (!patientInfo || !selectedDoctorId || !selectedRecordId) return;
     setLookupLoading(true);
     try {
       const res = await nurseService.requestAccess({
         patientId: patientInfo.patientId,
         doctorId: selectedDoctorId,
-        operation: 'create'
+        operation: 'edit',
+        recordId: selectedRecordId
       });
       setAccessRequest(res.data);
       setStep('waiting');
@@ -120,7 +130,7 @@ const NurseCreateRecord = () => {
           setRemainingSeconds(data.remainingSeconds);
           setExtensionRejected(data.extensionRejected || false);
 
-          // Fetch specialization fields
+          // Fetch specialization fields for doctor
           const doctor = assignedDoctors.find(d => d.doctor?._id === selectedDoctorId);
           if (doctor?.doctor?.specialization) {
             try {
@@ -128,6 +138,25 @@ const NurseCreateRecord = () => {
               setSpecializationFields(fieldRes.data || []);
             } catch { /* use empty */ }
           }
+
+          // Fetch existing record data to pre-fill
+          try {
+            const recordRes = await nurseService.getRecordForEdit(requestId);
+            const rec = recordRes.data;
+            setForm({
+              visitDate: rec.visitDate ? rec.visitDate.split('T')[0] : '',
+              diagnosis: rec.diagnosis || '',
+              symptoms: rec.symptoms || '',
+              prescriptionNotes: rec.prescriptionNotes || '',
+              recommendedTests: rec.recommendedTests || '',
+              nextVisitDate: rec.nextVisitDate ? rec.nextVisitDate.split('T')[0] : ''
+            });
+            setMedications(rec.medications?.length ? rec.medications : [{ name: '', dosage: '', frequency: '', duration: '' }]);
+            setHealthMetrics(rec.healthMetrics || {});
+            setCustomFields(rec.customFields?.length ? rec.customFields : []);
+            setPrescriptionLinks(rec.prescriptionLinks?.length ? rec.prescriptionLinks : ['']);
+            setExistingDocuments(rec.prescriptionDocuments || []);
+          } catch { /* use empty form */ }
 
           setStep('form');
           startTimer(data.remainingSeconds);
@@ -186,12 +215,12 @@ const NurseCreateRecord = () => {
 
   // ==================== FORM HANDLERS ====================
 
-  const handleFormChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handleFormChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleMetricChange = (key, value) => {
-    setHealthMetrics({ ...healthMetrics, [key]: value });
+  const handleMetricChange = (key, value) => setHealthMetrics({ ...healthMetrics, [key]: value });
+
+  const removeExistingDocument = (index) => {
+    setExistingDocuments(existingDocuments.filter((_, i) => i !== index));
   };
 
   const handleMedChange = (index, field, value) => {
@@ -231,13 +260,11 @@ const NurseCreateRecord = () => {
       setMsg({ type: 'error', text: 'Diagnosis is required' });
       return;
     }
-
     setSubmitting(true);
     setMsg({ type: '', text: '' });
 
     try {
       const formData = new FormData();
-      formData.append('accessRequestId', accessRequest._id);
       formData.append('visitDate', form.visitDate);
       formData.append('diagnosis', form.diagnosis);
       formData.append('symptoms', form.symptoms);
@@ -248,17 +275,18 @@ const NurseCreateRecord = () => {
       formData.append('healthMetrics', JSON.stringify(healthMetrics));
       formData.append('customFields', JSON.stringify(customFields.filter(f => f.fieldName.trim())));
       formData.append('prescriptionLinks', JSON.stringify(prescriptionLinks.filter(l => l.trim())));
+      formData.append('existingDocuments', JSON.stringify(existingDocuments));
 
       prescriptionFiles.forEach((file) => {
         formData.append('prescriptionFiles', file);
       });
 
-      await nurseService.submitRecord(formData);
-      setMsg({ type: 'success', text: 'Record created successfully!' });
+      await nurseService.editRecord(accessRequest._id, formData);
+      setMsg({ type: 'success', text: 'Record updated successfully!' });
       if (timerRef.current) clearInterval(timerRef.current);
       setTimeout(() => navigate('/nurse/records'), 1500);
     } catch (err) {
-      setMsg({ type: 'error', text: err?.response?.data?.message || 'Failed to submit record' });
+      setMsg({ type: 'error', text: err?.response?.data?.message || 'Failed to update record' });
     } finally {
       setSubmitting(false);
     }
@@ -274,7 +302,7 @@ const NurseCreateRecord = () => {
     return (
       <div className={`sticky top-0 z-50 px-6 py-3 flex items-center justify-between rounded-xl mb-4 shadow-md ${isExpired ? 'bg-red-600' : isLow ? 'bg-orange-500' : 'bg-green-600'} text-white`}>
         <div className="flex items-center gap-3">
-          <span className="text-2xl">{isExpired ? '\u23F0' : '\u23F1\uFE0F'}</span>
+          <span className="text-2xl">{isExpired ? '⏰' : '⏱️'}</span>
           <span className="font-bold text-lg">
             {isExpired ? 'TIME EXPIRED' : `Time Remaining: ${formatTime(remainingSeconds)}`}
           </span>
@@ -301,26 +329,26 @@ const NurseCreateRecord = () => {
   // ==================== RENDER ====================
 
   return (
-    <DashboardLayout title="Create Medical Record">
+    <DashboardLayout title="Edit Medical Record">
       <TimerBar />
 
-      {/* STEP 1: Patient Lookup */}
+      {/* STEP 1: Patient Lookup + Record Selection */}
       {step === 'lookup' && (
         <div className="bg-white p-6 rounded-xl shadow-sm max-w-2xl mx-auto">
-          <h2 className="text-xl font-semibold text-gray-800 mb-6">Step 1: Identify Patient</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">Step 1: Select Record to Edit</h2>
 
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Select Doctor</label>
               <select
                 value={selectedDoctorId}
-                onChange={(e) => { setSelectedDoctorId(e.target.value); setPatientInfo(null); setLookupMsg({ type: '', text: '' }); }}
+                onChange={(e) => { setSelectedDoctorId(e.target.value); setPatientInfo(null); setPatientRecords([]); setLookupMsg({ type: '', text: '' }); }}
                 className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600"
               >
                 <option value="">-- Select Doctor --</option>
                 {assignedDoctors.map((d) => (
                   <option key={d.doctor?._id} value={d.doctor?._id}>
-                    Dr. {d.doctor?.name} &mdash; {d.doctor?.specialization} ({d.hospitalName})
+                    Dr. {d.doctor?.name} — {d.doctor?.specialization} ({d.hospitalName})
                   </option>
                 ))}
               </select>
@@ -355,20 +383,46 @@ const NurseCreateRecord = () => {
             {patientInfo && (
               <div className="bg-purple-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-purple-800 mb-2">Patient Found</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-2 gap-2 text-sm mb-4">
                   <p><span className="text-gray-500">Name:</span> {patientInfo.name}</p>
                   <p><span className="text-gray-500">ID:</span> {patientInfo.patientId}</p>
-                  <p><span className="text-gray-500">Email:</span> {patientInfo.email}</p>
-                  <p><span className="text-gray-500">Gender:</span> {patientInfo.gender || '\u2014'}</p>
-                  <p><span className="text-gray-500">Blood Group:</span> {patientInfo.bloodGroup || '\u2014'}</p>
                 </div>
-                <button
-                  onClick={handleRequestAccess}
-                  disabled={lookupLoading}
-                  className="mt-4 w-full bg-purple-600 text-white py-2.5 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50"
-                >
-                  Request Doctor Permission to Create Record
-                </button>
+
+                {patientRecords.length > 0 ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Record to Edit</label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {patientRecords.map((rec) => (
+                        <label key={rec._id} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${selectedRecordId === rec._id ? 'bg-purple-100 border-purple-400' : 'bg-white border-gray-200'} border-2`}>
+                          <input
+                            type="radio"
+                            name="record"
+                            value={rec._id}
+                            checked={selectedRecordId === rec._id}
+                            onChange={(e) => setSelectedRecordId(e.target.value)}
+                            className="text-purple-600"
+                          />
+                          <div>
+                            <p className="font-medium text-gray-800 text-sm">{rec.diagnosis}</p>
+                            <p className="text-xs text-gray-500">{new Date(rec.visitDate || rec.createdAt).toLocaleDateString()} · {rec.hospital?.name || ''}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No editable records found for this patient under this doctor.</p>
+                )}
+
+                {selectedRecordId && (
+                  <button
+                    onClick={handleRequestAccess}
+                    disabled={lookupLoading}
+                    className="mt-4 w-full bg-purple-600 text-white py-2.5 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    Request Doctor Permission to Edit Record
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -379,13 +433,13 @@ const NurseCreateRecord = () => {
       {step === 'waiting' && (
         <div className="bg-white p-8 rounded-xl shadow-sm max-w-lg mx-auto text-center">
           <div className="animate-pulse mb-6">
-            <span className="text-6xl">{'\uD83D\uDD14'}</span>
+            <span className="text-6xl">🔔</span>
           </div>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Waiting for Doctor Approval</h2>
           <p className="text-gray-500 mb-4">
             A notification has been sent to <span className="font-semibold">Dr. {assignedDoctors.find(d => d.doctor?._id === selectedDoctorId)?.doctor?.name || 'the doctor'}</span>.
           </p>
-          <p className="text-gray-400 text-sm mb-6">This page will automatically update when the doctor responds. Please keep this tab open.</p>
+          <p className="text-gray-400 text-sm mb-6">This page will automatically update when the doctor responds.</p>
           <div className="flex items-center justify-center gap-2 text-purple-600">
             <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
             <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
@@ -400,7 +454,7 @@ const NurseCreateRecord = () => {
         </div>
       )}
 
-      {/* STEP 3: Record Form */}
+      {/* STEP 3: Edit Record Form */}
       {step === 'form' && (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl mx-auto">
           {msg.text && (
@@ -413,9 +467,9 @@ const NurseCreateRecord = () => {
           <div className="bg-purple-50 p-4 rounded-xl flex items-center justify-between">
             <div>
               <p className="font-semibold text-purple-800">{patientInfo?.name} ({patientInfo?.patientId})</p>
-              <p className="text-sm text-purple-600">Dr. {assignedDoctors.find(d => d.doctor?._id === selectedDoctorId)?.doctor?.name}</p>
+              <p className="text-sm text-purple-600">Dr. {assignedDoctors.find(d => d.doctor?._id === selectedDoctorId)?.doctor?.name} — Editing Record</p>
             </div>
-            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">Approved</span>
+            <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-semibold">Edit Mode</span>
           </div>
 
           {/* Basic Fields */}
@@ -463,14 +517,10 @@ const NurseCreateRecord = () => {
             </div>
             {medications.map((med, i) => (
               <div key={i} className="grid grid-cols-5 gap-2 mb-2">
-                <input placeholder="Name" value={med.name} onChange={(e) => handleMedChange(i, 'name', e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm" />
-                <input placeholder="Dosage" value={med.dosage} onChange={(e) => handleMedChange(i, 'dosage', e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm" />
-                <input placeholder="Frequency" value={med.frequency} onChange={(e) => handleMedChange(i, 'frequency', e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm" />
-                <input placeholder="Duration" value={med.duration} onChange={(e) => handleMedChange(i, 'duration', e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm" />
+                <input placeholder="Name" value={med.name} onChange={(e) => handleMedChange(i, 'name', e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
+                <input placeholder="Dosage" value={med.dosage} onChange={(e) => handleMedChange(i, 'dosage', e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
+                <input placeholder="Frequency" value={med.frequency} onChange={(e) => handleMedChange(i, 'frequency', e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
+                <input placeholder="Duration" value={med.duration} onChange={(e) => handleMedChange(i, 'duration', e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
                 <button type="button" onClick={() => removeMedication(i)} className="text-red-500 text-sm hover:text-red-600">Remove</button>
               </div>
             ))}
@@ -503,13 +553,11 @@ const NurseCreateRecord = () => {
               <h3 className="text-lg font-semibold text-gray-800">Custom Fields</h3>
               <button type="button" onClick={addCustomField} className="text-purple-600 text-sm font-semibold hover:text-purple-700">+ Add Field</button>
             </div>
-            {customFields.length === 0 && <p className="text-gray-400 text-sm">No custom fields added. Click above to add.</p>}
+            {customFields.length === 0 && <p className="text-gray-400 text-sm">No custom fields. Click above to add.</p>}
             {customFields.map((cf, i) => (
               <div key={i} className="grid grid-cols-3 gap-2 mb-2">
-                <input placeholder="Field Name" value={cf.fieldName} onChange={(e) => handleCustomFieldChange(i, 'fieldName', e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm" />
-                <input placeholder="Field Value" value={cf.fieldValue} onChange={(e) => handleCustomFieldChange(i, 'fieldValue', e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm" />
+                <input placeholder="Field Name" value={cf.fieldName} onChange={(e) => handleCustomFieldChange(i, 'fieldName', e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
+                <input placeholder="Field Value" value={cf.fieldValue} onChange={(e) => handleCustomFieldChange(i, 'fieldValue', e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
                 <button type="button" onClick={() => removeCustomField(i)} className="text-red-500 text-sm hover:text-red-600">Remove</button>
               </div>
             ))}
@@ -519,8 +567,36 @@ const NurseCreateRecord = () => {
           <div className="bg-white p-6 rounded-xl shadow-sm">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Prescription Documents</h3>
 
+            {existingDocuments.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-600 mb-2">Existing Documents ({existingDocuments.length})</p>
+                <div className="space-y-2">
+                  {existingDocuments.map((doc, i) => (
+                    <div key={i} className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg">
+                      <a
+                        href={doc.startsWith('http') ? doc : `http://localhost:5001${doc}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-2"
+                      >
+                        📄 {doc.split('/').pop()}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => removeExistingDocument(i)}
+                        className="text-red-500 hover:text-red-600 text-sm font-medium"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Remove documents or upload new files below to add more.</p>
+              </div>
+            )}
+
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Upload Files (PDF, JPG, PNG - max 10)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Upload New Files (PDF, JPG, PNG)</label>
               <input
                 type="file"
                 multiple
@@ -529,7 +605,7 @@ const NurseCreateRecord = () => {
                 className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg"
               />
               {prescriptionFiles.length > 0 && (
-                <p className="text-sm text-gray-500 mt-1">{prescriptionFiles.length} file(s) selected</p>
+                <p className="text-sm text-gray-500 mt-1">{prescriptionFiles.length} new file(s) selected</p>
               )}
             </div>
 
@@ -557,19 +633,9 @@ const NurseCreateRecord = () => {
 
           {/* Submit */}
           <div className="flex justify-end gap-4">
-            <button
-              type="button"
-              onClick={() => navigate('/nurse/dashboard')}
-              className="px-6 py-2.5 border-2 border-gray-300 rounded-lg text-gray-600 font-semibold hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || remainingSeconds <= 0}
-              className="px-8 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50"
-            >
-              {submitting ? 'Submitting...' : 'Submit Record'}
+            <button type="button" onClick={() => navigate('/nurse/dashboard')} className="px-6 py-2.5 border-2 border-gray-300 rounded-lg text-gray-600 font-semibold hover:bg-gray-50">Cancel</button>
+            <button type="submit" disabled={submitting || remainingSeconds <= 0} className="px-8 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50">
+              {submitting ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -578,4 +644,4 @@ const NurseCreateRecord = () => {
   );
 };
 
-export default NurseCreateRecord;
+export default NurseEditRecord;

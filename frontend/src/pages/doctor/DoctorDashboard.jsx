@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
 import { profileService, doctorService } from '../../services/api';
+
+const NURSE_REQUEST_POLL = 5000; // poll every 5 seconds
 
 const DoctorDashboard = () => {
   const { user } = useAuth();
@@ -25,6 +27,13 @@ const DoctorDashboard = () => {
 
   const [accessMethod, setAccessMethod] = useState('otp');
 
+  // Nurse access requests
+  const [nurseRequests, setNurseRequests] = useState([]);
+  const [nurseRequestCount, setNurseRequestCount] = useState(0);
+  const [showNursePopup, setShowNursePopup] = useState(false);
+  const [processingRequest, setProcessingRequest] = useState(null);
+  const nurseReqPollRef = useRef(null);
+
   const fetchData = async () => {
     try {
       const [dashRes, affRes] = await Promise.all([
@@ -38,7 +47,55 @@ const DoctorDashboard = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchNurseRequests = async () => {
+    try {
+      const [reqRes, countRes] = await Promise.all([
+        doctorService.getNurseRequests('pending'),
+        doctorService.getNurseRequestCount()
+      ]);
+      setNurseRequests(reqRes.data || []);
+      const count = countRes.data?.count || 0;
+      setNurseRequestCount(count);
+      // Auto-show popup when new requests arrive
+      if (count > 0 && !showNursePopup) {
+        setShowNursePopup(true);
+      }
+    } catch {
+      // silent
+    }
+  };
+
+  useEffect(() => { fetchData(); fetchNurseRequests(); }, []);
+
+  // Poll for nurse requests
+  useEffect(() => {
+    nurseReqPollRef.current = setInterval(fetchNurseRequests, NURSE_REQUEST_POLL);
+    return () => { if (nurseReqPollRef.current) clearInterval(nurseReqPollRef.current); };
+  }, []);
+
+  const handleApproveRequest = async (requestId) => {
+    setProcessingRequest(requestId);
+    try {
+      await doctorService.approveNurseRequest(requestId);
+      fetchNurseRequests();
+    } catch {
+      // silent
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
+
+  const handleRejectRequest = async (requestId) => {
+    setProcessingRequest(requestId);
+    try {
+      await doctorService.rejectNurseRequest(requestId);
+      fetchNurseRequests();
+    } catch {
+      // silent
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
 
   const handleAffiliate = async (e) => {
     e.preventDefault();
@@ -114,6 +171,79 @@ const DoctorDashboard = () => {
           <p className="text-4xl font-bold text-purple-600">{user?.rating?.toFixed(1) ?? '0.0'}</p>
         </div>
       </div>
+
+      {/* Nurse Request Notification Bell */}
+      {nurseRequestCount > 0 && !showNursePopup && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <button
+            onClick={() => setShowNursePopup(true)}
+            className="relative bg-purple-600 text-white w-14 h-14 rounded-full shadow-lg hover:bg-purple-700 flex items-center justify-center text-2xl animate-bounce"
+          >
+            🔔
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center font-bold">
+              {nurseRequestCount}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Nurse Access Request Popup */}
+      {showNursePopup && nurseRequests.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div className="bg-purple-600 text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold">Nurse Access Requests ({nurseRequests.length})</h3>
+              <button onClick={() => setShowNursePopup(false)} className="text-white/80 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh] space-y-3">
+              {nurseRequests.map((req) => (
+                <div key={req._id} className="border-2 border-gray-200 rounded-xl p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="font-semibold text-gray-800">{req.nurse?.name || 'Nurse'}</p>
+                      <p className="text-xs text-gray-500">
+                        {req.type === 'nurse_extension_request' ? '⏱️ Time Extension Request' : req.operation === 'edit' ? '✏️ Edit Record' : '📝 Create Record'}
+                      </p>
+                    </div>
+                    <span className="text-xs text-gray-400">{new Date(req.createdAt).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="text-sm text-gray-600 mb-3 space-y-1">
+                    <p>Patient: <span className="font-medium">{req.patient?.name || 'Unknown'}</span> ({req.patient?.patientId || ''})</p>
+                    {req.hospital?.name && <p>Hospital: <span className="font-medium">{req.hospital.name}</span></p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApproveRequest(req._id)}
+                      disabled={processingRequest === req._id}
+                      className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {processingRequest === req._id ? '...' : '✓ Approve'}
+                    </button>
+                    <button
+                      onClick={() => handleRejectRequest(req._id)}
+                      disabled={processingRequest === req._id}
+                      className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {processingRequest === req._id ? '...' : '✗ Reject'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nurse requests inline panel (when popup is dismissed) */}
+      {nurseRequestCount > 0 && (
+        <div className="bg-orange-50 border-2 border-orange-200 p-5 rounded-xl mb-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-orange-800">🔔 Pending Nurse Requests ({nurseRequestCount})</h2>
+            <button onClick={() => setShowNursePopup(true)} className="text-orange-600 text-sm font-semibold hover:text-orange-700">View All</button>
+          </div>
+          <p className="text-sm text-orange-600">You have {nurseRequestCount} pending nurse access request(s). Click "View All" to approve or reject.</p>
+        </div>
+      )}
 
       {/* Patient Access Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm mb-5">

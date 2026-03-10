@@ -12,8 +12,8 @@ const NurseAuditLogs = () => {
     setLoading(true);
     nurseService.getAuditLogs(page)
       .then((res) => {
-        setLogs(res.data?.logs || []);
-        setTotalPages(res.data?.totalPages || 1);
+        setLogs(res.data || []);
+        setTotalPages(res.totalPages || 1);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

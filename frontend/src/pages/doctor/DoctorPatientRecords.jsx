@@ -193,10 +193,86 @@ const DoctorPatientRecords = () => {
                     </div>
                   )}
 
+                  {selectedRecord.prescriptionDocuments?.length > 0 && (
+                    <div>
+                      <span className="font-semibold text-gray-600 block mb-2">Prescription Documents</span>
+                      <div className="space-y-2">
+                        {selectedRecord.prescriptionDocuments.map((doc, i) => (
+                          <a
+                            key={i}
+                            href={doc.startsWith('http') ? doc : `http://localhost:5001${doc}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium bg-purple-50 px-4 py-2 rounded-lg text-sm"
+                          >
+                            📄 {doc.split('/').pop()}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRecord.prescriptionLinks?.length > 0 && (
+                    <div>
+                      <span className="font-semibold text-gray-600 block mb-2">Prescription Links</span>
+                      <div className="space-y-2">
+                        {selectedRecord.prescriptionLinks.map((link, i) => (
+                          <a
+                            key={i}
+                            href={link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-4 py-2 rounded-lg text-sm"
+                          >
+                            🔗 {link.length > 60 ? link.substring(0, 60) + '...' : link}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRecord.customFields?.length > 0 && (
+                    <div>
+                      <span className="font-semibold text-gray-600 block mb-2">Additional Fields</span>
+                      <div className="bg-gray-50 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-100 text-gray-600">
+                              <th className="text-left p-2">Field</th>
+                              <th className="text-left p-2">Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedRecord.customFields.map((cf, i) => (
+                              <tr key={i} className="border-t border-gray-200">
+                                <td className="p-2 font-medium">{cf.fieldName}</td>
+                                <td className="p-2">{cf.fieldValue}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                   {selectedRecord.nextVisitDate && (
                     <div>
                       <span className="font-semibold text-gray-600 block mb-1">Next Visit Date</span>
                       <span className="text-gray-800">{new Date(selectedRecord.nextVisitDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+
+                  {selectedRecord.editHistory?.length > 0 && (
+                    <div>
+                      <span className="font-semibold text-gray-600 block mb-2">Edit History</span>
+                      <div className="space-y-2">
+                        {selectedRecord.editHistory.map((edit, i) => (
+                          <div key={i} className="bg-yellow-50 p-3 rounded-lg text-sm">
+                            <p className="font-medium text-gray-700">{edit.summary}</p>
+                            <p className="text-gray-500 text-xs mt-1">{new Date(edit.editedAt).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -13,8 +13,8 @@ const NurseRecords = () => {
     setLoading(true);
     nurseService.getMyRecords(page)
       .then((res) => {
-        setRecords(res.data.records || []);
-        setTotalPages(res.data.totalPages || 1);
+        setRecords(res.data || []);
+        setTotalPages(res.totalPages || 1);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

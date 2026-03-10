@@ -177,25 +177,42 @@ export const adminService = {
   reinstateNurse: (id) => api.patch(`/admin/nurses/${id}/reinstate`).then((r) => r.data)
 };
 
-// Doctor service — dashboard, patients, records, OTP/QR access, audit logs
+// Doctor service — dashboard, patients, records, OTP/QR access, audit logs, nurse requests
 export const doctorService = {
   getDashboard: () => api.get('/doctor/dashboard').then((r) => r.data),
   getMyPatients: () => api.get('/doctor/my-patients').then((r) => r.data),
   getPatientRecords: (patientId) => api.get(`/doctor/patient-records/${patientId}`).then((r) => r.data),
   verifyPatientOtp: (patientEmail, otp) => api.post('/doctor/patient-access/verify-otp', { patientEmail, otp }).then((r) => r.data),
   verifyQrToken: (qrToken) => api.post('/doctor/patient-access/verify-qr', { qrToken }).then((r) => r.data),
-  getAuditLogs: (page, limit) => api.get(`/doctor/audit-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data)
+  getAuditLogs: (page, limit) => api.get(`/doctor/audit-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data),
+  // Nurse access request management
+  getNurseRequests: (status) => api.get(`/doctor/nurse-requests?status=${status || 'pending'}`).then((r) => r.data),
+  getNurseRequestCount: () => api.get('/doctor/nurse-requests/count').then((r) => r.data),
+  approveNurseRequest: (id) => api.patch(`/doctor/nurse-requests/${id}/approve`).then((r) => r.data),
+  rejectNurseRequest: (id) => api.patch(`/doctor/nurse-requests/${id}/reject`).then((r) => r.data)
 };
 
-// Nurse service — dashboard, assigned doctors, specialization fields, records, audit logs
+// Nurse service — dashboard, assigned doctors, specialization fields, access requests, records, audit logs
 export const nurseService = {
   getDashboard: () => api.get('/nurse/dashboard').then((r) => r.data),
   getAssignedDoctors: () => api.get('/nurse/assigned-doctors').then((r) => r.data),
   getSpecializationFields: (specialization) => api.get(`/nurse/specialization-fields/${encodeURIComponent(specialization)}`).then((r) => r.data),
-  createRecord: (formData) =>
-    api.post('/nurse/create-record', formData, {
+  // Patient lookup
+  lookupPatient: (patientId, doctorId) => api.get(`/nurse/lookup-patient/${encodeURIComponent(patientId)}?doctorId=${doctorId}`).then((r) => r.data),
+  // Access request flow
+  requestAccess: (data) => api.post('/nurse/request-access', data).then((r) => r.data),
+  getAccessRequestStatus: (id) => api.get(`/nurse/access-request/${id}/status`).then((r) => r.data),
+  requestExtension: (id) => api.post(`/nurse/request-extension/${id}`).then((r) => r.data),
+  // Record operations
+  submitRecord: (formData) =>
+    api.post('/nurse/submit-record', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }).then((r) => r.data),
+  editRecord: (accessRequestId, formData) =>
+    api.put(`/nurse/edit-record/${accessRequestId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).then((r) => r.data),
+  getRecordForEdit: (accessRequestId) => api.get(`/nurse/record-for-edit/${accessRequestId}`).then((r) => r.data),
   getMyRecords: (page, limit) => api.get(`/nurse/my-records?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data),
   getAuditLogs: (page, limit) => api.get(`/nurse/audit-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data)
 };

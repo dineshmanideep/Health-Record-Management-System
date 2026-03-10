@@ -12,6 +12,8 @@ const MedicalRecord = require('../models/MedicalRecord');
 const ActivityLog = require('../models/ActivityLog');
 const Notification = require('../models/Notification');
 const HospitalAuditLog = require('../models/HospitalAuditLog');
+const NurseAccessRequest = require('../models/NurseAccessRequest');
+const Nurse = require('../models/Nurse');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'doctor' role.
@@ -396,6 +398,113 @@ router.get('/audit-logs', async (req, res) => {
     ]);
 
     res.json({ success: true, data: logs, total, page, totalPages: Math.ceil(total / limit) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== NURSE ACCESS REQUEST MANAGEMENT ====================
+
+// @route   GET /api/doctor/nurse-requests
+// @desc    Get all pending nurse access requests for this doctor
+router.get('/nurse-requests', async (req, res) => {
+  try {
+    const status = req.query.status || 'pending';
+    const requests = await NurseAccessRequest.find({ doctor: req.user._id, status })
+      .sort({ createdAt: -1 })
+      .populate('nurse', 'name email licenseNumber')
+      .populate('patient', 'name patientId email')
+      .populate('hospital', 'name')
+      .populate('record', 'diagnosis visitDate')
+      .lean();
+
+    res.json({ success: true, data: requests });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/doctor/nurse-requests/:id/approve
+// @desc    Doctor approves a nurse's request — starts the timer
+router.patch('/nurse-requests/:id/approve', async (req, res) => {
+  try {
+    const request = await NurseAccessRequest.findOne({ _id: req.params.id, doctor: req.user._id });
+    if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Request is not pending' });
+    }
+
+    const timeLimit = request.timeLimit || 10; // minutes
+    request.status = 'approved';
+    request.approvedAt = new Date();
+    request.expiresAt = new Date(Date.now() + timeLimit * 60 * 1000);
+    if (request.extensionRequested) {
+      request.extensionRequested = false; // reset extension flag after approval
+    }
+    await request.save();
+
+    // Notify the nurse
+    await Notification.create({
+      user: request.nurse,
+      userModel: 'Nurse',
+      type: 'nurse_request_approved',
+      title: 'Request Approved',
+      message: `Dr. ${req.user.name} approved your request. You have ${timeLimit} minutes to complete the form.`,
+      accessRequest: request._id
+    });
+
+    res.json({ success: true, data: request });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/doctor/nurse-requests/:id/reject
+// @desc    Doctor rejects a nurse's request
+router.patch('/nurse-requests/:id/reject', async (req, res) => {
+  try {
+    const request = await NurseAccessRequest.findOne({ _id: req.params.id, doctor: req.user._id });
+    if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Request is not pending' });
+    }
+
+    // If this was an extension request, mark extension as rejected
+    if (request.extensionRequested) {
+      request.extensionRejected = true;
+      request.extensionRequested = false;
+      // Keep status as approved but let it naturally expire
+      request.status = 'approved';
+    } else {
+      request.status = 'rejected';
+    }
+    await request.save();
+
+    // Notify the nurse
+    const isExtension = request.extensionRejected;
+    await Notification.create({
+      user: request.nurse,
+      userModel: 'Nurse',
+      type: 'nurse_request_rejected',
+      title: isExtension ? 'Extension Rejected' : 'Request Rejected',
+      message: isExtension
+        ? `Dr. ${req.user.name} rejected your time extension request. Please submit before the timer expires.`
+        : `Dr. ${req.user.name} rejected your request to ${request.operation} the medical record.`,
+      accessRequest: request._id
+    });
+
+    res.json({ success: true, data: request });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/doctor/nurse-requests/count
+// @desc    Get count of pending nurse requests (for badge/notification)
+router.get('/nurse-requests/count', async (req, res) => {
+  try {
+    const count = await NurseAccessRequest.countDocuments({ doctor: req.user._id, status: 'pending' });
+    res.json({ success: true, data: { count } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

@@ -3,8 +3,13 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
     required: true
+    // Can reference User, Doctor, Nurse, Hospital depending on context
+  },
+  userModel: {
+    type: String,
+    enum: ['User', 'Doctor', 'Nurse', 'Hospital'],
+    default: 'User'
   },
   type: {
     type: String,
@@ -15,6 +20,10 @@ const notificationSchema = new mongoose.Schema({
       'record_created',
       'record_modified',
       'visit_reminder',
+      'nurse_access_request',
+      'nurse_extension_request',
+      'nurse_request_approved',
+      'nurse_request_rejected',
       'general'
     ],
     required: true
@@ -26,6 +35,11 @@ const notificationSchema = new mongoose.Schema({
   message: {
     type: String,
     required: true
+  },
+  // Reference to NurseAccessRequest for actionable notifications
+  accessRequest: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'NurseAccessRequest'
   },
   read: {
     type: Boolean,
