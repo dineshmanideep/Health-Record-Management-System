@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
 const Doctor = require('../models/Doctor');
 const Hospital = require('../models/Hospital');
 const HospitalOTP = require('../models/HospitalOTP');
@@ -14,7 +16,23 @@ const Notification = require('../models/Notification');
 const HospitalAuditLog = require('../models/HospitalAuditLog');
 const NurseAccessRequest = require('../models/NurseAccessRequest');
 const Nurse = require('../models/Nurse');
+const RecordAssignment = require('../models/RecordAssignment');
 const { protect, authorize } = require('../middleware/auth');
+
+// Multer config for doctor's attachments
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads', 'assignments')),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+});
+const upload = multer({ 
+  storage, 
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  }
+});
 
 // All routes below require a valid JWT AND the 'doctor' role.
 router.use(protect);
@@ -505,6 +523,198 @@ router.get('/nurse-requests/count', async (req, res) => {
   try {
     const count = await NurseAccessRequest.countDocuments({ doctor: req.user._id, status: 'pending' });
     res.json({ success: true, data: { count } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/doctor/assigned-nurses
+// @desc    Get all nurses assigned to this doctor
+router.get('/assigned-nurses', async (req, res) => {
+  try {
+    // Find all nurse affiliations where this doctor is assigned
+    const affiliations = await HospitalAffiliation.find({
+      assignedDoctor: req.user._id,
+      staffRole: 'nurse',
+      status: 'active'
+    })
+      .populate({
+        path: 'hospitalId',
+        select: 'name address'
+      })
+      .lean();
+
+    // Get nurse details for each affiliation
+    const nursesData = await Promise.all(
+      affiliations.map(async (aff) => {
+        const nurse = await Nurse.findById(aff.staffId).select('name email phone qualification licenseNumber department shift specialization');
+        return {
+          ...aff,
+          nurse
+        };
+      })
+    );
+
+    res.json({ success: true, count: nursesData.length, data: nursesData });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== RECORD ASSIGNMENTS ====================
+
+// @route   POST /api/doctor/assign-record
+// @desc    Doctor creates a record assignment for a nurse
+router.post('/assign-record', upload.array('attachments', 5), async (req, res) => {
+  try {
+    const { nurseId, patientId, hospitalId, instructions, dueDate } = req.body;
+
+    if (!nurseId || !patientId || !hospitalId || !instructions) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Nurse, patient, hospital, and instructions are required' 
+      });
+    }
+
+    // Verify patient access
+    const access = await DoctorAccess.findOne({ 
+      doctor: req.user._id, 
+      patient: patientId, 
+      isActive: true 
+    });
+    if (!access) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You do not have access to this patient' 
+      });
+    }
+
+    // Verify nurse is assigned to this doctor
+    const nurseAffiliation = await HospitalAffiliation.findOne({
+      staffId: nurseId,
+      assignedDoctor: req.user._id,
+      staffRole: 'nurse',
+      status: 'active'
+    });
+    if (!nurseAffiliation) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'This nurse is not assigned to you' 
+      });
+    }
+
+    // Build attachment URLs
+    const attachments = req.files ? req.files.map(file => 
+      `${req.protocol}://${req.get('host')}/uploads/assignments/${file.filename}`
+    ) : [];
+
+    const assignment = await RecordAssignment.create({
+      doctor: req.user._id,
+      nurse: nurseId,
+      patient: patientId,
+      hospital: hospitalId,
+      instructions,
+      attachments,
+      dueDate: dueDate || undefined
+    });
+
+    // Notify the nurse
+    await Notification.create({
+      user: nurseId,
+      userModel: 'Nurse',
+      type: 'general',
+      title: 'New Record Assignment',
+      message: `Dr. ${req.user.name} assigned you to create a medical record. Check your assignments.`
+    });
+
+    const populated = await RecordAssignment.findById(assignment._id)
+      .populate('nurse', 'name email')
+      .populate('patient', 'name patientId')
+      .populate('hospital', 'name');
+
+    res.status(201).json({ success: true, data: populated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+// @route   GET /api/doctor/record-assignments
+// @desc    Get all record assignments created by this doctor
+router.get('/record-assignments', async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = { doctor: req.user._id };
+    if (status) filter.status = status;
+
+    const assignments = await RecordAssignment.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('nurse', 'name email')
+      .populate('patient', 'name patientId')
+      .populate('hospital', 'name')
+      .populate('medicalRecord')
+      .lean();
+
+    res.json({ success: true, count: assignments.length, data: assignments });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/doctor/record-assignments/:id
+// @desc    Get a specific assignment
+router.get('/record-assignments/:id', async (req, res) => {
+  try {
+    const assignment = await RecordAssignment.findOne({ 
+      _id: req.params.id, 
+      doctor: req.user._id 
+    })
+      .populate('nurse', 'name email phone')
+      .populate('patient', 'name patientId email')
+      .populate('hospital', 'name')
+      .populate('medicalRecord');
+
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+
+    res.json({ success: true, data: assignment });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/doctor/record-assignments/:id/cancel
+// @desc    Cancel a pending assignment
+router.patch('/record-assignments/:id/cancel', async (req, res) => {
+  try {
+    const assignment = await RecordAssignment.findOne({ 
+      _id: req.params.id, 
+      doctor: req.user._id 
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+
+    if (assignment.status === 'completed') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot cancel a completed assignment' 
+      });
+    }
+
+    assignment.status = 'cancelled';
+    await assignment.save();
+
+    await Notification.create({
+      user: assignment.nurse,
+      userModel: 'Nurse',
+      type: 'general',
+      title: 'Assignment Cancelled',
+      message: `Dr. ${req.user.name} cancelled the record assignment.`
+    });
+
+    res.json({ success: true, data: assignment });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

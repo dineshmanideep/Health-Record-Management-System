@@ -1,17 +1,50 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const path = require('path');
+const multer = require('multer');
 const Hospital = require('../models/Hospital');
 const HospitalOTP = require('../models/HospitalOTP');
 const HospitalAffiliation = require('../models/HospitalAffiliation');
 const HospitalAuditLog = require('../models/HospitalAuditLog');
 const Doctor = require('../models/Doctor');
 const Nurse = require('../models/Nurse');
+const User = require('../models/User');
+const TestType = require('../models/TestType');
+const TestAssignment = require('../models/TestAssignment');
+const PatientAccessOTP = require('../models/PatientAccessOTP');
+const Notification = require('../models/Notification');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'hospital' role.
 router.use(protect);
 router.use(authorize('hospital'));
+
+// Configure multer for test result uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/test-results/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `test-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|pdf|doc|docx/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image and document files are allowed'));
+    }
+  }
+});
 
 // Helper to log hospital audit actions
 const logAudit = (hospitalId, action, performedBy, details) =>
@@ -353,4 +386,401 @@ router.get('/audit-logs', async (req, res) => {
   }
 });
 
+// ==================== TEST TYPES ====================
+
+// @route   POST /api/hospital/test-types
+// @desc    Create a new test type
+router.post('/test-types', async (req, res) => {
+  try {
+    const { name, description, instructions, category, estimatedDuration } = req.body;
+
+    if (!name || !category) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Name and category are required' 
+      });
+    }
+
+    const testType = await TestType.create({
+      hospital: req.user._id,
+      name,
+      description,
+      instructions,
+      category,
+      estimatedDuration
+    });
+
+    await logAudit(
+      req.user._id,
+      'create_test_type',
+      req.user._id,
+      { testTypeId: testType._id, name }
+    );
+
+    res.status(201).json({ success: true, data: testType });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/hospital/test-types
+// @desc    Get all test types for the hospital
+router.get('/test-types', async (req, res) => {
+  try {
+    const { isActive } = req.query;
+    
+    const filter = { hospital: req.user._id };
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true';
+    }
+
+    const testTypes = await TestType.find(filter)
+      .sort('-createdAt')
+      .lean();
+
+    res.json({ success: true, data: testTypes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/hospital/test-types/:id
+// @desc    Update a test type
+router.put('/test-types/:id', async (req, res) => {
+  try {
+    const { name, description, instructions, category, estimatedDuration, isActive } = req.body;
+
+    const testType = await TestType.findOne({
+      _id: req.params.id,
+      hospital: req.user._id
+    });
+
+    if (!testType) {
+      return res.status(404).json({ success: false, message: 'Test type not found' });
+    }
+
+    if (name !== undefined) testType.name = name;
+    if (description !== undefined) testType.description = description;
+    if (instructions !== undefined) testType.instructions = instructions;
+    if (category !== undefined) testType.category = category;
+    if (estimatedDuration !== undefined) testType.estimatedDuration = estimatedDuration;
+    if (isActive !== undefined) testType.isActive = isActive;
+
+    await testType.save();
+
+    await logAudit(
+      req.user._id,
+      'update_test_type',
+      req.user._id,
+      { testTypeId: testType._id, name: testType.name }
+    );
+
+    res.json({ success: true, data: testType });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/hospital/test-types/:id
+// @desc    Deactivate a test type
+router.delete('/test-types/:id', async (req, res) => {
+  try {
+    const testType = await TestType.findOne({
+      _id: req.params.id,
+      hospital: req.user._id
+    });
+
+    if (!testType) {
+      return res.status(404).json({ success: false, message: 'Test type not found' });
+    }
+
+    testType.isActive = false;
+    await testType.save();
+
+    await logAudit(
+      req.user._id,
+      'deactivate_test_type',
+      req.user._id,
+      { testTypeId: testType._id, name: testType.name }
+    );
+
+    res.json({ success: true, message: 'Test type deactivated' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== PATIENT VERIFICATION ====================
+
+// @route   POST /api/hospital/verify-patient
+// @desc    Verify patient using OTP or QR code
+router.post('/verify-patient', async (req, res) => {
+  try {
+    const { method, otp, qrToken } = req.body;
+
+    if (!method || !['otp', 'qr'].includes(method)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid verification method' 
+      });
+    }
+
+    let patientId;
+
+    if (method === 'otp') {
+      if (!otp) {
+        return res.status(400).json({ success: false, message: 'OTP is required' });
+      }
+
+      const otpRecord = await PatientAccessOTP.findOne({
+        otp,
+        expiresAt: { $gt: new Date() }
+      }).populate('patient');
+
+      if (!otpRecord) {
+        return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+      }
+
+      patientId = otpRecord.patient._id;
+    } else if (method === 'qr') {
+      if (!qrToken) {
+        return res.status(400).json({ success: false, message: 'QR token is required' });
+      }
+
+      // Verify QR token signature
+      const [userIdPart, timestamp, signature] = qrToken.split('-');
+      
+      if (!userIdPart || !timestamp || !signature) {
+        return res.status(400).json({ success: false, message: 'Invalid QR token format' });
+      }
+
+      // Verify token age (24 hours)
+      const tokenAge = Date.now() - parseInt(timestamp);
+      if (tokenAge > 24 * 60 * 60 * 1000) {
+        return res.status(400).json({ success: false, message: 'QR code has expired' });
+      }
+
+      // Verify signature
+      const expectedSignature = crypto
+        .createHmac('sha256', process.env.JWT_SECRET)
+        .update(`${userIdPart}-${timestamp}`)
+        .digest('hex')
+        .substring(0, 8);
+
+      if (signature !== expectedSignature) {
+        return res.status(400).json({ success: false, message: 'Invalid QR token' });
+      }
+
+      patientId = userIdPart;
+    }
+
+    // Get patient details
+    const patient = await User.findOne({ _id: patientId, role: 'patient' })
+      .select('name email phone dateOfBirth gender address')
+      .lean();
+
+    if (!patient) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    res.json({ success: true, data: { patient } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==================== TEST ASSIGNMENTS ====================
+
+// @route   POST /api/hospital/test-assignments
+// @desc    Create a test assignment for a nurse
+router.post('/test-assignments', async (req, res) => {
+  try {
+    const { testTypeId, patientId, nurseId, notes, scheduledDate } = req.body;
+
+    if (!testTypeId || !patientId || !nurseId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Test type, patient, and nurse are required' 
+      });
+    }
+
+    // Verify test type belongs to this hospital
+    const testType = await TestType.findOne({
+      _id: testTypeId,
+      hospital: req.user._id,
+      isActive: true
+    });
+
+    if (!testType) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Test type not found or inactive' 
+      });
+    }
+
+    // Verify nurse is affiliated with this hospital
+    const nurseAffiliation = await HospitalAffiliation.findOne({
+      hospital: req.user._id,
+      user: nurseId,
+      role: 'nurse',
+      status: 'active'
+    });
+
+    if (!nurseAffiliation) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Nurse is not affiliated with this hospital' 
+      });
+    }
+
+    // Verify patient exists
+    const patient = await User.findOne({ _id: patientId, role: 'patient' });
+    if (!patient) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    const testAssignment = await TestAssignment.create({
+      hospital: req.user._id,
+      testType: testTypeId,
+      patient: patientId,
+      nurse: nurseId,
+      notes,
+      scheduledDate
+    });
+
+    // Create notification for nurse
+    await Notification.create({
+      user: nurseId,
+      type: 'test_assigned',
+      title: 'New Test Assignment',
+      message: `You have been assigned a new test: ${testType.name} for patient ${patient.name}`,
+      relatedModel: 'TestAssignment',
+      relatedId: testAssignment._id
+    });
+
+    await logAudit(
+      req.user._id,
+      'create_test_assignment',
+      req.user._id,
+      { 
+        testAssignmentId: testAssignment._id, 
+        testTypeName: testType.name,
+        nurseId,
+        patientId 
+      }
+    );
+
+    const populatedAssignment = await TestAssignment.findById(testAssignment._id)
+      .populate('testType', 'name category')
+      .populate('patient', 'name email')
+      .populate('nurse', 'name email')
+      .lean();
+
+    res.status(201).json({ success: true, data: populatedAssignment });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/hospital/test-assignments
+// @desc    Get all test assignments for the hospital
+router.get('/test-assignments', async (req, res) => {
+  try {
+    const { status, nurseId, patientId, testTypeId } = req.query;
+    
+    const filter = { hospital: req.user._id };
+    if (status) filter.status = status;
+    if (nurseId) filter.nurse = nurseId;
+    if (patientId) filter.patient = patientId;
+    if (testTypeId) filter.testType = testTypeId;
+
+    const assignments = await TestAssignment.find(filter)
+      .populate('testType', 'name category estimatedDuration')
+      .populate('patient', 'name email phone')
+      .populate('nurse', 'name email')
+      .sort('-createdAt')
+      .lean();
+
+    res.json({ success: true, data: assignments });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/hospital/test-assignments/:id
+// @desc    Get single test assignment
+router.get('/test-assignments/:id', async (req, res) => {
+  try {
+    const assignment = await TestAssignment.findOne({
+      _id: req.params.id,
+      hospital: req.user._id
+    })
+      .populate('testType')
+      .populate('patient', 'name email phone dateOfBirth gender')
+      .populate('nurse', 'name email phone')
+      .lean();
+
+    if (!assignment) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Test assignment not found' 
+      });
+    }
+
+    res.json({ success: true, data: assignment });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/hospital/test-assignments/:id/cancel
+// @desc    Cancel a test assignment
+router.patch('/test-assignments/:id/cancel', async (req, res) => {
+  try {
+    const assignment = await TestAssignment.findOne({
+      _id: req.params.id,
+      hospital: req.user._id
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Test assignment not found' 
+      });
+    }
+
+    if (assignment.status === 'completed') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot cancel completed assignment' 
+      });
+    }
+
+    assignment.status = 'cancelled';
+    await assignment.save();
+
+    // Notify nurse
+    await Notification.create({
+      user: assignment.nurse,
+      type: 'test_cancelled',
+      title: 'Test Assignment Cancelled',
+      message: `A test assignment has been cancelled by the hospital`,
+      relatedModel: 'TestAssignment',
+      relatedId: assignment._id
+    });
+
+    await logAudit(
+      req.user._id,
+      'cancel_test_assignment',
+      req.user._id,
+      { testAssignmentId: assignment._id }
+    );
+
+    res.json({ success: true, message: 'Test assignment cancelled' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
+

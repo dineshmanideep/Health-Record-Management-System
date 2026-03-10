@@ -53,6 +53,12 @@ const medicalRecordSchema = new mongoose.Schema({
   prescriptionDocuments: [{
     type: String
   }],
+  // Categorized medical documents
+  categorizedDocuments: [{
+    filePath: { type: String, required: true },
+    category: { type: String, enum: ['test_report', 'diagnosis_report'], required: true },
+    uploadedAt: { type: Date, default: Date.now }
+  }],
   // Multiple prescription links (URLs)
   prescriptionLinks: [{
     type: String

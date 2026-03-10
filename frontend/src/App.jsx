@@ -22,14 +22,13 @@ import DoctorProfile from './pages/doctor/DoctorProfile';
 import DoctorPatients from './pages/doctor/DoctorPatients';
 import DoctorPatientRecords from './pages/doctor/DoctorPatientRecords';
 import DoctorAuditLogs from './pages/doctor/DoctorAuditLogs';
+import DoctorAssignRecords from './pages/doctor/DoctorAssignRecords';
 
 // Nurse pages
 import NurseDashboard from './pages/nurse/NurseDashboard';
 import NurseProfile from './pages/nurse/NurseProfile';
-import NurseCreateRecord from './pages/nurse/NurseCreateRecord';
-import NurseEditRecord from './pages/nurse/NurseEditRecord';
-import NurseRecords from './pages/nurse/NurseRecords';
 import NurseAuditLogs from './pages/nurse/NurseAuditLogs';
+import NurseAssignments from './pages/nurse/NurseAssignments';
 
 // Hospital pages
 import HospitalDashboard from './pages/hospital/HospitalDashboard';
@@ -149,6 +148,14 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/doctor/assign-records" 
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorAssignRecords />
+              </ProtectedRoute>
+            } 
+          />
 
           {/* Nurse Routes */}
           <Route 
@@ -168,34 +175,18 @@ function App() {
             } 
           />
           <Route 
-            path="/nurse/create-record" 
-            element={
-              <ProtectedRoute allowedRoles={['nurse']}>
-                <NurseCreateRecord />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/nurse/edit-record" 
-            element={
-              <ProtectedRoute allowedRoles={['nurse']}>
-                <NurseEditRecord />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/nurse/records" 
-            element={
-              <ProtectedRoute allowedRoles={['nurse']}>
-                <NurseRecords />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
             path="/nurse/audit-logs" 
             element={
               <ProtectedRoute allowedRoles={['nurse']}>
                 <NurseAuditLogs />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/nurse/assignments" 
+            element={
+              <ProtectedRoute allowedRoles={['nurse']}>
+                <NurseAssignments />
               </ProtectedRoute>
             } 
           />

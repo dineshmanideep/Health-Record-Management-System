@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
-import { useAuth } from '../../context/AuthContext';
 import { profileService, nurseService } from '../../services/api';
 
 const NurseDashboard = () => {
-  const { user } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [affiliations, setAffiliations] = useState([]);
   const [otpInput, setOtpInput] = useState('');
@@ -51,6 +49,10 @@ const NurseDashboard = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm">
+          <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Pending Tasks</h3>
+          <p className="text-4xl font-bold text-orange-600">{dashboard?.pendingAssignmentsCount ?? 0}</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm">
           <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Records Created</h3>
           <p className="text-4xl font-bold text-purple-600">{dashboard?.recordCount ?? 0}</p>
         </div>
@@ -62,23 +64,64 @@ const NurseDashboard = () => {
           <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Hospital Affiliations</h3>
           <p className="text-4xl font-bold text-purple-600">{dashboard?.affiliationCount ?? 0}</p>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm">
-          <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Current Shift</h3>
-          <p className="text-xl font-bold text-purple-600">{user?.shift || 'Morning'}</p>
-        </div>
       </div>
 
       {/* Quick Actions */}
       <div className="bg-white p-6 rounded-xl shadow-sm mb-5">
         <h2 className="text-gray-800 text-xl font-semibold mb-4">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
-          <Link to="/nurse/create-record" className="px-5 py-3 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors no-underline">
-            + Create Patient Visit Record
+          <Link to="/nurse/assignments" className="px-5 py-3 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors no-underline">
+            📋 View Doctor Assignments
           </Link>
-          <Link to="/nurse/records" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
-            View My Records
+          <Link to="/nurse/profile" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
+            👤 My Profile
+          </Link>
+          <Link to="/nurse/audit-logs" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
+            📊 Audit Logs
           </Link>
         </div>
+      </div>
+
+      {/* Pending Assignments */}
+      <div className="bg-white p-6 rounded-xl shadow-sm mb-5">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-gray-800 text-xl font-semibold">Pending Doctor Assignments</h2>
+          <Link to="/nurse/assignments" className="text-purple-600 hover:text-purple-700 text-sm font-semibold no-underline">
+            View All →
+          </Link>
+        </div>
+        {!dashboard?.pendingAssignments?.length ? (
+          <p className="text-gray-500 text-sm">No pending assignments. You're all caught up! 🎉</p>
+        ) : (
+          <div className="space-y-3">
+            {dashboard.pendingAssignments.map((assignment) => (
+              <div key={assignment._id} className="border-l-4 border-orange-500 bg-orange-50 p-4 rounded-lg">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-800">
+                      Patient: {assignment.patient?.name} (ID: {assignment.patient?.patientId})
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Assigned by: Dr. {assignment.doctor?.name} ({assignment.doctor?.specialization})
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Hospital: {assignment.hospital?.name}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Assigned: {new Date(assignment.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <Link 
+                    to="/nurse/assignments" 
+                    className="ml-4 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors no-underline"
+                  >
+                    View
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Assigned Doctors */}
@@ -144,7 +187,7 @@ const NurseDashboard = () => {
       </div>
 
       {/* Recent Records */}
-      <div className="bg-white p-6 rounded-xl shadow-sm">
+      {/* <div className="bg-white p-6 rounded-xl shadow-sm">
         <h2 className="text-gray-800 text-xl font-semibold mb-4">Recent Records Created</h2>
         {!dashboard?.recentRecords?.length ? (
           <p className="text-gray-500 text-sm">No records created yet.</p>
@@ -163,7 +206,7 @@ const NurseDashboard = () => {
             ))}
           </div>
         )}
-      </div>
+      </div> */}
     </DashboardLayout>
   );
 };

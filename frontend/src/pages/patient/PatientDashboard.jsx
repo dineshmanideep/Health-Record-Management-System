@@ -156,6 +156,15 @@ const PatientDashboard = () => {
                 <p className="text-sm text-blue-600 mt-3 text-center max-w-xs">
                   Show this QR code to your doctor. They can scan it to request access to your medical records.
                 </p>
+                <div className="mt-4 w-full max-w-md">
+                  <p className="text-xs text-blue-700 font-semibold mb-1 text-center">Access Token (Alternative to scanning):</p>
+                  <div className="bg-white p-3 rounded border border-blue-300 font-mono text-xs break-all text-center text-gray-800">
+                    {data.qrToken}
+                  </div>
+                  <p className="text-xs text-blue-600 mt-2 text-center">
+                    Your doctor can use this token instead of scanning the QR code
+                  </p>
+                </div>
               </div>
             )}
           </div>

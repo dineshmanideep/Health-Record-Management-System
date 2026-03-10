@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   patientId: {
-    type: String,
+    type: Number,
     unique: true,
     sparse: true
   },
@@ -82,7 +82,7 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', async function() {
   if (this.isNew && this.role === 'user' && !this.patientId) {
     const count = await mongoose.model('User').countDocuments({ role: 'user' });
-    this.patientId = `PID-${String(count + 1).padStart(6, '0')}`;
+    this.patientId = count + 1;
   }
 });
 

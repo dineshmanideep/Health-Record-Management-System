@@ -9,6 +9,7 @@ const DoctorDashboard = () => {
   const { user } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [affiliations, setAffiliations] = useState([]);
+  const [assignedNurses, setAssignedNurses] = useState([]);
   const [otpInput, setOtpInput] = useState('');
   const [deptInput, setDeptInput] = useState('');
   const [affiliating, setAffiliating] = useState(false);
@@ -36,12 +37,14 @@ const DoctorDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [dashRes, affRes] = await Promise.all([
+      const [dashRes, affRes, nursesRes] = await Promise.all([
         doctorService.getDashboard(),
-        profileService.doctor.getAffiliations()
+        profileService.doctor.getAffiliations(),
+        doctorService.getAssignedNurses()
       ]);
       setDashboard(dashRes.data);
       setAffiliations(affRes.data || []);
+      setAssignedNurses(nursesRes.data || []);
     } catch {
       // silent
     }
@@ -369,6 +372,42 @@ const DoctorDashboard = () => {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      {/* Assigned Nurses */}
+      <div className="bg-white p-6 rounded-xl shadow-sm mb-5">
+        <h2 className="text-gray-800 text-xl font-semibold mb-4">👩‍⚕️ Nurses Assigned to Me</h2>
+        {assignedNurses.length === 0 ? (
+          <p className="text-gray-500 text-sm">No nurses currently assigned to you.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {assignedNurses.map((item) => (
+              <div key={item._id} className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border-2 border-purple-100">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="font-bold text-gray-800 text-lg">{item.nurse?.name || 'Nurse'}</p>
+                    <p className="text-sm text-gray-600">{item.nurse?.email || ''}</p>
+                  </div>
+                  <span className="px-2 py-1 bg-purple-600 text-white text-xs rounded-full font-semibold">
+                    {item.nurse?.shift || 'N/A'}
+                  </span>
+                </div>
+                <div className="space-y-1 text-sm text-gray-700">
+                  <p><span className="font-semibold">License:</span> {item.nurse?.licenseNumber || 'N/A'}</p>
+                  <p><span className="font-semibold">Qualification:</span> {item.nurse?.qualification || 'N/A'}</p>
+                  {item.nurse?.specialization && (
+                    <p><span className="font-semibold">Specialization:</span> {item.nurse.specialization}</p>
+                  )}
+                  <p><span className="font-semibold">Department:</span> {item.department || item.nurse?.department || 'N/A'}</p>
+                  <p><span className="font-semibold">Hospital:</span> {item.hospitalId?.name || 'N/A'}</p>
+                  {item.nurse?.phone && (
+                    <p><span className="font-semibold">Phone:</span> {item.nurse.phone}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

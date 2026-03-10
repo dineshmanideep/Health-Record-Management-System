@@ -112,7 +112,22 @@ export const profileService = {
     revokeAffiliation: (id) => api.patch(`/hospital/affiliations/${id}/revoke`).then((r) => r.data),
     assignNurse: (affiliationId, doctorId) => api.post('/hospital/assign-nurse', { affiliationId, doctorId }).then((r) => r.data),
     unassignNurse: (affiliationId) => api.delete(`/hospital/assign-nurse/${affiliationId}`).then((r) => r.data),
-    getAuditLogs: (page, limit) => api.get(`/hospital/audit-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data)
+    getAuditLogs: (page, limit) => api.get(`/hospital/audit-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data),
+    // Test types
+    createTestType: (data) => api.post('/hospital/test-types', data).then((r) => r.data),
+    getTestTypes: (isActive) => api.get(`/hospital/test-types${isActive !== undefined ? `?isActive=${isActive}` : ''}`).then((r) => r.data),
+    updateTestType: (id, data) => api.put(`/hospital/test-types/${id}`, data).then((r) => r.data),
+    deleteTestType: (id) => api.delete(`/hospital/test-types/${id}`).then((r) => r.data),
+    // Patient verification
+    verifyPatient: (method, data) => api.post('/hospital/verify-patient', { method, ...data }).then((r) => r.data),
+    // Test assignments
+    createTestAssignment: (data) => api.post('/hospital/test-assignments', data).then((r) => r.data),
+    getTestAssignments: (filters) => {
+      const params = new URLSearchParams(filters).toString();
+      return api.get(`/hospital/test-assignments${params ? `?${params}` : ''}`).then((r) => r.data);
+    },
+    getTestAssignment: (id) => api.get(`/hospital/test-assignments/${id}`).then((r) => r.data),
+    cancelTestAssignment: (id) => api.patch(`/hospital/test-assignments/${id}/cancel`).then((r) => r.data)
   },
   admin: {
     get: () => api.get('/admin/profile').then((r) => r.data),
@@ -177,7 +192,7 @@ export const adminService = {
   reinstateNurse: (id) => api.patch(`/admin/nurses/${id}/reinstate`).then((r) => r.data)
 };
 
-// Doctor service — dashboard, patients, records, OTP/QR access, audit logs, nurse requests
+// Doctor service — dashboard, patients, records, OTP/QR access, audit logs, nurse requests, assignments
 export const doctorService = {
   getDashboard: () => api.get('/doctor/dashboard').then((r) => r.data),
   getMyPatients: () => api.get('/doctor/my-patients').then((r) => r.data),
@@ -189,32 +204,37 @@ export const doctorService = {
   getNurseRequests: (status) => api.get(`/doctor/nurse-requests?status=${status || 'pending'}`).then((r) => r.data),
   getNurseRequestCount: () => api.get('/doctor/nurse-requests/count').then((r) => r.data),
   approveNurseRequest: (id) => api.patch(`/doctor/nurse-requests/${id}/approve`).then((r) => r.data),
-  rejectNurseRequest: (id) => api.patch(`/doctor/nurse-requests/${id}/reject`).then((r) => r.data)
+  rejectNurseRequest: (id) => api.patch(`/doctor/nurse-requests/${id}/reject`).then((r) => r.data),
+  // Assigned nurses
+  getAssignedNurses: () => api.get('/doctor/assigned-nurses').then((r) => r.data),
+  // Record assignments
+  createAssignment: (formData) => api.post('/doctor/assign-record', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then((r) => r.data),
+  getAssignments: (status) => api.get(`/doctor/record-assignments${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  getAssignment: (id) => api.get(`/doctor/record-assignments/${id}`).then((r) => r.data),
+  cancelAssignment: (id) => api.patch(`/doctor/record-assignments/${id}/cancel`).then((r) => r.data)
 };
 
-// Nurse service — dashboard, assigned doctors, specialization fields, access requests, records, audit logs
+// Nurse service — dashboard, assigned doctors, audit logs, assignments, test assignments
 export const nurseService = {
   getDashboard: () => api.get('/nurse/dashboard').then((r) => r.data),
   getAssignedDoctors: () => api.get('/nurse/assigned-doctors').then((r) => r.data),
-  getSpecializationFields: (specialization) => api.get(`/nurse/specialization-fields/${encodeURIComponent(specialization)}`).then((r) => r.data),
-  // Patient lookup
-  lookupPatient: (patientId, doctorId) => api.get(`/nurse/lookup-patient/${encodeURIComponent(patientId)}?doctorId=${doctorId}`).then((r) => r.data),
-  // Access request flow
-  requestAccess: (data) => api.post('/nurse/request-access', data).then((r) => r.data),
-  getAccessRequestStatus: (id) => api.get(`/nurse/access-request/${id}/status`).then((r) => r.data),
-  requestExtension: (id) => api.post(`/nurse/request-extension/${id}`).then((r) => r.data),
-  // Record operations
-  submitRecord: (formData) =>
-    api.post('/nurse/submit-record', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }).then((r) => r.data),
-  editRecord: (accessRequestId, formData) =>
-    api.put(`/nurse/edit-record/${accessRequestId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }).then((r) => r.data),
-  getRecordForEdit: (accessRequestId) => api.get(`/nurse/record-for-edit/${accessRequestId}`).then((r) => r.data),
-  getMyRecords: (page, limit) => api.get(`/nurse/my-records?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data),
-  getAuditLogs: (page, limit) => api.get(`/nurse/audit-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data)
+  getAuditLogs: (page, limit) => api.get(`/nurse/audit-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data),
+  // Doctor record assignments
+  getAssignments: (status) => api.get(`/nurse/assignments${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  getAssignment: (id) => api.get(`/nurse/assignments/${id}`).then((r) => r.data),
+  startAssignment: (id) => api.patch(`/nurse/assignments/${id}/start`).then((r) => r.data),
+  completeAssignment: (id, formData) => api.post(`/nurse/assignments/${id}/complete`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then((r) => r.data),
+  // Hospital test assignments
+  getTestAssignments: (status) => api.get(`/nurse/test-assignments${status ? `?status=${status}` : ''}`).then((r) => r.data),
+  getTestAssignment: (id) => api.get(`/nurse/test-assignments/${id}`).then((r) => r.data),
+  startTestAssignment: (id) => api.patch(`/nurse/test-assignments/${id}/start`).then((r) => r.data),
+  completeTestAssignment: (id, formData) => api.post(`/nurse/test-assignments/${id}/complete`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then((r) => r.data)
 };
 
 export default api;
