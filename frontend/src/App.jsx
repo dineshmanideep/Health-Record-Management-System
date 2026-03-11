@@ -29,6 +29,7 @@ import NurseDashboard from './pages/nurse/NurseDashboard';
 import NurseProfile from './pages/nurse/NurseProfile';
 import NurseAuditLogs from './pages/nurse/NurseAuditLogs';
 import NurseAssignments from './pages/nurse/NurseAssignments';
+import NurseTestAssignments from './pages/nurse/NurseTestAssignments';
 
 // Hospital pages
 import HospitalDashboard from './pages/hospital/HospitalDashboard';
@@ -36,6 +37,8 @@ import HospitalProfile from './pages/hospital/HospitalProfile';
 import HospitalDoctors from './pages/hospital/HospitalDoctors';
 import HospitalNurses from './pages/hospital/HospitalNurses';
 import HospitalAuditLogs from './pages/hospital/HospitalAuditLogs';
+import HospitalTests from './pages/hospital/HospitalTests';
+import HospitalTestAssignments from './pages/hospital/HospitalTestAssignments';
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -190,6 +193,14 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/nurse/test-assignments" 
+            element={
+              <ProtectedRoute allowedRoles={['nurse']}>
+                <NurseTestAssignments />
+              </ProtectedRoute>
+            } 
+          />
 
           {/* Hospital Routes */}
           <Route 
@@ -229,6 +240,22 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['hospital']}>
                 <HospitalAuditLogs />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hospital/tests" 
+            element={
+              <ProtectedRoute allowedRoles={['hospital']}>
+                <HospitalTests />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/hospital/test-assignments" 
+            element={
+              <ProtectedRoute allowedRoles={['hospital']}>
+                <HospitalTestAssignments />
               </ProtectedRoute>
             } 
           />

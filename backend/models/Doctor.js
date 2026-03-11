@@ -25,16 +25,16 @@ const doctorSchema = new mongoose.Schema({
     default: 'doctor'
   },
   phone: {
-    type: String,
-    required: true
+    type: String
+    // Optional - can be added in profile
   },
   specialization: {
-    type: String,
-    required: [true, 'Specialization is required']
+    type: String
+    // Optional - can be added in profile  
   },
   qualification: {
-    type: String,
-    required: true
+    type: String
+    // Optional - can be added in profile
   },
   licenseNumber: {
     type: String,

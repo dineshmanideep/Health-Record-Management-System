@@ -13,6 +13,8 @@ const PatientAccessOTP = require('../models/PatientAccessOTP');
 const ActivityLog = require('../models/ActivityLog');
 const Doctor = require('../models/Doctor');
 const Hospital = require('../models/Hospital');
+const TestAssignment = require('../models/TestAssignment');
+const TestType = require('../models/TestType');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'user' (patient) role.
@@ -132,24 +134,56 @@ router.get('/dashboard', async (req, res) => {
 // ==================== MEDICAL RECORDS ====================
 
 // @route   GET /api/patient/records
-// @desc    Get all hospital-created medical records, grouped by hospital
+// @desc    Get all hospital-created medical records and test assignments, grouped by hospital
 router.get('/records', async (req, res) => {
   try {
-    const records = await MedicalRecord.find({ patient: req.user._id })
+    // Fetch doctor-created medical records
+    const medicalRecords = await MedicalRecord.find({ patient: req.user._id })
       .sort({ visitDate: -1 })
       .populate('doctor', 'name specialization')
       .populate('nurse', 'name')
       .populate('hospital', 'name')
       .lean();
 
+    // Fetch completed test assignments
+    const testAssignments = await TestAssignment.find({ 
+      patient: req.user._id,
+      status: 'completed'
+    })
+      .sort({ completedAt: -1 })
+      .populate('testType', 'name description')
+      .populate('nurse', 'name')
+      .populate('hospital', 'name')
+      .lean();
+
     // Group by hospital
     const grouped = {};
-    records.forEach((r) => {
+    
+    // Add medical records
+    medicalRecords.forEach((r) => {
       const hId = r.hospital?._id?.toString() || 'unknown';
       if (!grouped[hId]) {
         grouped[hId] = { hospital: r.hospital, records: [] };
       }
-      grouped[hId].records.push(r);
+      grouped[hId].records.push({ ...r, recordType: 'medical_record' });
+    });
+
+    // Add test assignments
+    testAssignments.forEach((t) => {
+      const hId = t.hospital?._id?.toString() || 'unknown';
+      if (!grouped[hId]) {
+        grouped[hId] = { hospital: t.hospital, records: [] };
+      }
+      grouped[hId].records.push({ ...t, recordType: 'test_assignment' });
+    });
+
+    // Sort records within each hospital by date
+    Object.values(grouped).forEach(group => {
+      group.records.sort((a, b) => {
+        const dateA = a.recordType === 'medical_record' ? new Date(a.visitDate) : new Date(a.completedAt);
+        const dateB = b.recordType === 'medical_record' ? new Date(b.visitDate) : new Date(b.completedAt);
+        return dateB - dateA; // newest first
+      });
     });
 
     res.json({ success: true, data: Object.values(grouped) });

@@ -25,12 +25,12 @@ const nurseSchema = new mongoose.Schema({
     default: 'nurse'
   },
   phone: {
-    type: String,
-    required: true
+    type: String
+    // Optional - can be added in profile
   },
   qualification: {
-    type: String,
-    required: true
+    type: String
+    // Optional - can be added in profile
   },
   licenseNumber: {
     type: String,

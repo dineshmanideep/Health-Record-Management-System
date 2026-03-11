@@ -14,6 +14,8 @@ const TestType = require('../models/TestType');
 const TestAssignment = require('../models/TestAssignment');
 const PatientAccessOTP = require('../models/PatientAccessOTP');
 const Notification = require('../models/Notification');
+const ActivityLog = require('../models/ActivityLog');
+const MedicalRecord = require('../models/MedicalRecord');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'hospital' role.
@@ -413,13 +415,14 @@ router.post('/test-types', async (req, res) => {
     await logAudit(
       req.user._id,
       'create_test_type',
-      req.user._id,
+      { id: req.user._id, role: 'hospital', name: req.user.name },
       { testTypeId: testType._id, name }
     );
 
     res.status(201).json({ success: true, data: testType });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error creating test type:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -440,7 +443,8 @@ router.get('/test-types', async (req, res) => {
 
     res.json({ success: true, data: testTypes });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error fetching test types:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -471,13 +475,14 @@ router.put('/test-types/:id', async (req, res) => {
     await logAudit(
       req.user._id,
       'update_test_type',
-      req.user._id,
+      { id: req.user._id, role: 'hospital', name: req.user.name },
       { testTypeId: testType._id, name: testType.name }
     );
 
     res.json({ success: true, data: testType });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error updating test type:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -500,17 +505,96 @@ router.delete('/test-types/:id', async (req, res) => {
     await logAudit(
       req.user._id,
       'deactivate_test_type',
-      req.user._id,
+      { id: req.user._id, role: 'hospital', name: req.user.name },
       { testTypeId: testType._id, name: testType.name }
     );
 
     res.json({ success: true, message: 'Test type deactivated' });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error deactivating test type:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
 // ==================== PATIENT VERIFICATION ====================
+
+// @route   POST /api/hospital/patient-access/verify-otp
+// @desc    Hospital enters patient email + OTP to gain access for test assignment
+router.post('/patient-access/verify-otp', async (req, res) => {
+  try {
+    const { patientEmail, otp } = req.body;
+    
+    if (!patientEmail || !otp) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Patient email and OTP are required' 
+      });
+    }
+
+    // Find patient by email
+    const patient = await User.findOne({ email: patientEmail, role: 'user' });
+    if (!patient) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Patient not found with this email' 
+      });
+    }
+
+    // Hash the OTP to match database storage
+    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+
+    // Verify OTP
+    const otpRecord = await PatientAccessOTP.findOne({
+      patient: patient._id,
+      otpHash,
+      used: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!otpRecord) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid or expired OTP' 
+      });
+    }
+
+    // Mark OTP as used (optional - hospitals may want to keep it for multiple assignments)
+    // For now, we won't mark as used so hospitals can assign multiple tests with same OTP
+    // otpRecord.used = true;
+    // await otpRecord.save();
+
+    // Log access activity
+    ActivityLog.create({
+      patient: patient._id,
+      action: 'hospital_access_granted',
+      performedBy: { 
+        id: req.user._id, 
+        role: 'hospital', 
+        name: req.user.name 
+      },
+      details: `${req.user.name} granted access via email + OTP`
+    }).catch(() => {});
+
+    // Return patient details
+    res.json({
+      success: true,
+      data: {
+        patient: {
+          _id: patient._id,
+          name: patient.name,
+          email: patient.email,
+          phone: patient.phone,
+          dateOfBirth: patient.dateOfBirth,
+          gender: patient.gender,
+          bloodGroup: patient.bloodGroup,
+          address: patient.address
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // @route   POST /api/hospital/verify-patient
 // @desc    Verify patient using OTP or QR code
@@ -532,8 +616,11 @@ router.post('/verify-patient', async (req, res) => {
         return res.status(400).json({ success: false, message: 'OTP is required' });
       }
 
+      // Hash the OTP to match database storage
+      const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+
       const otpRecord = await PatientAccessOTP.findOne({
-        otp,
+        otpHash,
         expiresAt: { $gt: new Date() }
       }).populate('patient');
 
@@ -575,8 +662,8 @@ router.post('/verify-patient', async (req, res) => {
     }
 
     // Get patient details
-    const patient = await User.findOne({ _id: patientId, role: 'patient' })
-      .select('name email phone dateOfBirth gender address')
+    const patient = await User.findOne({ _id: patientId, role: 'user' })
+      .select('name email phone dateOfBirth gender address bloodGroup')
       .lean();
 
     if (!patient) {
@@ -586,6 +673,39 @@ router.post('/verify-patient', async (req, res) => {
     res.json({ success: true, data: { patient } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/hospital/patient-records/:patientId
+// @desc    Get patient medical records (hospital can view all records for verified patients)
+router.get('/patient-records/:patientId', async (req, res) => {
+  try {
+    // Verify patient exists
+    const patient = await User.findOne({ _id: req.params.patientId, role: 'user' });
+    if (!patient) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    // Get all medical records for this patient
+    const records = await MedicalRecord.find({ patient: req.params.patientId })
+      .sort({ visitDate: -1 })
+      .populate('doctor', 'name specialization email')
+      .populate('nurse', 'name email')
+      .populate('hospital', 'name')
+      .lean();
+
+    // Log the access
+    ActivityLog.create({
+      patient: req.params.patientId,
+      action: 'hospital_viewed_records',
+      performedBy: { id: req.user._id, role: 'hospital', name: req.user.name },
+      details: `Hospital ${req.user.name} viewed medical records`
+    }).catch(() => {});
+
+    res.json({ success: true, data: records });
+  } catch (error) {
+    console.error('Error fetching patient records:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -620,9 +740,9 @@ router.post('/test-assignments', async (req, res) => {
 
     // Verify nurse is affiliated with this hospital
     const nurseAffiliation = await HospitalAffiliation.findOne({
-      hospital: req.user._id,
-      user: nurseId,
-      role: 'nurse',
+      hospitalId: req.user._id,
+      staffId: nurseId,
+      staffRole: 'nurse',
       status: 'active'
     });
 
@@ -634,7 +754,7 @@ router.post('/test-assignments', async (req, res) => {
     }
 
     // Verify patient exists
-    const patient = await User.findOne({ _id: patientId, role: 'patient' });
+    const patient = await User.findOne({ _id: patientId, role: 'user' });
     if (!patient) {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
@@ -651,17 +771,16 @@ router.post('/test-assignments', async (req, res) => {
     // Create notification for nurse
     await Notification.create({
       user: nurseId,
+      userModel: 'Nurse',
       type: 'test_assigned',
       title: 'New Test Assignment',
-      message: `You have been assigned a new test: ${testType.name} for patient ${patient.name}`,
-      relatedModel: 'TestAssignment',
-      relatedId: testAssignment._id
+      message: `You have been assigned a new test: ${testType.name} for patient ${patient.name}`
     });
 
     await logAudit(
       req.user._id,
       'create_test_assignment',
-      req.user._id,
+      { id: req.user._id, role: 'hospital', name: req.user.name },
       { 
         testAssignmentId: testAssignment._id, 
         testTypeName: testType.name,
@@ -678,7 +797,8 @@ router.post('/test-assignments', async (req, res) => {
 
     res.status(201).json({ success: true, data: populatedAssignment });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error creating test assignment:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -703,7 +823,8 @@ router.get('/test-assignments', async (req, res) => {
 
     res.json({ success: true, data: assignments });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error fetching test assignments:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -729,7 +850,8 @@ router.get('/test-assignments/:id', async (req, res) => {
 
     res.json({ success: true, data: assignment });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error fetching test assignment:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -762,23 +884,23 @@ router.patch('/test-assignments/:id/cancel', async (req, res) => {
     // Notify nurse
     await Notification.create({
       user: assignment.nurse,
+      userModel: 'Nurse',
       type: 'test_cancelled',
       title: 'Test Assignment Cancelled',
-      message: `A test assignment has been cancelled by the hospital`,
-      relatedModel: 'TestAssignment',
-      relatedId: assignment._id
+      message: `A test assignment has been cancelled by the hospital`
     });
 
     await logAudit(
       req.user._id,
       'cancel_test_assignment',
-      req.user._id,
+      { id: req.user._id, role: 'hospital', name: req.user.name },
       { testAssignmentId: assignment._id }
     );
 
     res.json({ success: true, message: 'Test assignment cancelled' });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Error cancelling test assignment:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 

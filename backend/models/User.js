@@ -34,13 +34,16 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     trim: true
+    // Optional - can be added in profile
   },
   dateOfBirth: {
     type: Date
+    // Optional - can be added in profile
   },
   gender: {
     type: String,
     enum: ['male', 'female', 'other']
+    // Optional - can be added in profile
   },
   address: {
     street: String,
@@ -48,10 +51,12 @@ const userSchema = new mongoose.Schema({
     state: String,
     zipCode: String,
     country: String
+    // Optional - can be added in profile
   },
   bloodGroup: {
     type: String,
     enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+    // Optional - can be added in profile
   },
   medicalRecords: [{
     type: mongoose.Schema.Types.ObjectId,

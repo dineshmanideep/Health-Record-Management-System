@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+import QRScanner from '../../components/QRScanner';
 import { useAuth } from '../../context/AuthContext';
 import { profileService, doctorService } from '../../services/api';
 
@@ -25,6 +26,7 @@ const DoctorDashboard = () => {
   const [qrToken, setQrToken] = useState('');
   const [qrAccessMsg, setQrAccessMsg] = useState({ type: '', text: '' });
   const [accessingQr, setAccessingQr] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   const [accessMethod, setAccessMethod] = useState('otp');
 
@@ -153,6 +155,36 @@ const DoctorDashboard = () => {
     }
   };
 
+  const handleQRScan = async (scannedText) => {
+    // Close scanner immediately
+    setShowQRScanner(false);
+    
+    // Strip the 'hrms:patient:' prefix if present
+    let token = scannedText;
+    if (token.startsWith('hrms:patient:')) {
+      token = token.replace('hrms:patient:', '');
+    }
+    
+    // Directly verify the QR token
+    setAccessingQr(true);
+    setQrAccessMsg({ type: '', text: '' });
+    try {
+      const res = await doctorService.verifyQrToken(token.trim());
+      setQrAccessMsg({ type: 'success', text: `✅ Access granted to patient: ${res.data?.patientName || 'Unknown'}` });
+      fetchData();
+    } catch (err) {
+      setQrAccessMsg({ type: 'error', text: err?.response?.data?.message || 'Invalid QR code.' });
+    } finally {
+      setAccessingQr(false);
+    }
+  };
+
+  const handleQRScanError = (error) => {
+    console.error('QR Scan error:', error);
+    setShowQRScanner(false);
+    setQrAccessMsg({ type: 'error', text: 'Failed to scan QR code. Please check camera permissions.' });
+  };
+
   return (
     <DashboardLayout title="Doctor Dashboard">
       {/* KPI Cards */}
@@ -169,10 +201,10 @@ const DoctorDashboard = () => {
           <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Hospital Affiliations</h3>
           <p className="text-4xl font-bold text-purple-600">{dashboard?.affiliationCount ?? 0}</p>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm">
+        {/* <div className="bg-white p-6 rounded-xl shadow-sm">
           <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Rating</h3>
           <p className="text-4xl font-bold text-purple-600">{user?.rating?.toFixed(1) ?? '0.0'}</p>
-        </div>
+        </div> */}
       </div>
 
       {/* Nurse Request Notification Bell */}
@@ -302,25 +334,45 @@ const DoctorDashboard = () => {
             </button>
           </form>
         ) : (
-          <form onSubmit={handleQrAccess} className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1">
-              <label className="block text-xs font-semibold text-gray-600 mb-1">QR Token</label>
-              <input
-                type="text"
-                value={qrToken}
-                onChange={(e) => setQrToken(e.target.value.trim())}
-                placeholder="Paste QR code token here"
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:border-purple-600 transition-colors"
-              />
+          <div className="space-y-3">
+            {/* Scan QR Code Button - Primary Action */}
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowQRScanner(true)}
+                disabled={accessingQr}
+                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-bold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="text-2xl">📷</span>
+                <span>{accessingQr ? 'Verifying...' : 'Scan Patient QR Code'}</span>
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={accessingQr || !qrToken}
-              className="px-5 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50"
-            >
-              {accessingQr ? 'Verifying...' : 'Verify QR'}
-            </button>
-          </form>
+            
+            {/* Optional: Manual QR Token Input (collapsed by default) */}
+            <details className="mt-4">
+              <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-700 text-center">Or paste QR token manually</summary>
+              <form onSubmit={handleQrAccess} className="mt-3 space-y-2">
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={qrToken}
+                      onChange={(e) => setQrToken(e.target.value.trim())}
+                      placeholder="Paste QR code token here"
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:border-purple-600 transition-colors"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={accessingQr || !qrToken}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50"
+                  >
+                    Verify
+                  </button>
+                </div>
+              </form>
+            </details>
+          </div>
         )}
 
         {accessMsg.text && accessMethod === 'otp' && (
@@ -445,7 +497,7 @@ const DoctorDashboard = () => {
       </div>
 
       {/* Recent Records */}
-      <div className="bg-white p-6 rounded-xl shadow-sm">
+      {/* <div className="bg-white p-6 rounded-xl shadow-sm">
         <h2 className="text-gray-800 text-xl font-semibold mb-4">Recent Medical Records</h2>
         {!dashboard?.recentRecords?.length ? (
           <p className="text-gray-500 text-sm">No medical records yet.</p>
@@ -462,7 +514,16 @@ const DoctorDashboard = () => {
             ))}
           </div>
         )}
-      </div>
+      </div> */}
+
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner
+          onScan={handleQRScan}
+          onError={handleQRScanError}
+          onClose={() => setShowQRScanner(false)}
+        />
+      )}
     </DashboardLayout>
   );
 };

@@ -25,8 +25,8 @@ const hospitalSchema = new mongoose.Schema({
     default: 'hospital'
   },
   phone: {
-    type: String,
-    required: true
+    type: String
+    // Optional - can be added in profile
   },
   registrationNumber: {
     type: String,
@@ -35,30 +35,30 @@ const hospitalSchema = new mongoose.Schema({
   },
   address: {
     street: {
-      type: String,
-      required: true
+      type: String
+      // Optional - can be added in profile
     },
     city: {
-      type: String,
-      required: true
+      type: String
+      // Optional - can be added in profile
     },
     state: {
-      type: String,
-      required: true
+      type: String
+      // Optional - can be added in profile
     },
     zipCode: {
-      type: String,
-      required: true
+      type: String
+      // Optional - can be added in profile
     },
     country: {
-      type: String,
-      required: true
+      type: String
+      // Optional - can be added in profile
     }
   },
   hospitalType: {
     type: String,
-    enum: ['Government', 'Private', 'Semi-Government'],
-    required: true
+    enum: ['Government', 'Private', 'Semi-Government']
+    // Optional - can be added in profile
   },
   facilities: [{
     type: String

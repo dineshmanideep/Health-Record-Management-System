@@ -24,6 +24,9 @@ const notificationSchema = new mongoose.Schema({
       'nurse_extension_request',
       'nurse_request_approved',
       'nurse_request_rejected',
+      'test_assigned',
+      'test_completed',
+      'test_cancelled',
       'general'
     ],
     required: true

@@ -3,13 +3,14 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { patientService } from '../../services/api';
 
 const PatientMedicalRecords = () => {
-  const [tab, setTab] = useState('hospital'); // 'hospital' | 'self' | 'doctors'
+  const [tab, setTab] = useState('hospital'); // 'hospital' | 'self' | 'doctors' | 'documents'
   const [groupedRecords, setGroupedRecords] = useState([]);
   const [selfRecords, setSelfRecords] = useState([]);
   const [trustedDoctors, setTrustedDoctors] = useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [documentFilter, setDocumentFilter] = useState('all'); // 'all' | 'test' | 'diagnosis'
 
   // Self-record form state
   const [showForm, setShowForm] = useState(false);
@@ -98,8 +99,62 @@ const PatientMedicalRecords = () => {
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString() : 'N/A';
 
+  // Get all documents from all records in timeline order
+  const getAllDocuments = () => {
+    const allDocs = [];
+    groupedRecords.forEach(group => {
+      group.records.forEach(record => {
+        if (record.recordType === 'medical_record') {
+          // Handle doctor-created medical records
+          if (record.categorizedDocuments?.length > 0) {
+            record.categorizedDocuments.forEach(doc => {
+              allDocs.push({
+                ...doc,
+                record: {
+                  _id: record._id,
+                  recordType: 'medical_record',
+                  visitDate: record.visitDate,
+                  diagnosis: record.diagnosis,
+                  doctor: record.doctor,
+                  hospital: record.hospital,
+                  nurse: record.nurse
+                }
+              });
+            });
+          }
+        } else if (record.recordType === 'test_assignment') {
+          // Handle test assignments
+          if (record.resultDocuments?.length > 0) {
+            record.resultDocuments.forEach(doc => {
+              allDocs.push({
+                ...doc,
+                record: {
+                  _id: record._id,
+                  recordType: 'test_assignment',
+                  completedAt: record.completedAt,
+                  testType: record.testType,
+                  results: record.results,
+                  nurse: record.nurse,
+                  hospital: record.hospital
+                }
+              });
+            });
+          }
+        }
+      });
+    });
+    
+    // Sort by upload date (newest first)
+    return allDocs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+  };
+
+  const allDocuments = getAllDocuments();
+  const testReports = allDocuments.filter(d => d.category === 'test_report');
+  const diagnosisReports = allDocuments.filter(d => d.category === 'diagnosis_report');
+
   const tabs = [
     { key: 'hospital', label: 'Hospital Records' },
+    { key: 'documents', label: 'All Documents' },
     { key: 'self', label: 'Self-Uploaded' },
     { key: 'doctors', label: 'Trusted Doctors' }
   ];
@@ -135,146 +190,240 @@ const PatientMedicalRecords = () => {
                   <button onClick={() => setSelectedRecord(null)} className="text-purple-600 font-medium mb-4 cursor-pointer bg-transparent border-none text-sm">
                     ← Back to Records
                   </button>
-                  <h2 className="text-2xl font-semibold text-gray-800 mb-4">Visit Details</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div><span className="font-semibold text-gray-600">Visit Date:</span> <span>{formatDate(selectedRecord.visitDate)}</span></div>
-                      <div><span className="font-semibold text-gray-600">Doctor:</span> <span>Dr. {selectedRecord.doctor?.name} ({selectedRecord.doctor?.specialization})</span></div>
-                      <div><span className="font-semibold text-gray-600">Hospital:</span> <span>{selectedRecord.hospital?.name}</span></div>
-                      <div><span className="font-semibold text-gray-600">Recorded By:</span> <span>Nurse {selectedRecord.nurse?.name}</span></div>
-                      <div><span className="font-semibold text-gray-600">Diagnosis:</span> <span>{selectedRecord.diagnosis}</span></div>
-                      {selectedRecord.symptoms && <div><span className="font-semibold text-gray-600">Symptoms:</span> <span>{selectedRecord.symptoms}</span></div>}
-                      {selectedRecord.recommendedTests && <div><span className="font-semibold text-gray-600">Recommended Tests:</span> <span>{selectedRecord.recommendedTests}</span></div>}
-                      {selectedRecord.nextVisitDate && <div><span className="font-semibold text-gray-600">Next Visit:</span> <span className="text-yellow-700 font-medium">{formatDate(selectedRecord.nextVisitDate)}</span></div>}
-                    </div>
-                    <div className="space-y-3">
-                      {selectedRecord.prescriptionNotes && (
-                        <div>
-                          <span className="font-semibold text-gray-600 block mb-1">Prescription:</span>
-                          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded text-sm whitespace-pre-wrap">
-                            {selectedRecord.prescriptionNotes}
-                          </div>
+                  
+                  {selectedRecord.recordType === 'medical_record' ? (
+                    /* MEDICAL RECORD DETAIL VIEW */
+                    <>
+                      <h2 className="text-2xl font-semibold text-gray-800 mb-4">Visit Details</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div><span className="font-semibold text-gray-600">Visit Date:</span> <span>{formatDate(selectedRecord.visitDate)}</span></div>
+                          <div><span className="font-semibold text-gray-600">Doctor:</span> <span>Dr. {selectedRecord.doctor?.name} ({selectedRecord.doctor?.specialization})</span></div>
+                          <div><span className="font-semibold text-gray-600">Hospital:</span> <span>{selectedRecord.hospital?.name}</span></div>
+                          <div><span className="font-semibold text-gray-600">Recorded By:</span> <span>Nurse {selectedRecord.nurse?.name}</span></div>
+                          <div><span className="font-semibold text-gray-600">Diagnosis:</span> <span>{selectedRecord.diagnosis}</span></div>
+                          {selectedRecord.symptoms && <div><span className="font-semibold text-gray-600">Symptoms:</span> <span>{selectedRecord.symptoms}</span></div>}
+                          {selectedRecord.recommendedTests && <div><span className="font-semibold text-gray-600">Recommended Tests:</span> <span>{selectedRecord.recommendedTests}</span></div>}
+                          {selectedRecord.nextVisitDate && <div><span className="font-semibold text-gray-600">Next Visit:</span> <span className="text-yellow-700 font-medium">{formatDate(selectedRecord.nextVisitDate)}</span></div>}
                         </div>
-                      )}
-                      
-                      {/* Test Reports */}
-                      {selectedRecord.categorizedDocuments?.filter(d => d.category === 'test_report').length > 0 && (
-                        <div>
-                          <span className="font-semibold text-gray-600 block mb-2">🧪 Test Reports:</span>
-                          <div className="space-y-2">
-                            {selectedRecord.categorizedDocuments
-                              .filter(d => d.category === 'test_report')
-                              .map((doc, i) => (
-                                <a
-                                  key={i}
-                                  href={doc.filePath.startsWith('http') ? doc.filePath : `http://localhost:5000${doc.filePath}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center justify-between gap-2 text-green-700 hover:text-green-900 font-medium text-sm bg-green-50 border border-green-200 px-4 py-3 rounded-lg"
-                                >
-                                  <span className="flex items-center gap-2">
-                                    📊 {doc.filePath.split('/').pop()}
-                                  </span>
-                                  <span className="text-xs text-green-600">
-                                    {new Date(doc.uploadedAt).toLocaleDateString()}
-                                  </span>
-                                </a>
-                              ))}
-                          </div>
-                        </div>
-                      )}
+                        <div className="space-y-3">
+                          {selectedRecord.prescriptionNotes && (
+                            <div>
+                              <span className="font-semibold text-gray-600 block mb-1">Prescription:</span>
+                              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded text-sm whitespace-pre-wrap">
+                                {selectedRecord.prescriptionNotes}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Test Reports */}
+                          {selectedRecord.categorizedDocuments?.filter(d => d.category === 'test_report').length > 0 && (
+                            <div>
+                              <span className="font-semibold text-gray-600 block mb-2">🧪 Test Reports:</span>
+                              <div className="space-y-2">
+                                {selectedRecord.categorizedDocuments
+                                  .filter(d => d.category === 'test_report')
+                                  .map((doc, i) => (
+                                    <a
+                                      key={i}
+                                      href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center justify-between gap-2 text-green-700 hover:text-green-900 font-medium text-sm bg-green-50 border border-green-200 px-4 py-3 rounded-lg"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        📊 {doc.filePath.split('/').pop()}
+                                      </span>
+                                      <span className="text-xs text-green-600">
+                                        {new Date(doc.uploadedAt).toLocaleDateString()}
+                                      </span>
+                                    </a>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
 
-                      {/* Diagnosis Reports */}
-                      {selectedRecord.categorizedDocuments?.filter(d => d.category === 'diagnosis_report').length > 0 && (
-                        <div>
-                          <span className="font-semibold text-gray-600 block mb-2">📋 Diagnosis Reports:</span>
-                          <div className="space-y-2">
-                            {selectedRecord.categorizedDocuments
-                              .filter(d => d.category === 'diagnosis_report')
-                              .map((doc, i) => (
-                                <a
-                                  key={i}
-                                  href={doc.filePath.startsWith('http') ? doc.filePath : `http://localhost:5000${doc.filePath}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center justify-between gap-2 text-purple-700 hover:text-purple-900 font-medium text-sm bg-purple-50 border border-purple-200 px-4 py-3 rounded-lg"
-                                >
-                                  <span className="flex items-center gap-2">
-                                    📄 {doc.filePath.split('/').pop()}
-                                  </span>
-                                  <span className="text-xs text-purple-600">
-                                    {new Date(doc.uploadedAt).toLocaleDateString()}
-                                  </span>
-                                </a>
-                              ))}
+                          {/* Diagnosis Reports */}
+                          {selectedRecord.categorizedDocuments?.filter(d => d.category === 'diagnosis_report').length > 0 && (
+                            <div>
+                              <span className="font-semibold text-gray-600 block mb-2">📋 Diagnosis Reports:</span>
+                              <div className="space-y-2">
+                                {selectedRecord.categorizedDocuments
+                                  .filter(d => d.category === 'diagnosis_report')
+                                  .map((doc, i) => (
+                                    <a
+                                      key={i}
+                                      href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center justify-between gap-2 text-purple-700 hover:text-purple-900 font-medium text-sm bg-purple-50 border border-purple-200 px-4 py-3 rounded-lg"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        📄 {doc.filePath.split('/').pop()}
+                                      </span>
+                                      <span className="text-xs text-purple-600">
+                                        {new Date(doc.uploadedAt).toLocaleDateString()}
+                                      </span>
+                                    </a>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {selectedRecord.healthMetrics && Object.values(selectedRecord.healthMetrics).some(v => v != null) && (
+                        <div className="mt-6">
+                          <h3 className="font-semibold text-gray-700 mb-3">Health Metrics</h3>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {selectedRecord.healthMetrics.bloodSugar != null && (
+                              <div className="bg-green-50 p-3 rounded text-center">
+                                <p className="text-xs text-gray-500">Blood Sugar</p>
+                                <p className="text-lg font-bold text-green-700">{selectedRecord.healthMetrics.bloodSugar} mg/dL</p>
+                              </div>
+                            )}
+                            {selectedRecord.healthMetrics.bloodPressureSystolic != null && (
+                              <div className="bg-red-50 p-3 rounded text-center">
+                                <p className="text-xs text-gray-500">Blood Pressure</p>
+                                <p className="text-lg font-bold text-red-700">{selectedRecord.healthMetrics.bloodPressureSystolic}/{selectedRecord.healthMetrics.bloodPressureDiastolic} mmHg</p>
+                              </div>
+                            )}
+                            {selectedRecord.healthMetrics.thyroidTSH != null && (
+                              <div className="bg-blue-50 p-3 rounded text-center">
+                                <p className="text-xs text-gray-500">Thyroid (TSH)</p>
+                                <p className="text-lg font-bold text-blue-700">{selectedRecord.healthMetrics.thyroidTSH} mIU/L</p>
+                              </div>
+                            )}
+                            {selectedRecord.healthMetrics.heartRate != null && (
+                              <div className="bg-purple-50 p-3 rounded text-center">
+                                <p className="text-xs text-gray-500">Heart Rate</p>
+                                <p className="text-lg font-bold text-purple-700">{selectedRecord.healthMetrics.heartRate} bpm</p>
+                              </div>
+                            )}
+                            {selectedRecord.healthMetrics.weight != null && (
+                              <div className="bg-yellow-50 p-3 rounded text-center">
+                                <p className="text-xs text-gray-500">Weight</p>
+                                <p className="text-lg font-bold text-yellow-700">{selectedRecord.healthMetrics.weight} kg</p>
+                              </div>
+                            )}
+                            {selectedRecord.healthMetrics.height != null && (
+                              <div className="bg-indigo-50 p-3 rounded text-center">
+                                <p className="text-xs text-gray-500">Height</p>
+                                <p className="text-lg font-bold text-indigo-700">{selectedRecord.healthMetrics.height} cm</p>
+                              </div>
+                            )}
+                            {selectedRecord.healthMetrics.temperature != null && (
+                              <div className="bg-orange-50 p-3 rounded text-center">
+                                <p className="text-xs text-gray-500">Temperature</p>
+                                <p className="text-lg font-bold text-orange-700">{selectedRecord.healthMetrics.temperature} °F</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
-                    </div>
-                  </div>
-                  {selectedRecord.healthMetrics && Object.values(selectedRecord.healthMetrics).some(v => v != null) && (
-                    <div className="mt-6">
-                      <h3 className="font-semibold text-gray-700 mb-3">Health Metrics</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {selectedRecord.healthMetrics.bloodSugar != null && (
-                          <div className="bg-green-50 p-3 rounded text-center">
-                            <p className="text-xs text-gray-500">Blood Sugar</p>
-                            <p className="text-lg font-bold text-green-700">{selectedRecord.healthMetrics.bloodSugar} mg/dL</p>
+                      {selectedRecord.editHistory?.length > 0 && (
+                        <div className="mt-6">
+                          <h3 className="font-semibold text-gray-700 mb-3">Edit History</h3>
+                          <div className="space-y-2">
+                            {selectedRecord.editHistory.map((edit, i) => (
+                              <div key={i} className="bg-yellow-50 p-3 rounded text-sm">
+                                <p className="font-medium text-gray-700">{edit.summary}</p>
+                                <p className="text-gray-500 text-xs mt-1">{new Date(edit.editedAt).toLocaleString()}</p>
+                              </div>
+                            ))}
                           </div>
-                        )}
-                        {selectedRecord.healthMetrics.bloodPressureSystolic != null && (
-                          <div className="bg-red-50 p-3 rounded text-center">
-                            <p className="text-xs text-gray-500">Blood Pressure</p>
-                            <p className="text-lg font-bold text-red-700">{selectedRecord.healthMetrics.bloodPressureSystolic}/{selectedRecord.healthMetrics.bloodPressureDiastolic} mmHg</p>
-                          </div>
-                        )}
-                        {selectedRecord.healthMetrics.thyroidTSH != null && (
-                          <div className="bg-blue-50 p-3 rounded text-center">
-                            <p className="text-xs text-gray-500">Thyroid (TSH)</p>
-                            <p className="text-lg font-bold text-blue-700">{selectedRecord.healthMetrics.thyroidTSH} mIU/L</p>
-                          </div>
-                        )}
-                        {selectedRecord.healthMetrics.heartRate != null && (
-                          <div className="bg-purple-50 p-3 rounded text-center">
-                            <p className="text-xs text-gray-500">Heart Rate</p>
-                            <p className="text-lg font-bold text-purple-700">{selectedRecord.healthMetrics.heartRate} bpm</p>
-                          </div>
-                        )}
-                        {selectedRecord.healthMetrics.weight != null && (
-                          <div className="bg-yellow-50 p-3 rounded text-center">
-                            <p className="text-xs text-gray-500">Weight</p>
-                            <p className="text-lg font-bold text-yellow-700">{selectedRecord.healthMetrics.weight} kg</p>
-                          </div>
-                        )}
-                        {selectedRecord.healthMetrics.height != null && (
-                          <div className="bg-indigo-50 p-3 rounded text-center">
-                            <p className="text-xs text-gray-500">Height</p>
-                            <p className="text-lg font-bold text-indigo-700">{selectedRecord.healthMetrics.height} cm</p>
-                          </div>
-                        )}
-                        {selectedRecord.healthMetrics.temperature != null && (
-                          <div className="bg-orange-50 p-3 rounded text-center">
-                            <p className="text-xs text-gray-500">Temperature</p>
-                            <p className="text-lg font-bold text-orange-700">{selectedRecord.healthMetrics.temperature} °F</p>
-                          </div>
-                        )}
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-400 mt-4">Record created: {new Date(selectedRecord.createdAt).toLocaleString()}</p>
+                    </>
+                  ) : (
+                    /* TEST ASSIGNMENT DETAIL VIEW */
+                    <>
+                      <h2 className="text-2xl font-semibold text-gray-800 mb-4">Test Assignment Details</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div><span className="font-semibold text-gray-600">Test Type:</span> <span className="text-lg font-medium text-green-700">🧪 {selectedRecord.testType?.name}</span></div>
+                          {selectedRecord.testType?.description && <div><span className="font-semibold text-gray-600">Description:</span> <span className="text-sm text-gray-500">{selectedRecord.testType.description}</span></div>}
+                          <div><span className="font-semibold text-gray-600">Completed Date:</span> <span>{formatDate(selectedRecord.completedAt)}</span></div>
+                          <div><span className="font-semibold text-gray-600">Hospital:</span> <span>{selectedRecord.hospital?.name}</span></div>
+                          <div><span className="font-semibold text-gray-600">Performed By:</span> <span>Nurse {selectedRecord.nurse?.name}</span></div>
+                          <div><span className="font-semibold text-gray-600">Status:</span> <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">{selectedRecord.status}</span></div>
+                        </div>
+                        <div className="space-y-3">
+                          {selectedRecord.results && (
+                            <div>
+                              <span className="font-semibold text-gray-600 block mb-1">Test Results:</span>
+                              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded text-sm whitespace-pre-wrap">
+                                {selectedRecord.results}
+                              </div>
+                            </div>
+                          )}
+                          {selectedRecord.notes && (
+                            <div>
+                              <span className="font-semibold text-gray-600 block mb-1">Notes:</span>
+                              <div className="bg-gray-50 p-3 rounded text-sm whitespace-pre-wrap">
+                                {selectedRecord.notes}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Test Reports */}
+                          {selectedRecord.resultDocuments?.filter(d => d.category === 'test_report').length > 0 && (
+                            <div>
+                              <span className="font-semibold text-gray-600 block mb-2">🧪 Test Reports:</span>
+                              <div className="space-y-2">
+                                {selectedRecord.resultDocuments
+                                  .filter(d => d.category === 'test_report')
+                                  .map((doc, i) => (
+                                    <a
+                                      key={i}
+                                      href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center justify-between gap-2 text-green-700 hover:text-green-900 font-medium text-sm bg-green-50 border border-green-200 px-4 py-3 rounded-lg"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        📊 {doc.filePath.split('/').pop()}
+                                      </span>
+                                      <span className="text-xs text-green-600">
+                                        {new Date(doc.uploadedAt).toLocaleDateString()}
+                                      </span>
+                                    </a>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Diagnosis Reports */}
+                          {selectedRecord.resultDocuments?.filter(d => d.category === 'diagnosis_report').length > 0 && (
+                            <div>
+                              <span className="font-semibold text-gray-600 block mb-2">📋 Diagnosis Reports:</span>
+                              <div className="space-y-2">
+                                {selectedRecord.resultDocuments
+                                  .filter(d => d.category === 'diagnosis_report')
+                                  .map((doc, i) => (
+                                    <a
+                                      key={i}
+                                      href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center justify-between gap-2 text-purple-700 hover:text-purple-900 font-medium text-sm bg-purple-50 border border-purple-200 px-4 py-3 rounded-lg"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        📄 {doc.filePath.split('/').pop()}
+                                      </span>
+                                      <span className="text-xs text-purple-600">
+                                        {new Date(doc.uploadedAt).toLocaleDateString()}
+                                      </span>
+                                    </a>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                      <p className="text-xs text-gray-400 mt-4">Test assigned: {new Date(selectedRecord.createdAt).toLocaleString()}</p>
+                    </>
                   )}
-                  {selectedRecord.editHistory?.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="font-semibold text-gray-700 mb-3">Edit History</h3>
-                      <div className="space-y-2">
-                        {selectedRecord.editHistory.map((edit, i) => (
-                          <div key={i} className="bg-yellow-50 p-3 rounded text-sm">
-                            <p className="font-medium text-gray-700">{edit.summary}</p>
-                            <p className="text-gray-500 text-xs mt-1">{new Date(edit.editedAt).toLocaleString()}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-400 mt-4">Record created: {new Date(selectedRecord.createdAt).toLocaleString()}</p>
                 </div>
               ) : (
                 <>
@@ -292,9 +441,10 @@ const PatientMedicalRecords = () => {
                           <table className="w-full text-left">
                             <thead>
                               <tr className="border-b border-gray-200">
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Visit Date</th>
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Doctor</th>
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Diagnosis</th>
+                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Date</th>
+                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Type</th>
+                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Details</th>
+                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Staff</th>
                                 <th className="py-3 px-4 text-sm font-semibold text-gray-600">Documents</th>
                                 <th className="py-3 px-4 text-sm font-semibold text-gray-600">Action</th>
                               </tr>
@@ -302,11 +452,36 @@ const PatientMedicalRecords = () => {
                             <tbody>
                               {group.records.map((r) => (
                                 <tr key={r._id} className="border-b border-gray-100 hover:bg-gray-50">
-                                  <td className="py-3 px-4 text-sm">{formatDate(r.visitDate)}</td>
-                                  <td className="py-3 px-4 text-sm">Dr. {r.doctor?.name} <span className="text-gray-400 text-xs">({r.doctor?.specialization})</span></td>
-                                  <td className="py-3 px-4 text-sm">{r.diagnosis}</td>
+                                  <td className="py-3 px-4 text-sm">
+                                    {r.recordType === 'medical_record' 
+                                      ? formatDate(r.visitDate) 
+                                      : formatDate(r.completedAt)}
+                                  </td>
+                                  <td className="py-3 px-4 text-sm">
+                                    {r.recordType === 'medical_record' ? (
+                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium">
+                                        👨‍⚕️ Doctor Visit
+                                      </span>
+                                    ) : (
+                                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">
+                                        🧪 {r.testType?.name || 'Test'}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4 text-sm">
+                                    {r.recordType === 'medical_record' 
+                                      ? r.diagnosis 
+                                      : (r.results || r.notes || 'Test completed')}
+                                  </td>
+                                  <td className="py-3 px-4 text-sm">
+                                    {r.recordType === 'medical_record' ? (
+                                      <>Dr. {r.doctor?.name} <span className="text-gray-400 text-xs">({r.doctor?.specialization})</span></>
+                                    ) : (
+                                      <>Nurse {r.nurse?.name}</>
+                                    )}
+                                  </td>
                                   <td className="py-3 px-4 text-xs">
-                                    {r.categorizedDocuments?.length > 0 ? (
+                                    {r.recordType === 'medical_record' && r.categorizedDocuments?.length > 0 ? (
                                       <div className="flex gap-2">
                                         {r.categorizedDocuments.filter(d => d.category === 'test_report').length > 0 && (
                                           <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
@@ -316,6 +491,19 @@ const PatientMedicalRecords = () => {
                                         {r.categorizedDocuments.filter(d => d.category === 'diagnosis_report').length > 0 && (
                                           <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">
                                             📋 {r.categorizedDocuments.filter(d => d.category === 'diagnosis_report').length}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : r.recordType === 'test_assignment' && r.resultDocuments?.length > 0 ? (
+                                      <div className="flex gap-2">
+                                        {r.resultDocuments.filter(d => d.category === 'test_report').length > 0 && (
+                                          <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
+                                            🧪 {r.resultDocuments.filter(d => d.category === 'test_report').length}
+                                          </span>
+                                        )}
+                                        {r.resultDocuments.filter(d => d.category === 'diagnosis_report').length > 0 && (
+                                          <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                                            📋 {r.resultDocuments.filter(d => d.category === 'diagnosis_report').length}
                                           </span>
                                         )}
                                       </div>
@@ -340,7 +528,219 @@ const PatientMedicalRecords = () => {
               )}
             </>
           )}
+          {/* ==================== ALL DOCUMENTS ==================== */}
+          {tab === 'documents' && (
+            <div className="bg-white p-8 rounded-xl shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-2">Medical Documents</h2>
+                <p className="text-sm text-gray-500">All test reports and diagnosis documents from your hospital visits</p>
+              </div>
 
+              {/* Filter Buttons */}
+              <div className="flex gap-3 mb-6">
+                <button
+                  onClick={() => setDocumentFilter('all')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    documentFilter === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  All Documents ({allDocuments.length})
+                </button>
+                <button
+                  onClick={() => setDocumentFilter('test')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    documentFilter === 'test' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  🧪 Test Reports ({testReports.length})
+                </button>
+                <button
+                  onClick={() => setDocumentFilter('diagnosis')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    documentFilter === 'diagnosis' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  📋 Diagnosis Reports ({diagnosisReports.length})
+                </button>
+              </div>
+
+              {allDocuments.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <p className="text-6xl mb-4">📄</p>
+                  <p>No medical documents found yet.</p>
+                  <p className="text-sm mt-2">Documents will appear here after hospital visits and tests.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Test Reports Section */}
+                  {(documentFilter === 'all' || documentFilter === 'test') && testReports.length > 0 && (
+                    <div className="mb-8">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <span>🧪</span> Test Reports ({testReports.length})
+                      </h3>
+                      <div className="space-y-3">
+                        {testReports.map((doc, idx) => (
+                          <div key={idx} className="border-l-4 border-green-500 bg-green-50 p-4 rounded-lg hover:bg-green-100 transition-colors">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <a
+                                    href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-green-700 hover:text-green-900 font-semibold flex items-center gap-2 no-underline"
+                                  >
+                                    <span className="text-2xl">📊</span>
+                                    <span>{doc.filePath.split('/').pop()}</span>
+                                  </a>
+                                  <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full font-medium">
+                                    {new Date(doc.uploadedAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                                  {doc.record.recordType === 'medical_record' ? (
+                                    <>
+                                      <div>
+                                        <span className="font-medium">Visit Date:</span> {formatDate(doc.record.visitDate)}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Doctor:</span> Dr. {doc.record.doctor?.name} ({doc.record.doctor?.specialization})
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Hospital:</span> {doc.record.hospital?.name}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Diagnosis:</span> {doc.record.diagnosis}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div>
+                                        <span className="font-medium">Test Date:</span> {formatDate(doc.record.completedAt)}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Test Type:</span> 🧪 {doc.record.testType?.name}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Hospital:</span> {doc.record.hospital?.name}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Performed By:</span> Nurse {doc.record.nurse?.name}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const record = groupedRecords.flatMap(g => g.records).find(r => r._id === doc.record._id);
+                                  setSelectedRecord(record);
+                                  setTab('hospital');
+                                }}
+                                className="text-green-700 hover:text-green-900 font-medium text-sm bg-white border border-green-300 px-3 py-2 rounded-lg hover:bg-green-50 transition-colors"
+                              >
+                                View Record
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Diagnosis Reports Section */}
+                  {(documentFilter === 'all' || documentFilter === 'diagnosis') && diagnosisReports.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <span>📋</span> Diagnosis Reports ({diagnosisReports.length})
+                      </h3>
+                      <div className="space-y-3">
+                        {diagnosisReports.map((doc, idx) => (
+                          <div key={idx} className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition-colors">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <a
+                                    href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-700 hover:text-blue-900 font-semibold flex items-center gap-2 no-underline"
+                                  >
+                                    <span className="text-2xl">📄</span>
+                                    <span>{doc.filePath.split('/').pop()}</span>
+                                  </a>
+                                  <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full font-medium">
+                                    {new Date(doc.uploadedAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                                  {doc.record.recordType === 'medical_record' ? (
+                                    <>
+                                      <div>
+                                        <span className="font-medium">Visit Date:</span> {formatDate(doc.record.visitDate)}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Doctor:</span> Dr. {doc.record.doctor?.name} ({doc.record.doctor?.specialization})
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Hospital:</span> {doc.record.hospital?.name}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Diagnosis:</span> {doc.record.diagnosis}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div>
+                                        <span className="font-medium">Test Date:</span> {formatDate(doc.record.completedAt)}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Test Type:</span> 🧪 {doc.record.testType?.name}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Hospital:</span> {doc.record.hospital?.name}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">Performed By:</span> Nurse {doc.record.nurse?.name}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const record = groupedRecords.flatMap(g => g.records).find(r => r._id === doc.record._id);
+                                  setSelectedRecord(record);
+                                  setTab('hospital');
+                                }}
+                                className="text-blue-700 hover:text-blue-900 font-medium text-sm bg-white border border-blue-300 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                              >
+                                View Record
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No documents message for filtered view */}
+                  {documentFilter === 'test' && testReports.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <p className="text-4xl mb-2">🧪</p>
+                      <p>No test reports found.</p>
+                    </div>
+                  )}
+                  {documentFilter === 'diagnosis' && diagnosisReports.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <p className="text-4xl mb-2">📋</p>
+                      <p>No diagnosis reports found.</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           {/* ==================== SELF-UPLOADED RECORDS ==================== */}
           {tab === 'self' && (
             <div className="bg-white p-8 rounded-xl shadow-sm">

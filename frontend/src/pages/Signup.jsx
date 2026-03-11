@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getPasswordError } from '../utils/passwordValidation';
+import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -10,30 +12,11 @@ const Signup = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    phone: '',
     role: 'user',
-    // Patient fields
-    bloodGroup: '',
-    dateOfBirth: '',
-    gender: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
-    // Doctor/Nurse fields
-    specialization: '',
+    // Doctor/Nurse specific - only license number required
     licenseNumber: '',
-    qualification: '',
-    experience: '',
-    // Nurse specific
-    shift: 'Morning',
-    // Hospital fields
-    registrationNumber: '',
-    hospitalType: 'Private',
-    // Admin fields
-    accessLevel: 'admin'
+    // Hospital specific - only registration number required
+    registrationNumber: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,11 +26,21 @@ const Signup = () => {
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
     setError('');
+  };
+
+  const validatePassword = () => {
+    const errorMessage = getPasswordError(formData.password);
+    if (errorMessage) {
+      setError(errorMessage);
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -60,44 +53,26 @@ const Signup = () => {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!validatePassword()) {
       return;
     }
 
     setLoading(true);
 
-    // Destructure all role-specific flat fields before building the payload
-    const {
-      confirmPassword: _,
-      address, city, state, zipCode,
-      emergencyContactName, emergencyContactPhone,
-      gender,
-      ...rest
-    } = formData;
-
-    let signupData;
-
-    if (formData.role === 'hospital') {
-      // Hospital needs nested address object
-      signupData = {
-        ...rest,
-        address: { street: address, city, state, zipCode, country: 'India' }
-      };
-    } else if (formData.role === 'user') {
-      // Patient: nested address + emergencyContact + lowercase gender
-      signupData = {
-        ...rest,
-        gender: gender ? gender.toLowerCase() : undefined,
-        address: { street: address, city, state, zipCode },
-        emergencyContact: {
-          name: emergencyContactName,
-          phone: emergencyContactPhone
-        }
-      };
-    } else {
-      // Doctor / Nurse — no address nesting needed
-      signupData = { ...rest };
+    // Build signup data with only essential fields
+    const { confirmPassword: _, ...baseFields } = formData;
+    
+    // Remove empty/unused fields based on role
+    const signupData = { ...baseFields };
+    
+    // Remove licenseNumber for patient and hospital
+    if (formData.role === 'user' || formData.role === 'hospital') {
+      delete signupData.licenseNumber;
+    }
+    
+    // Remove registrationNumber for patient, doctor, and nurse
+    if (formData.role !== 'hospital') {
+      delete signupData.registrationNumber;
     }
 
     const result = await signup(signupData);
@@ -170,7 +145,7 @@ const Signup = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5 max-h-[60vh] overflow-y-auto px-2">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label htmlFor="role" className="block text-sm font-semibold text-gray-700">
               Select Role
@@ -223,406 +198,49 @@ const Signup = () => {
             />
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="phone" className="block text-sm font-semibold text-gray-700">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="Enter your phone number"
-              required
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-            />
-          </div>
-
-          {/* Patient Specific Fields */}
-          {formData.role === 'user' && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="dateOfBirth" className="block text-sm font-semibold text-gray-700">
-                  Date of Birth
-                </label>
-                <input
-                  type="date"
-                  id="dateOfBirth"
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="gender" className="block text-sm font-semibold text-gray-700">
-                  Gender
-                </label>
-                <select
-                  id="gender"
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                >
-                  <option value="">Select Gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="bloodGroup" className="block text-sm font-semibold text-gray-700">
-                  Blood Group
-                </label>
-                <select
-                  id="bloodGroup"
-                  name="bloodGroup"
-                  value={formData.bloodGroup}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                >
-                  <option value="">Select Blood Group</option>
-                  <option value="A+">A+</option>
-                  <option value="A-">A-</option>
-                  <option value="B+">B+</option>
-                  <option value="B-">B-</option>
-                  <option value="AB+">AB+</option>
-                  <option value="AB-">AB-</option>
-                  <option value="O+">O+</option>
-                  <option value="O-">O-</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="address" className="block text-sm font-semibold text-gray-700">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="Street address"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label htmlFor="city" className="block text-sm font-semibold text-gray-700">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    id="city"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    placeholder="City"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="state" className="block text-sm font-semibold text-gray-700">
-                    State
-                  </label>
-                  <input
-                    type="text"
-                    id="state"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    placeholder="State"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="zipCode" className="block text-sm font-semibold text-gray-700">
-                  ZIP Code
-                </label>
-                <input
-                  type="text"
-                  id="zipCode"
-                  name="zipCode"
-                  value={formData.zipCode}
-                  onChange={handleChange}
-                  placeholder="ZIP code"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="emergencyContactName" className="block text-sm font-semibold text-gray-700">
-                  Emergency Contact Name
-                </label>
-                <input
-                  type="text"
-                  id="emergencyContactName"
-                  name="emergencyContactName"
-                  value={formData.emergencyContactName}
-                  onChange={handleChange}
-                  placeholder="Emergency contact name"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="emergencyContactPhone" className="block text-sm font-semibold text-gray-700">
-                  Emergency Contact Phone
-                </label>
-                <input
-                  type="tel"
-                  id="emergencyContactPhone"
-                  name="emergencyContactPhone"
-                  value={formData.emergencyContactPhone}
-                  onChange={handleChange}
-                  placeholder="Emergency contact phone"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-            </>
+          {/* Doctor/Nurse: License Number */}
+          {(formData.role === 'doctor' || formData.role === 'nurse') && (
+            <div className="space-y-2">
+              <label htmlFor="licenseNumber" className="block text-sm font-semibold text-gray-700">
+                {formData.role === 'doctor' ? 'Medical License Number' : 'Nursing License Number'} *
+              </label>
+              <input
+                type="text"
+                id="licenseNumber"
+                name="licenseNumber"
+                value={formData.licenseNumber}
+                onChange={handleChange}
+                placeholder={`Enter your ${formData.role === 'doctor' ? 'medical' : 'nursing'} license number`}
+                required
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This will be verified by an admin before your account is activated.
+              </p>
+            </div>
           )}
 
-          {/* Doctor Specific Fields */}
-          {formData.role === 'doctor' && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="specialization" className="block text-sm font-semibold text-gray-700">
-                  Specialization
-                </label>
-                <input
-                  type="text"
-                  id="specialization"
-                  name="specialization"
-                  value={formData.specialization}
-                  onChange={handleChange}
-                  placeholder="e.g., Cardiology, Neurology"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="licenseNumber" className="block text-sm font-semibold text-gray-700">
-                  License Number
-                </label>
-                <input
-                  type="text"
-                  id="licenseNumber"
-                  name="licenseNumber"
-                  value={formData.licenseNumber}
-                  onChange={handleChange}
-                  placeholder="Medical license number"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="qualification" className="block text-sm font-semibold text-gray-700">
-                  Qualification
-                </label>
-                <input
-                  type="text"
-                  id="qualification"
-                  name="qualification"
-                  value={formData.qualification}
-                  onChange={handleChange}
-                  placeholder="e.g., MBBS, MD"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="experience" className="block text-sm font-semibold text-gray-700">
-                  Experience (years)
-                </label>
-                <input
-                  type="number"
-                  id="experience"
-                  name="experience"
-                  value={formData.experience}
-                  onChange={handleChange}
-                  placeholder="Years of experience"
-                  min="0"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Nurse Specific Fields */}
-          {formData.role === 'nurse' && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="licenseNumber" className="block text-sm font-semibold text-gray-700">
-                  License Number
-                </label>
-                <input
-                  type="text"
-                  id="licenseNumber"
-                  name="licenseNumber"
-                  value={formData.licenseNumber}
-                  onChange={handleChange}
-                  placeholder="Nursing license number"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="qualification" className="block text-sm font-semibold text-gray-700">
-                  Qualification
-                </label>
-                <input
-                  type="text"
-                  id="qualification"
-                  name="qualification"
-                  value={formData.qualification}
-                  onChange={handleChange}
-                  placeholder="e.g., BSN, RN"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="experience" className="block text-sm font-semibold text-gray-700">
-                  Experience (years)
-                </label>
-                <input
-                  type="number"
-                  id="experience"
-                  name="experience"
-                  value={formData.experience}
-                  onChange={handleChange}
-                  placeholder="Years of experience"
-                  min="0"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="shift" className="block text-sm font-semibold text-gray-700">
-                  Preferred Shift
-                </label>
-                <select
-                  id="shift"
-                  name="shift"
-                  value={formData.shift}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                >
-                  <option value="Morning">Morning</option>
-                  <option value="Evening">Evening</option>
-                  <option value="Night">Night</option>
-                </select>
-              </div>
-            </>
-          )}
-
-          {/* Hospital Specific Fields */}
+          {/* Hospital: Registration Number */}
           {formData.role === 'hospital' && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="registrationNumber" className="block text-sm font-semibold text-gray-700">
-                  Registration Number
-                </label>
-                <input
-                  type="text"
-                  id="registrationNumber"
-                  name="registrationNumber"
-                  value={formData.registrationNumber}
-                  onChange={handleChange}
-                  placeholder="Hospital registration number"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="hospitalType" className="block text-sm font-semibold text-gray-700">
-                  Hospital Type
-                </label>
-                <select
-                  id="hospitalType"
-                  name="hospitalType"
-                  value={formData.hospitalType}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                >
-                  <option value="Private">Private</option>
-                  <option value="Government">Government</option>
-                  <option value="Semi-Government">Semi-Government</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="address" className="block text-sm font-semibold text-gray-700">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="Street address"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label htmlFor="city" className="block text-sm font-semibold text-gray-700">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    id="city"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    placeholder="City"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="state" className="block text-sm font-semibold text-gray-700">
-                    State
-                  </label>
-                  <input
-                    type="text"
-                    id="state"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    placeholder="State"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="zipCode" className="block text-sm font-semibold text-gray-700">
-                  ZIP Code
-                </label>
-                <input
-                  type="text"
-                  id="zipCode"
-                  name="zipCode"
-                  value={formData.zipCode}
-                  onChange={handleChange}
-                  placeholder="ZIP code"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
-                />
-              </div>
-            </>
+            <div className="space-y-2">
+              <label htmlFor="registrationNumber" className="block text-sm font-semibold text-gray-700">
+                Hospital Registration Number *
+              </label>
+              <input
+                type="text"
+                id="registrationNumber"
+                name="registrationNumber"
+                value={formData.registrationNumber}
+                onChange={handleChange}
+                placeholder="Enter hospital registration number"
+                required
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This will be verified by an admin before your account is activated.
+              </p>
+            </div>
           )}
-
-          {/* Admin Specific Fields — removed: admin accounts are pre-seeded */}
 
           {/* Password Fields */}
           <div className="space-y-2">
@@ -635,10 +253,13 @@ const Signup = () => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="Enter your password (min 6 characters)"
+              placeholder="Enter your password"
               required
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
             />
+            
+            {/* Password Strength Indicator */}
+            <PasswordStrengthIndicator password={formData.password} />
           </div>
 
           <div className="space-y-2">
@@ -656,6 +277,8 @@ const Signup = () => {
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-600 transition-colors"
             />
           </div>
+
+       
 
           <button
             type="submit"

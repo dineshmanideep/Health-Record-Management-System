@@ -77,7 +77,10 @@ const DashboardLayout = ({ children, title }) => {
           {user?.role === 'nurse' && (
             <>
               <Link to="/nurse/assignments" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">📋</span> My Assignments
+                <span className="text-xl">📋</span> Doctor Assignments
+              </Link>
+              <Link to="/nurse/test-assignments" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">🧪</span> Hospital Tests
               </Link>
               <Link to="/nurse/audit-logs" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
                 <span className="text-xl">🔍</span> Audit Logs
@@ -92,8 +95,14 @@ const DashboardLayout = ({ children, title }) => {
               <Link to="/hospital/nurses" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
                 <span className="text-xl">👩‍⚕️</span> Nurses
               </Link>
+              <Link to="/hospital/tests" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">🧪</span> Test Types
+              </Link>
+              <Link to="/hospital/test-assignments" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
+                <span className="text-xl">📋</span> Test Assignments
+              </Link>
               <Link to="/hospital/audit-logs" className="text-white no-underline px-5 py-4 flex items-center gap-3 hover:bg-white/10 transition-colors">
-                <span className="text-xl">📋</span> Audit Logs
+                <span className="text-xl">🔍</span> Audit Logs
               </Link>
             </>
           )}

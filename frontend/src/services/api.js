@@ -119,7 +119,9 @@ export const profileService = {
     updateTestType: (id, data) => api.put(`/hospital/test-types/${id}`, data).then((r) => r.data),
     deleteTestType: (id) => api.delete(`/hospital/test-types/${id}`).then((r) => r.data),
     // Patient verification
+    verifyPatientWithEmail: (patientEmail, otp) => api.post('/hospital/patient-access/verify-otp', { patientEmail, otp }).then((r) => r.data),
     verifyPatient: (method, data) => api.post('/hospital/verify-patient', { method, ...data }).then((r) => r.data),
+    getPatientRecords: (patientId) => api.get(`/hospital/patient-records/${patientId}`).then((r) => r.data),
     // Test assignments
     createTestAssignment: (data) => api.post('/hospital/test-assignments', data).then((r) => r.data),
     getTestAssignments: (filters) => {
@@ -236,5 +238,8 @@ export const nurseService = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }).then((r) => r.data)
 };
+
+// Export hospital service for easier import
+export const hospitalService = profileService.hospital;
 
 export default api;

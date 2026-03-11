@@ -16,7 +16,14 @@ const hospitalAuditLogSchema = new mongoose.Schema(
         'nurse_revoked',
         'nurse_assigned_to_doctor',
         'nurse_unassigned_from_doctor',
-        'profile_updated'
+        'profile_updated',
+        'create_test_type',
+        'update_test_type',
+        'deactivate_test_type',
+        'create_test_assignment',
+        'start_test_assignment',
+        'complete_test_assignment',
+        'cancel_test_assignment'
       ],
       required: true
     },
@@ -26,7 +33,7 @@ const hospitalAuditLogSchema = new mongoose.Schema(
       name: { type: String }
     },
     details: {
-      type: String
+      type: mongoose.Schema.Types.Mixed
     }
   },
   { timestamps: true }

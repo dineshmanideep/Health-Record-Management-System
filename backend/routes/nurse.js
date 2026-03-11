@@ -93,6 +93,7 @@ router.put('/profile', async (req, res) => {
 // @route   POST /api/nurse/affiliate
 // @desc    Affiliate this nurse with a hospital using a hospital-generated OTP
 // @access  Private — nurse only
+// NOTE: One nurse can only be affiliated with ONE hospital at a time
 router.post('/affiliate', async (req, res) => {
   try {
     const { otp, department } = req.body;
@@ -110,14 +111,29 @@ router.post('/affiliate', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
     }
 
+    // Check if nurse already has an active affiliation with ANY hospital
+    const existingAffiliation = await HospitalAffiliation.findOne({
+      staffId: req.user._id,
+      staffRole: 'nurse',
+      status: 'active'
+    });
+
+    if (existingAffiliation) {
+      const currentHospital = await Hospital.findById(existingAffiliation.hospitalId).select('name');
+      return res.status(409).json({ 
+        success: false, 
+        message: `You are already affiliated with ${currentHospital?.name || 'another hospital'}. A nurse can only work at one hospital at a time.` 
+      });
+    }
+
+    // Check if there's an inactive affiliation with this specific hospital
     const existing = await HospitalAffiliation.findOne({
       staffId: req.user._id,
       hospitalId: otpRecord.hospitalId
     });
-    if (existing) {
-      if (existing.status === 'active') {
-        return res.status(409).json({ success: false, message: 'You are already affiliated with this hospital' });
-      }
+    
+    if (existing && existing.status === 'inactive') {
+      // Reactivate the affiliation
       existing.status = 'active';
       existing.joinedAt = new Date();
       existing.leftAt = undefined;
@@ -128,6 +144,7 @@ router.post('/affiliate', async (req, res) => {
       return res.json({ success: true, data: existing, hospital });
     }
 
+    // Create new affiliation
     const affiliation = await HospitalAffiliation.create({
       staffId: req.user._id,
       staffRole: 'nurse',
@@ -148,23 +165,25 @@ router.post('/affiliate', async (req, res) => {
 });
 
 // @route   GET /api/nurse/affiliations
-// @desc    Get all hospital affiliations for this nurse
+// @desc    Get hospital affiliation for this nurse (single hospital only)
 // @access  Private — nurse only
 router.get('/affiliations', async (req, res) => {
   try {
-    const affiliations = await HospitalAffiliation.find({
+    // One nurse can only be affiliated with ONE hospital
+    const affiliation = await HospitalAffiliation.findOne({
       staffId: req.user._id,
-      staffRole: 'nurse'
+      staffRole: 'nurse',
+      status: 'active'
     });
 
-    const populated = await Promise.all(
-      affiliations.map(async (aff) => {
-        const hospital = await Hospital.findById(aff.hospitalId).select('name address phone email hospitalType');
-        return { ...aff.toObject(), hospital };
-      })
-    );
+    if (!affiliation) {
+      return res.json({ success: true, data: null });
+    }
 
-    res.json({ success: true, count: populated.length, data: populated });
+    const hospital = await Hospital.findById(affiliation.hospitalId).select('name address phone email hospitalType');
+    const result = { ...affiliation.toObject(), hospital };
+
+    res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -174,12 +193,22 @@ router.get('/affiliations', async (req, res) => {
 // @desc    Get dashboard stats for this nurse
 router.get('/dashboard', async (req, res) => {
   try {
-    const affiliations = await HospitalAffiliation.find({ staffId: req.user._id, staffRole: 'nurse', status: 'active' });
-    const affiliationCount = affiliations.length;
+    // One nurse = one hospital
+    const affiliation = await HospitalAffiliation.findOne({ 
+      staffId: req.user._id, 
+      staffRole: 'nurse', 
+      status: 'active' 
+    });
 
-    // Find assigned doctors
-    const assignedDoctorIds = affiliations.filter(a => a.assignedDoctor).map(a => a.assignedDoctor);
-    const assignedDoctors = await Doctor.find({ _id: { $in: assignedDoctorIds } }).select('name specialization email');
+    let hospital = null;
+    let assignedDoctor = null;
+
+    if (affiliation) {
+      hospital = await Hospital.findById(affiliation.hospitalId).select('name address');
+      if (affiliation.assignedDoctor) {
+        assignedDoctor = await Doctor.findById(affiliation.assignedDoctor).select('name specialization email');
+      }
+    }
 
     const recordCount = await MedicalRecord.countDocuments({ nurse: req.user._id });
 
@@ -210,15 +239,36 @@ router.get('/dashboard', async (req, res) => {
       .populate('hospital', 'name')
       .lean();
 
+    // Pending hospital test assignments count
+    const pendingTestAssignmentsCount = await TestAssignment.countDocuments({ 
+      nurse: req.user._id, 
+      status: 'pending' 
+    });
+
+    // Recent pending test assignments
+    const pendingTestAssignments = await TestAssignment.find({ 
+      nurse: req.user._id, 
+      status: 'pending' 
+    })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('testType', 'name category')
+      .populate('patient', 'name patientId')
+      .populate('hospital', 'name')
+      .lean();
+
     res.json({
       success: true,
       data: { 
-        affiliationCount, 
-        assignedDoctors, 
+        hospital,
+        assignedDoctor, 
         recordCount, 
         recentRecords,
         pendingAssignmentsCount,
-        pendingAssignments
+        pendingAssignments,
+        pendingTestAssignmentsCount,
+        pendingTestAssignments,
+        isAffiliated: !!affiliation
       }
     });
   } catch (error) {
@@ -546,7 +596,11 @@ router.patch('/test-assignments/:id/start', async (req, res) => {
     await HospitalAuditLog.create({
       hospital: assignment.hospital,
       action: 'start_test_assignment',
-      performedBy: req.user._id,
+      performedBy: { 
+        id: req.user._id, 
+        role: 'nurse', 
+        name: req.user.name 
+      },
       details: { testAssignmentId: assignment._id }
     });
 
@@ -564,7 +618,7 @@ router.patch('/test-assignments/:id/start', async (req, res) => {
 // @desc    Complete test assignment with results and documents
 router.post('/test-assignments/:id/complete', uploadTestResults.array('documents', 10), async (req, res) => {
   try {
-    const { results, documentCategories } = req.body;
+    const { results } = req.body;
 
     const assignment = await TestAssignment.findOne({
       _id: req.params.id,
@@ -595,11 +649,13 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
     // Process uploaded documents with categories
     const resultDocuments = [];
     if (req.files && req.files.length > 0) {
-      const categories = documentCategories ? JSON.parse(documentCategories) : [];
       req.files.forEach((file, index) => {
+        // Extract category from req.body
+        const categoryKey = `documentCategories[${index}]`;
+        const category = req.body[categoryKey] || 'test_report';
         resultDocuments.push({
           filePath: file.path,
-          category: categories[index] || 'other',
+          category: category,
           uploadedAt: new Date()
         });
       });
@@ -615,7 +671,11 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
     await HospitalAuditLog.create({
       hospital: assignment.hospital._id,
       action: 'complete_test_assignment',
-      performedBy: req.user._id,
+      performedBy: { 
+        id: req.user._id, 
+        role: 'nurse', 
+        name: req.user.name 
+      },
       details: { 
         testAssignmentId: assignment._id,
         testTypeName: assignment.testType.name,

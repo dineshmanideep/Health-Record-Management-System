@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
 import { profileService } from '../../services/api';
@@ -78,6 +79,28 @@ const HospitalDashboard = () => {
             </div>
           </div>
 
+          {/* Quick Actions */}
+          <div className="bg-white p-6 rounded-xl shadow-sm mb-5">
+            <h2 className="text-gray-800 text-xl font-semibold mb-4">Quick Actions</h2>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/hospital/tests" className="px-5 py-3 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors no-underline">
+                🧪 Manage Test Types
+              </Link>
+              <Link to="/hospital/test-assignments" className="px-5 py-3 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors no-underline">
+                📋 Test Assignments
+              </Link>
+              <Link to="/hospital/doctors" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
+                👨‍⚕️ View Doctors
+              </Link>
+              <Link to="/hospital/nurses" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
+                👩‍⚕️ View Nurses
+              </Link>
+              <Link to="/hospital/audit-logs" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
+                📊 Audit Logs
+              </Link>
+            </div>
+          </div>
+
           {/* Welcome + OTP Generation */}
           <div className="bg-white p-8 rounded-xl shadow-sm mb-5">
             <h2 className="text-gray-800 mb-2 text-2xl font-semibold">Welcome, {user?.name}!</h2>
@@ -118,7 +141,13 @@ const HospitalDashboard = () => {
                       <span className={`inline-block px-2 py-1 text-xs font-medium rounded mr-2 ${actionColor(log.action)}`}>
                         {actionLabel(log.action)}
                       </span>
-                      <span className="text-sm text-gray-600">{log.details}</span>
+                      <span className="text-sm text-gray-600">
+                        {typeof log.details === 'string' 
+                          ? log.details 
+                          : typeof log.details === 'object' && log.details !== null
+                          ? JSON.stringify(log.details)
+                          : String(log.details || '')}
+                      </span>
                     </div>
                     <span className="text-xs text-gray-400">{new Date(log.createdAt).toLocaleString()}</span>
                   </div>

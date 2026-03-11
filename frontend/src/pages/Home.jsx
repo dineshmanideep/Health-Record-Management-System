@@ -51,7 +51,7 @@ const Home = () => {
             <div className="text-6xl mb-5">👤</div>
             <h3 className="text-purple-600 mb-4 text-xl font-semibold">For Patients</h3>
             <p className="text-gray-600 leading-relaxed">
-              Keep all your medical records in one secure place. Access them from any hospital.
+              Keep all your medical records in one secure place. Access them anywhere.
             </p>
           </div>
           <div className="p-8 bg-white rounded-xl shadow-lg hover:-translate-y-2 hover:shadow-2xl transition-all">
@@ -72,7 +72,7 @@ const Home = () => {
             <div className="text-6xl mb-5">👩‍⚕️</div>
             <h3 className="text-purple-600 mb-4 text-xl font-semibold">For Nurses</h3>
             <p className="text-gray-600 leading-relaxed">
-              Efficient patient management. Quick access to vital information.
+             Easily update patient records and upload test results. Ensure accurate and timely information.
             </p>
           </div>
         </div>

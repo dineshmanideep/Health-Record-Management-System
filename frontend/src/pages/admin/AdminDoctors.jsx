@@ -126,12 +126,12 @@ const AdminDoctors = () => {
                     </span>
                   </div>
                   <p className="text-sm text-gray-500 mt-0.5">
-                    {d.email} · {d.specialization}
+                    {d.email} 
                     {d.licenseNumber && ` · License# ${d.licenseNumber}`}
                   </p>
-                  {d.experience !== undefined && (
+                  {/* {d.experience !== undefined && (
                     <p className="text-xs text-gray-400 mt-0.5">{d.experience} yr{d.experience !== 1 ? 's' : ''} experience</p>
-                  )}
+                  )} */}
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {d.accountStatus === 'pending_verification' && (

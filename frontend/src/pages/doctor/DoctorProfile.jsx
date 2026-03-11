@@ -125,18 +125,18 @@ const DoctorProfile = () => {
             )}
           </div>
 
-          <div className="bg-white p-8 rounded-xl shadow-sm mb-5">
+          {/* <div className="bg-white p-8 rounded-xl shadow-sm mb-5">
             <h2 className="text-gray-800 mb-5 text-2xl font-semibold">Hospital Affiliation</h2>
             <div className="flex py-4 border-b border-gray-200"><span className="font-semibold text-gray-600 w-52">Hospital</span><span className="text-gray-800 flex-1">{profile.hospitalAffiliation || 'Not affiliated'}</span></div>
             <div className="flex py-4 border-b border-gray-200"><span className="font-semibold text-gray-600 w-52">Department</span><span className="text-gray-800 flex-1">{profile.department || 'Not provided'}</span></div>
             <div className="flex py-4"><span className="font-semibold text-gray-600 w-52">Consultation Fee</span><span className="text-gray-800 flex-1">{profile.consultationFee != null ? `$${profile.consultationFee}` : 'Not set'}</span></div>
-          </div>
+          </div> */}
 
           <div className="bg-white p-8 rounded-xl shadow-sm">
             <h2 className="text-gray-800 mb-5 text-2xl font-semibold">Statistics</h2>
             <div className="flex py-4 border-b border-gray-200"><span className="font-semibold text-gray-600 w-52">Total Patients</span><span className="text-gray-800 flex-1">{profile.patients?.length ?? 0}</span></div>
-            <div className="flex py-4 border-b border-gray-200"><span className="font-semibold text-gray-600 w-52">Rating</span><span className="text-gray-800 flex-1">{profile.rating != null ? `${profile.rating} / 5.0` : '0.0 / 5.0'}</span></div>
-            <div className="flex py-4"><span className="font-semibold text-gray-600 w-52">Reviews</span><span className="text-gray-800 flex-1">{profile.reviewCount ?? 0}</span></div>
+            {/* <div className="flex py-4 border-b border-gray-200"><span className="font-semibold text-gray-600 w-52">Rating</span><span className="text-gray-800 flex-1">{profile.rating != null ? `${profile.rating} / 5.0` : '0.0 / 5.0'}</span></div>
+            <div className="flex py-4"><span className="font-semibold text-gray-600 w-52">Reviews</span><span className="text-gray-800 flex-1">{profile.reviewCount ?? 0}</span></div> */}
           </div>
         </>
       )}
