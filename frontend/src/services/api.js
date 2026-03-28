@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 // Create axios instance
 const api = axios.create({
@@ -162,6 +162,12 @@ export const patientService = {
   revokeDoctorAccess: (doctorId) => api.patch(`/patient/revoke-access/${doctorId}`).then((r) => r.data),
   // Health analytics
   getHealthAnalytics: () => api.get('/patient/health-analytics').then((r) => r.data),
+  // Smartwatch integration
+  getSmartwatchStatus: () => api.get('/patient/smartwatch/status').then((r) => r.data),
+  connectSmartwatch: (data) => api.post('/patient/smartwatch/connect', data).then((r) => r.data),
+  disconnectSmartwatch: () => api.post('/patient/smartwatch/disconnect').then((r) => r.data),
+  syncSmartwatch: (metrics) => api.post('/patient/smartwatch/sync', metrics ? { metrics } : {}).then((r) => r.data),
+  getSmartwatchMetrics: (days) => api.get(`/patient/smartwatch/metrics?days=${days || 7}`).then((r) => r.data),
   // Activity logs
   getActivityLogs: (page, limit) => api.get(`/patient/activity-logs?page=${page || 1}&limit=${limit || 20}`).then((r) => r.data),
   // Notifications

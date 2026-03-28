@@ -1,0 +1,6 @@
+Enter these in your Connect Smartwatch API form:
+
+Provider: Other (or any of your choosing)
+Device ID: mock-watch-001
+API Base URL: https://smartwatch-demo.free.beeceptor.com
+API Token: demo-token-123

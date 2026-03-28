@@ -17,7 +17,10 @@ const activityLogSchema = new mongoose.Schema({
       'doctor_access_granted',
       'doctor_access_revoked',
       'doctor_viewed_records',
-      'profile_updated'
+      'profile_updated',
+      'smartwatch_connected',
+      'smartwatch_synced',
+      'smartwatch_disconnected'
     ],
     required: true
   },

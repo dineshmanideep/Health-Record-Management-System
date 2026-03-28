@@ -15,6 +15,7 @@ import PatientProfile from './pages/patient/PatientProfile';
 import PatientMedicalRecords from './pages/patient/PatientMedicalRecords';
 import PatientHealthAnalytics from './pages/patient/PatientHealthAnalytics';
 import PatientActivityLogs from './pages/patient/PatientActivityLogs';
+import PatientSmartwatchInsights from './pages/patient/PatientSmartwatchInsights';
 
 // Doctor pages
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
@@ -47,10 +48,13 @@ import AdminHospitals from './pages/admin/AdminHospitals';
 import AdminDoctors from './pages/admin/AdminDoctors';
 import AdminNurses from './pages/admin/AdminNurses';
 
+import { ThemeProvider } from './context/ThemeContext';
+
 function App() {
   return (
-    <Router>
-      <AuthProvider>
+    <ThemeProvider>
+      <Router>
+        <AuthProvider>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -108,6 +112,14 @@ function App() {
                 <PatientActivityLogs />
               </ProtectedRoute>
             } 
+          />
+          <Route
+            path="/patient/smartwatch-insights"
+            element={
+              <ProtectedRoute allowedRoles={['user']}>
+                <PatientSmartwatchInsights />
+              </ProtectedRoute>
+            }
           />
 
           {/* Doctor Routes */}
@@ -314,6 +326,7 @@ function App() {
         </Routes>
       </AuthProvider>
     </Router>
+  </ThemeProvider>
   );
 }
 

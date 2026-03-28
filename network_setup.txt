@@ -1,0 +1,8 @@
+- to start 
+sudo ufw allow 5173/tcp
+sudo ufw allow 5001/tcp
+
+
+- after the use 
+sudo ufw delete allow 5173/tcp
+sudo ufw delete allow 5001/tcp

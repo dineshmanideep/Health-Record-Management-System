@@ -47,116 +47,128 @@ const HospitalDashboard = () => {
   };
 
   const actionColor = (action) => {
-    if (action.includes('joined')) return 'bg-green-100 text-green-700';
-    if (action.includes('revoked')) return 'bg-red-100 text-red-700';
-    if (action.includes('assigned')) return 'bg-blue-100 text-blue-700';
-    return 'bg-gray-100 text-gray-700';
+    if (action.includes('joined')) return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400';
+    if (action.includes('revoked')) return 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
+    if (action.includes('assigned')) return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400';
+    return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400';
   };
 
+  const KPICard = ({ label, value, icon, color }) => (
+    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800 group hover:shadow-xl transition-all overflow-hidden relative">
+      <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
+        <span className="text-8xl">{icon}</span>
+      </div>
+      <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 relative z-10">{label}</p>
+      <p className={`text-4xl font-black ${color} relative z-10`}>{value}</p>
+    </div>
+  );
+
   return (
-    <DashboardLayout title="Hospital Dashboard">
-      {loading ? (
-        <p className="text-gray-500">Loading dashboard...</p>
-      ) : (
-        <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-              <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Affiliated Doctors</h3>
-              <p className="text-4xl font-bold text-teal-600">{data?.doctorCount || 0}</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-              <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Affiliated Nurses</h3>
-              <p className="text-4xl font-bold text-teal-600">{data?.nurseCount || 0}</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-              <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Available Beds</h3>
-              <p className="text-4xl font-bold text-teal-600">{data?.availableBeds ?? 0}</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-              <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Total Beds</h3>
-              <p className="text-4xl font-bold text-teal-600">{data?.totalBeds ?? 0}</p>
-            </div>
+    <DashboardLayout title="Facility Control">
+      <div className="max-w-7xl mx-auto space-y-8 pb-20 px-4 sm:px-0">
+        
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32 animate-pulse">
+            <div className="w-12 h-12 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Accessing facility metrics...</p>
           </div>
-
-          {/* Quick Actions */}
-          <div className="bg-white p-6 rounded-xl shadow-sm mb-5">
-            <h2 className="text-gray-800 text-xl font-semibold mb-4">Quick Actions</h2>
-            <div className="flex flex-wrap gap-3">
-              <Link to="/hospital/tests" className="px-5 py-3 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors no-underline">
-                🧪 Manage Test Types
-              </Link>
-              <Link to="/hospital/test-assignments" className="px-5 py-3 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors no-underline">
-                📋 Test Assignments
-              </Link>
-              <Link to="/hospital/doctors" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
-                👨‍⚕️ View Doctors
-              </Link>
-              <Link to="/hospital/nurses" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
-                👩‍⚕️ View Nurses
-              </Link>
-              <Link to="/hospital/audit-logs" className="px-5 py-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors no-underline">
-                📊 Audit Logs
-              </Link>
-            </div>
-          </div>
-
-          {/* Welcome + OTP Generation */}
-          <div className="bg-white p-8 rounded-xl shadow-sm mb-5">
-            <h2 className="text-gray-800 mb-2 text-2xl font-semibold">Welcome, {user?.name}!</h2>
-            <p className="text-gray-600 mb-5">Generate a one-time code (valid 10 mins) and share it with a verified doctor or nurse so they can join your hospital.</p>
-
-            <div className="flex gap-3 mb-4 flex-wrap">
-              <button onClick={() => generateOTP('doctor')} disabled={generating} className="px-5 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50">
-                {generating ? 'Generating...' : 'Generate OTP for Doctor'}
-              </button>
-              <button onClick={() => generateOTP('nurse')} disabled={generating} className="px-5 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50">
-                {generating ? 'Generating...' : 'Generate OTP for Nurse'}
-              </button>
+        ) : (
+          <>
+            {/* KPI Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <KPICard label="Staff Physicians" value={data?.doctorCount || 0} icon="👨‍⚕️" color="text-indigo-600 dark:text-indigo-400" />
+              <KPICard label="Clinical Nurses" value={data?.nurseCount || 0} icon="👩‍⚕️" color="text-teal-600 dark:text-teal-400" />
+              <KPICard label="Available Capacity" value={data?.availableBeds ?? 0} icon="🛏️" color="text-emerald-500" />
+              <KPICard label="Total Node Capacity" value={data?.totalBeds ?? 0} icon="🏢" color="text-slate-400" />
             </div>
 
-            {otpError && <p className="text-red-600 text-sm mb-3">{otpError}</p>}
+            {/* Quick Actions Cluster */}
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+               <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 tracking-tight">Facility Navigation</h2>
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Link to="/hospital/tests" className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-[2rem] hover:bg-slate-900 dark:hover:bg-white group transition-all">
+                     <span className="text-3xl group-hover:scale-110 transition-transform">🧪</span>
+                     <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-slate-400">Manage</p>
+                        <p className="text-sm font-black text-slate-900 dark:text-white group-hover:text-white dark:group-hover:text-slate-900">Diagnostic Types</p>
+                     </div>
+                  </Link>
+                  <Link to="/hospital/test-assignments" className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-[2rem] hover:bg-slate-900 dark:hover:bg-white group transition-all">
+                     <span className="text-3xl group-hover:scale-110 transition-transform">📋</span>
+                     <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-slate-400">Queue</p>
+                        <p className="text-sm font-black text-slate-900 dark:text-white group-hover:text-white dark:group-hover:text-slate-900">Test Assignments</p>
+                     </div>
+                  </Link>
+                  <Link to="/hospital/doctors" className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-[2rem] hover:bg-slate-900 dark:hover:bg-white group transition-all">
+                     <span className="text-3xl group-hover:scale-110 transition-transform">👨‍⚕️</span>
+                     <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-slate-400">Directory</p>
+                        <p className="text-sm font-black text-slate-900 dark:text-white group-hover:text-white dark:group-hover:text-slate-900">Medical Staff</p>
+                     </div>
+                  </Link>
+               </div>
+            </div>
 
-            {otp.value && (
-              <div className="bg-teal-50 border border-teal-200 rounded-xl p-5">
-                <p className="text-sm text-teal-700 font-medium mb-2">
-                  Share this OTP with the {otp.targetRole} — it expires at {otp.expiresAt?.toLocaleTimeString()}
-                </p>
-                <p className="text-5xl font-bold text-teal-800 tracking-widest text-center py-3 font-mono">{otp.value}</p>
-                <p className="text-xs text-teal-600 text-center mt-2">Shown only once. Do not share publicly.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Recent Audit Logs */}
-          <div className="bg-white p-8 rounded-xl shadow-sm">
-            <h2 className="text-gray-800 mb-5 text-2xl font-semibold">Recent Activity</h2>
-            {!data?.recentLogs?.length ? (
-              <p className="text-gray-500 text-sm">No activity recorded yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {data.recentLogs.map((log) => (
-                  <div key={log._id} className="flex items-center justify-between py-3 border-b border-gray-100">
-                    <div>
-                      <span className={`inline-block px-2 py-1 text-xs font-medium rounded mr-2 ${actionColor(log.action)}`}>
-                        {actionLabel(log.action)}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {typeof log.details === 'string' 
-                          ? log.details 
-                          : typeof log.details === 'object' && log.details !== null
-                          ? JSON.stringify(log.details)
-                          : String(log.details || '')}
-                      </span>
-                    </div>
-                    <span className="text-xs text-gray-400">{new Date(log.createdAt).toLocaleString()}</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               {/* OTP Generation Cluster */}
+               <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Personnel Onboarding</h2>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10 leading-relaxed">Generate ephemeral synchronization codes for clinical staff integration</p>
+                  
+                  <div className="flex gap-4 mb-8">
+                     <button onClick={() => generateOTP('doctor')} disabled={generating} className="flex-1 px-5 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 disabled:opacity-50">
+                       {generating && otp.targetRole === 'doctor' ? 'Generating...' : 'Doctor OTP'}
+                     </button>
+                     <button onClick={() => generateOTP('nurse')} disabled={generating} className="flex-1 px-5 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 disabled:opacity-50">
+                       {generating && otp.targetRole === 'nurse' ? 'Generating...' : 'Nurse OTP'}
+                     </button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
+
+                  {otpError && <p className="text-red-600 text-[10px] font-black uppercase tracking-widest text-center mb-6">{otpError}</p>}
+
+                  {otp.value && (
+                    <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-900/30 rounded-[2.5rem] p-8 animate-fade-in text-center">
+                      <p className="text-[10px] font-black text-teal-700 dark:text-teal-400 uppercase tracking-widest mb-4">
+                        Subject Identity: {otp.targetRole} · Expires: {otp.expiresAt?.toLocaleTimeString()}
+                      </p>
+                      <p className="text-6xl font-black text-teal-800 dark:text-teal-300 tracking-[0.2em] mb-4 font-mono">{otp.value}</p>
+                      <p className="text-[9px] font-bold text-teal-600/60 uppercase">Share this code with the principal immediately</p>
+                    </div>
+                  )}
+               </div>
+
+               {/* Activity Log Cluster */}
+               <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 overflow-hidden flex flex-col">
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-8">Clinical Telemetry</h2>
+                  {!data?.recentLogs?.length ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
+                       <span className="text-5xl mb-6 opacity-20">📜</span>
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No activity registered in the current cycle</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 flex-1">
+                      {data.recentLogs.slice(0, 5).map((log) => (
+                        <div key={log._id} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800 border border-transparent dark:border-slate-700 rounded-2xl group transition-all">
+                          <div className="flex-1 min-w-0">
+                            <span className={`inline-block px-3 py-1 text-[8px] font-black uppercase tracking-widest rounded-lg mb-2 ${actionColor(log.action)}`}>
+                              {actionLabel(log.action)}
+                            </span>
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate pr-4">
+                              {typeof log.details === 'string' ? log.details : 'System configuration update'}
+                            </p>
+                          </div>
+                          <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">{new Date(log.createdAt).toLocaleTimeString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <Link to="/hospital/audit-logs" className="mt-8 text-center text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Inspect Full Audit Trail →</Link>
+               </div>
+            </div>
+          </>
+        )}
+      </div>
     </DashboardLayout>
   );
 };
