@@ -1,109 +1,127 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const QRScanner = ({ onScan, onError, onClose }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const scannerRef = useRef(null);
+  const scannerElementId = useMemo(() => `qr-reader-${Math.random().toString(36).slice(2, 10)}`, []);
   const html5QrCodeRef = useRef(null);
   const isScannerRunningRef = useRef(false);
+  const isScannerStartingRef = useRef(false);
   const hasScannedRef = useRef(false);
 
   const stopScanner = async () => {
-    if (html5QrCodeRef.current && isScannerRunningRef.current) {
-      try {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current.clear();
-        isScannerRunningRef.current = false;
-        setIsScanning(false);
-      } catch (err) {
-        console.error('Error stopping scanner:', err);
+    const scanner = html5QrCodeRef.current;
+    if (!scanner) return;
+
+    try {
+      if (isScannerRunningRef.current) {
+        await scanner.stop();
       }
+      await scanner.clear();
+    } catch (err) {
+      console.error('Error stopping scanner:', err);
+    } finally {
+      html5QrCodeRef.current = null;
+      isScannerRunningRef.current = false;
+      isScannerStartingRef.current = false;
+      setIsScanning(false);
     }
   };
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
 
     const startScanner = async () => {
       try {
-        // Create scanner instance
-        html5QrCodeRef.current = new Html5Qrcode("qr-reader");
-        
-        // Get available cameras
-        const devices = await Html5Qrcode.getCameras();
-        console.log('Available cameras:', devices);
-        
-        if (!mounted) return;
-        
-        if (devices && devices.length) {
-          // Prefer back camera on mobile devices
-          const preferredCamera = devices.find(device => 
-            device.label && device.label.toLowerCase().includes('back')
-          ) || devices[0];
+        if (!window.isSecureContext) {
+          const msg = 'Camera requires HTTPS on mobile. Open with https://<PC-IP>:5173 and allow camera permission.';
+          setErrorMsg(msg);
+          if (onError) onError(msg);
+          return;
+        }
 
-          console.log('Using camera:', preferredCamera.label);
+        if (isScannerRunningRef.current || isScannerStartingRef.current) return;
+        isScannerStartingRef.current = true;
 
-          // Start scanning
-          await html5QrCodeRef.current.start(
-            preferredCamera.id,
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
-              aspectRatio: 1.0
-            },
-            (decodedText) => {
-              // Success callback - only process once
-              if (hasScannedRef.current) return;
-              hasScannedRef.current = true;
-              
-              console.log('QR Code scanned:', decodedText);
-              
-              if (onScan) {
-                onScan(decodedText);
-              }
-              stopScanner();
-            },
-            () => {
-              // Error callback (ignore continuous scanning errors)
-              // Only log critical errors
-            }
-          );
-          
-          if (!mounted) {
+        const scanner = new Html5Qrcode(scannerElementId);
+        html5QrCodeRef.current = scanner;
+
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras?.length) {
+          throw new Error('No camera detected on this device.');
+        }
+
+        const preferredCamera =
+          cameras.find((camera) => /back|rear|environment/i.test(camera.label || '')) || cameras[0];
+
+        const config = {
+          fps: 10,
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+            const qrboxSize = Math.floor(minEdgeSize * 0.7);
+            return { width: qrboxSize, height: qrboxSize };
+          },
+          aspectRatio: 1,
+          rememberLastUsedCamera: true
+        };
+
+        await scanner.start(
+          preferredCamera.id,
+          config,
+          (decodedText) => {
+            if (hasScannedRef.current) return;
+            hasScannedRef.current = true;
+            if (onScan) onScan(decodedText);
             stopScanner();
-            return;
-          }
-          
-          isScannerRunningRef.current = true;
-          setIsScanning(true);
-          console.log('Scanner started successfully');
-        } else {
-          setErrorMsg('No camera found on this device');
-          if (onError) {
-            onError('No camera found');
-          }
+          },
+          () => {}
+        );
+
+        const videoEl = document.querySelector(`#${scannerElementId} video`);
+        if (videoEl) {
+          videoEl.setAttribute('playsinline', 'true');
+          videoEl.setAttribute('muted', 'true');
+          videoEl.setAttribute('autoplay', 'true');
+          videoEl.style.objectFit = 'cover';
         }
+
+        if (!isMounted) {
+          await stopScanner();
+          return;
+        }
+
+        isScannerRunningRef.current = true;
+        isScannerStartingRef.current = false;
+        setIsScanning(true);
       } catch (err) {
-        console.error('Error starting QR scanner:', err);
-        if (!mounted) return;
-        
-        setErrorMsg('Failed to access camera. Please allow camera permissions.');
-        if (onError) {
-          onError(err.message || 'Camera access denied');
+        if (!isMounted) return;
+
+        isScannerStartingRef.current = false;
+        isScannerRunningRef.current = false;
+
+        let msg = 'Failed to access camera.';
+        if (err?.name === 'NotAllowedError' || err === 'NotAllowedError') {
+          msg = 'Camera permission denied. Allow camera access in browser settings and refresh.';
+        } else if (err?.name === 'NotFoundError' || err === 'NotFoundError') {
+          msg = 'No camera detected on this device.';
+        } else if (err?.message) {
+          msg = `Camera error: ${err.message}`;
         }
+
+        setErrorMsg(msg);
+        if (onError) onError(msg);
       }
     };
 
     startScanner();
 
-    // Cleanup on unmount
     return () => {
-      mounted = false;
+      isMounted = false;
       stopScanner();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [scannerElementId]);
 
   const handleClose = async () => {
     await stopScanner();
@@ -113,47 +131,61 @@ const QRScanner = ({ onScan, onError, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
+    <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 dark:border-slate-800">
         {/* Header */}
-        <div className="flex justify-between items-center p-5 border-b">
-          <h3 className="text-xl font-bold text-gray-800">Scan QR Code</h3>
+        <div className="flex justify-between items-center px-8 py-6 border-b dark:border-slate-800">
+          <div>
+            <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Scan QR Code</h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Device Synchronization</p>
+          </div>
           <button
             onClick={handleClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl"
+            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all text-2xl"
           >
             ×
           </button>
         </div>
 
         {/* Scanner Area */}
-        <div className="p-6">
+        <div className="p-8">
           {errorMsg ? (
-            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6 text-center">
-              <p className="text-red-800 font-semibold mb-2">📷 Camera Error</p>
-              <p className="text-red-600 text-sm">{errorMsg}</p>
-              <button
-                onClick={handleClose}
-                className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                Close
-              </button>
+            <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-900/30 rounded-2xl p-8 text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">📷</div>
+              <p className="text-red-800 dark:text-red-400 font-black uppercase tracking-widest text-xs mb-2">Camera Error</p>
+              <p className="text-red-600 dark:text-red-500 text-sm font-medium mb-6 leading-relaxed">{errorMsg}</p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-2.5 bg-red-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-700 shadow-lg shadow-red-500/20 transition-all active:scale-95"
+                >
+                  Retry
+                </button>
+                <button
+                  onClick={handleClose}
+                  className="px-6 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-300 transition-all"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           ) : (
             <>
               <div 
-                id="qr-reader" 
-                ref={scannerRef}
-                className="rounded-lg overflow-hidden border-2 border-purple-200"
+                id={scannerElementId}
+                className="rounded-3xl overflow-hidden border-4 border-slate-100 dark:border-slate-800 shadow-inner bg-slate-50 dark:bg-slate-950/50"
                 style={{ userSelect: 'none', cursor: 'default' }}
               ></div>
               
-              <div className="mt-4 text-center">
-                <p className="text-gray-600 text-sm mb-2">
-                  📱 Position the QR code within the frame
-                </p>
-                <p className="text-gray-500 text-xs">
-                  The scanner will automatically detect and read the code
+              <div className="mt-8 text-center space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isScanning ? 'bg-indigo-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                  <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                    {isScanning ? 'Optical sensor active' : 'Initializing optical sensor'}
+                  </p>
+                </div>
+                <p className="text-xs font-bold text-slate-400 dark:text-slate-500 px-8">
+                  Position the code within the biometric frame for automated detection
                 </p>
               </div>
             </>
@@ -161,12 +193,12 @@ const QRScanner = ({ onScan, onError, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 pb-5 flex justify-end">
+        <div className="px-8 pb-8 flex justify-center">
           <button
             onClick={handleClose}
-            className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
           >
-            Cancel
+            Terminate Session
           </button>
         </div>
       </div>

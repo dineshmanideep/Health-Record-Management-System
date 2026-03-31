@@ -127,17 +127,17 @@ const PatientDashboard = () => {
                 <div className="relative z-10">
                   <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-4">Welcome back, {user?.name.split(' ')[0]}!</h2>
                   <p className="text-slate-500 dark:text-slate-400 max-w-lg mb-8 leading-relaxed">
-                    Your medical history is unified and secure. Access your latest records or generate an OTP to share access with a trusted clinician.
+                    Your medical history is unified and secure. Access your latest records or generate a code to share access with your doctor.
                   </p>
                   <div className="flex flex-wrap gap-4">
                     <button onClick={() => navigate('/patient/records')} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">
-                      Browse Records
+                      View Medical Records
                     </button>
                     <button onClick={handleGenerateOTP} disabled={otpLoading} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition-all disabled:opacity-50">
-                      {otpLoading ? 'Generating...' : 'Get Access OTP'}
+                      {otpLoading ? 'Generating...' : 'Get Access Code'}
                     </button>
                     <button onClick={() => setShowQR(!showQR)} className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
-                      {showQR ? 'Hide QR' : 'Show QR'}
+                      {showQR ? 'Hide QR' : 'Show QR Code'}
                     </button>
                   </div>
                 </div>
@@ -147,9 +147,9 @@ const PatientDashboard = () => {
                   <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-8">
                      {otpInfo && (
                         <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/50 animate-fadeInRotate">
-                          <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-3"> clinician Access OTP</p>
+                          <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-3">Doctor Access Code</p>
                           <div className="text-4xl font-black text-emerald-600 dark:text-emerald-300 tracking-[0.5em] font-mono mb-2">{otpInfo.otp}</div>
-                          <p className="text-[10px] font-bold text-emerald-600/70 dark:text-emerald-500">Valid for {otpInfo.expiresInMinutes}m • Shared access only.</p>
+                          <p className="text-[10px] font-bold text-emerald-600/70 dark:text-emerald-500">Valid for {otpInfo.expiresInMinutes}m • Single-use only.</p>
                         </div>
                      )}
                      {showQR && (
@@ -157,7 +157,7 @@ const PatientDashboard = () => {
                            <div className="bg-white p-3 rounded-2xl shadow-sm mb-4">
                               <QRCodeSVG value={`hrms:patient:${data.qrToken}`} size={140} level="H" />
                            </div>
-                           <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 text-center leading-relaxed">Scan to request document access instantly.</p>
+                           <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 text-center leading-relaxed">Let your doctor scan this to see your records.</p>
                         </div>
                      )}
                   </div>

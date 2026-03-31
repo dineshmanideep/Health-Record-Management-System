@@ -99,13 +99,23 @@ const PatientMedicalRecords = () => {
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString() : 'N/A';
 
+  const solveFileUrl = (path) => {
+    if (!path) return '#';
+    if (path.startsWith('http')) return path;
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    const backendOrigin = import.meta.env.VITE_BACKEND_ORIGIN || '';
+    if (backendOrigin) {
+      return `${backendOrigin}${cleanPath}`;
+    }
+    return cleanPath;
+  };
+
   // Get all documents from all records in timeline order
   const getAllDocuments = () => {
     const allDocs = [];
     groupedRecords.forEach(group => {
       group.records.forEach(record => {
         if (record.recordType === 'medical_record') {
-          // Handle doctor-created medical records
           if (record.categorizedDocuments?.length > 0) {
             record.categorizedDocuments.forEach(doc => {
               allDocs.push({
@@ -123,7 +133,6 @@ const PatientMedicalRecords = () => {
             });
           }
         } else if (record.recordType === 'test_assignment') {
-          // Handle test assignments
           if (record.resultDocuments?.length > 0) {
             record.resultDocuments.forEach(doc => {
               allDocs.push({
@@ -143,8 +152,6 @@ const PatientMedicalRecords = () => {
         }
       });
     });
-    
-    // Sort by upload date (newest first)
     return allDocs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
   };
 
@@ -160,17 +167,23 @@ const PatientMedicalRecords = () => {
   ];
 
   return (
-    <DashboardLayout title="Medical Records">
-      {error && <p className="text-red-600 mb-4">{error}</p>}
+    <DashboardLayout title="Medical records">
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center animate-pulse">
+          ⚠️ {error}
+        </div>
+      )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6">
+      {/* Modern Tab Navigation */}
+      <div className="flex flex-wrap gap-2 mb-8 bg-slate-100/50 dark:bg-slate-800/30 p-1.5 rounded-2xl w-fit">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => { setTab(t.key); setSelectedRecord(null); }}
-            className={`px-5 py-2.5 rounded-lg font-medium text-sm border-none cursor-pointer transition-colors ${
-              tab === t.key ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'
+            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+              tab === t.key 
+                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-105' 
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             {t.label}
@@ -179,341 +192,232 @@ const PatientMedicalRecords = () => {
       </div>
 
       {loading ? (
-        <p className="text-gray-500">Loading records...</p>
+        <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+           <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+           <p className="mt-4 text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest text-[10px]">Loading records...</p>
+        </div>
       ) : (
-        <>
+        <div className="space-y-6">
           {/* ==================== HOSPITAL RECORDS ==================== */}
           {tab === 'hospital' && (
-            <>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {selectedRecord ? (
-                <div className="bg-white p-8 rounded-xl shadow-sm">
-                  <button onClick={() => setSelectedRecord(null)} className="text-purple-600 font-medium mb-4 cursor-pointer bg-transparent border-none text-sm">
-                    ← Back to Records
+                <div className="bg-white dark:bg-slate-900 p-8 sm:p-12 rounded-[3.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+                  <button 
+                    onClick={() => setSelectedRecord(null)} 
+                    className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-10 hover:translate-x-[-4px] transition-transform"
+                  >
+                    ← Back To List
                   </button>
                   
                   {selectedRecord.recordType === 'medical_record' ? (
-                    /* MEDICAL RECORD DETAIL VIEW */
                     <>
-                      <h2 className="text-2xl font-semibold text-gray-800 mb-4">Visit Details</h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-3">
-                          <div><span className="font-semibold text-gray-600">Visit Date:</span> <span>{formatDate(selectedRecord.visitDate)}</span></div>
-                          <div><span className="font-semibold text-gray-600">Doctor:</span> <span>Dr. {selectedRecord.doctor?.name} ({selectedRecord.doctor?.specialization})</span></div>
-                          <div><span className="font-semibold text-gray-600">Hospital:</span> <span>{selectedRecord.hospital?.name}</span></div>
-                          <div><span className="font-semibold text-gray-600">Recorded By:</span> <span>Nurse {selectedRecord.nurse?.name}</span></div>
-                          <div><span className="font-semibold text-gray-600">Diagnosis:</span> <span>{selectedRecord.diagnosis}</span></div>
-                          {selectedRecord.symptoms && <div><span className="font-semibold text-gray-600">Symptoms:</span> <span>{selectedRecord.symptoms}</span></div>}
-                          {selectedRecord.recommendedTests && <div><span className="font-semibold text-gray-600">Recommended Tests:</span> <span>{selectedRecord.recommendedTests}</span></div>}
-                          {selectedRecord.nextVisitDate && <div><span className="font-semibold text-gray-600">Next Visit:</span> <span className="text-yellow-700 font-medium">{formatDate(selectedRecord.nextVisitDate)}</span></div>}
-                        </div>
-                        <div className="space-y-3">
-                          {selectedRecord.prescriptionNotes && (
-                            <div>
-                              <span className="font-semibold text-gray-600 block mb-1">Prescription:</span>
-                              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded text-sm whitespace-pre-wrap">
-                                {selectedRecord.prescriptionNotes}
-                              </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                        <div className="lg:col-span-2 space-y-10">
+                          <div>
+                            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-6">Visit Details</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                               {[
+                               { label: 'Visit Date', value: formatDate(selectedRecord.visitDate), icon: '📅' },
+                                 { label: 'Physician', value: `Dr. ${selectedRecord.doctor?.name}`, icon: '👨‍⚕️', sub: selectedRecord.doctor?.specialization },
+                                 { label: 'Diagnosis', value: selectedRecord.diagnosis, icon: '📋' },
+                                 { label: 'Hospital', value: selectedRecord.hospital?.name, icon: '🏥' },
+                               ].map((item, idx) => (
+                                 <div key={idx} className="flex gap-4">
+                                   <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-lg">{item.icon}</div>
+                                   <div>
+                                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{item.label}</p>
+                                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.value}</p>
+                                      {item.sub && <p className="text-[10px] text-indigo-500 font-bold">{item.sub}</p>}
+                                   </div>
+                                 </div>
+                               ))}
                             </div>
-                          )}
-                          
-                          {/* Test Reports */}
-                          {selectedRecord.categorizedDocuments?.filter(d => d.category === 'test_report').length > 0 && (
-                            <div>
-                              <span className="font-semibold text-gray-600 block mb-2">🧪 Test Reports:</span>
-                              <div className="space-y-2">
-                                {selectedRecord.categorizedDocuments
-                                  .filter(d => d.category === 'test_report')
-                                  .map((doc, i) => (
-                                    <a
-                                      key={i}
-                                      href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center justify-between gap-2 text-green-700 hover:text-green-900 font-medium text-sm bg-green-50 border border-green-200 px-4 py-3 rounded-lg"
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        📊 {doc.filePath.split('/').pop()}
-                                      </span>
-                                      <span className="text-xs text-green-600">
-                                        {new Date(doc.uploadedAt).toLocaleDateString()}
-                                      </span>
-                                    </a>
-                                  ))}
-                              </div>
-                            </div>
-                          )}
+                          </div>
 
-                          {/* Diagnosis Reports */}
-                          {selectedRecord.categorizedDocuments?.filter(d => d.category === 'diagnosis_report').length > 0 && (
-                            <div>
-                              <span className="font-semibold text-gray-600 block mb-2">📋 Diagnosis Reports:</span>
-                              <div className="space-y-2">
-                                {selectedRecord.categorizedDocuments
-                                  .filter(d => d.category === 'diagnosis_report')
-                                  .map((doc, i) => (
-                                    <a
-                                      key={i}
-                                      href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center justify-between gap-2 text-purple-700 hover:text-purple-900 font-medium text-sm bg-purple-50 border border-purple-200 px-4 py-3 rounded-lg"
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        📄 {doc.filePath.split('/').pop()}
-                                      </span>
-                                      <span className="text-xs text-purple-600">
-                                        {new Date(doc.uploadedAt).toLocaleDateString()}
-                                      </span>
-                                    </a>
-                                  ))}
-                              </div>
+                          {selectedRecord.prescriptionNotes && (
+                            <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-8 rounded-3xl border border-indigo-100 dark:border-indigo-800/50">
+                               <h4 className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-4">Prescription</h4>
+                               <p className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-relaxed italic">{selectedRecord.prescriptionNotes}</p>
                             </div>
                           )}
+                        </div>
+
+                        <div className="space-y-8">
+                           <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Uploaded Documents</h3>
+                           <div className="space-y-3">
+                              {(selectedRecord.categorizedDocuments || []).map((doc, i) => (
+                                <a
+                                  key={i}
+                                  href={solveFileUrl(doc.filePath)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent dark:border-slate-700 rounded-2xl hover:border-indigo-500 transition-all group/doc"
+                                >
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${doc.category === 'test_report' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                     {doc.category === 'test_report' ? '📊' : '📄'}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5 truncate">{doc.category?.replace('_', ' ')}</p>
+                                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover/doc:text-indigo-500">{doc.filePath.split('/').pop()}</p>
+                                  </div>
+                                </a>
+                              ))}
+                              {!selectedRecord.categorizedDocuments?.length && <p className="text-[10px] text-slate-400 italic">No documents found.</p>}
+                           </div>
                         </div>
                       </div>
+
                       {selectedRecord.healthMetrics && Object.values(selectedRecord.healthMetrics).some(v => v != null) && (
-                        <div className="mt-6">
-                          <h3 className="font-semibold text-gray-700 mb-3">Health Metrics</h3>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {selectedRecord.healthMetrics.bloodSugar != null && (
-                              <div className="bg-green-50 p-3 rounded text-center">
-                                <p className="text-xs text-gray-500">Blood Sugar</p>
-                                <p className="text-lg font-bold text-green-700">{selectedRecord.healthMetrics.bloodSugar} mg/dL</p>
-                              </div>
-                            )}
-                            {selectedRecord.healthMetrics.bloodPressureSystolic != null && (
-                              <div className="bg-red-50 p-3 rounded text-center">
-                                <p className="text-xs text-gray-500">Blood Pressure</p>
-                                <p className="text-lg font-bold text-red-700">{selectedRecord.healthMetrics.bloodPressureSystolic}/{selectedRecord.healthMetrics.bloodPressureDiastolic} mmHg</p>
-                              </div>
-                            )}
-                            {selectedRecord.healthMetrics.thyroidTSH != null && (
-                              <div className="bg-blue-50 p-3 rounded text-center">
-                                <p className="text-xs text-gray-500">Thyroid (TSH)</p>
-                                <p className="text-lg font-bold text-blue-700">{selectedRecord.healthMetrics.thyroidTSH} mIU/L</p>
-                              </div>
-                            )}
-                            {selectedRecord.healthMetrics.heartRate != null && (
-                              <div className="bg-purple-50 p-3 rounded text-center">
-                                <p className="text-xs text-gray-500">Heart Rate</p>
-                                <p className="text-lg font-bold text-purple-700">{selectedRecord.healthMetrics.heartRate} bpm</p>
-                              </div>
-                            )}
-                            {selectedRecord.healthMetrics.weight != null && (
-                              <div className="bg-yellow-50 p-3 rounded text-center">
-                                <p className="text-xs text-gray-500">Weight</p>
-                                <p className="text-lg font-bold text-yellow-700">{selectedRecord.healthMetrics.weight} kg</p>
-                              </div>
-                            )}
-                            {selectedRecord.healthMetrics.height != null && (
-                              <div className="bg-indigo-50 p-3 rounded text-center">
-                                <p className="text-xs text-gray-500">Height</p>
-                                <p className="text-lg font-bold text-indigo-700">{selectedRecord.healthMetrics.height} cm</p>
-                              </div>
-                            )}
-                            {selectedRecord.healthMetrics.temperature != null && (
-                              <div className="bg-orange-50 p-3 rounded text-center">
-                                <p className="text-xs text-gray-500">Temperature</p>
-                                <p className="text-lg font-bold text-orange-700">{selectedRecord.healthMetrics.temperature} °F</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {selectedRecord.editHistory?.length > 0 && (
-                        <div className="mt-6">
-                          <h3 className="font-semibold text-gray-700 mb-3">Edit History</h3>
-                          <div className="space-y-2">
-                            {selectedRecord.editHistory.map((edit, i) => (
-                              <div key={i} className="bg-yellow-50 p-3 rounded text-sm">
-                                <p className="font-medium text-gray-700">{edit.summary}</p>
-                                <p className="text-gray-500 text-xs mt-1">{new Date(edit.editedAt).toLocaleString()}</p>
+                        <div className="mt-12 pt-12 border-t dark:border-slate-800">
+                          <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-8">Vital Statistics</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            {[
+                              { label: 'Glucose', val: selectedRecord.healthMetrics.bloodSugar, unit: 'mg/dL', bg: 'bg-emerald-50 dark:bg-emerald-900/10', text: 'text-emerald-600' },
+                              { label: 'Pressure', val: selectedRecord.healthMetrics.bloodPressureSystolic ? `${selectedRecord.healthMetrics.bloodPressureSystolic}/${selectedRecord.healthMetrics.bloodPressureDiastolic}` : null, unit: 'mmHg', bg: 'bg-rose-50 dark:bg-rose-900/10', text: 'text-rose-600' },
+                              { label: 'Endocrine', val: selectedRecord.healthMetrics.thyroidTSH, unit: 'mIU/L', bg: 'bg-blue-50 dark:bg-blue-900/10', text: 'text-blue-600' },
+                              { label: 'Pulse', val: selectedRecord.healthMetrics.heartRate, unit: 'bpm', bg: 'bg-indigo-50 dark:bg-indigo-900/10', text: 'text-indigo-600' },
+                            ].filter(m => m.val).map((m, idx) => (
+                              <div key={idx} className={`${m.bg} p-6 rounded-3xl border border-transparent dark:border-slate-800`}>
+                                <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">{m.label}</p>
+                                <p className={`text-xl font-black ${m.text} dark:text-white`}>{m.val} <span className="text-[10px] opacity-60 font-medium">{m.unit}</span></p>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
-                      <p className="text-xs text-gray-400 mt-4">Record created: {new Date(selectedRecord.createdAt).toLocaleString()}</p>
+                      <div className="mt-12 p-6 bg-slate-50 dark:bg-slate-800/20 rounded-3xl flex flex-wrap gap-4 items-center justify-between">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Record ID: {selectedRecord._id.toUpperCase()}</p>
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Uploaded On: {new Date(selectedRecord.createdAt).toLocaleString()}</p>
+                      </div>
                     </>
                   ) : (
-                    /* TEST ASSIGNMENT DETAIL VIEW */
                     <>
-                      <h2 className="text-2xl font-semibold text-gray-800 mb-4">Test Assignment Details</h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-3">
-                          <div><span className="font-semibold text-gray-600">Test Type:</span> <span className="text-lg font-medium text-green-700">🧪 {selectedRecord.testType?.name}</span></div>
-                          {selectedRecord.testType?.description && <div><span className="font-semibold text-gray-600">Description:</span> <span className="text-sm text-gray-500">{selectedRecord.testType.description}</span></div>}
-                          <div><span className="font-semibold text-gray-600">Completed Date:</span> <span>{formatDate(selectedRecord.completedAt)}</span></div>
-                          <div><span className="font-semibold text-gray-600">Hospital:</span> <span>{selectedRecord.hospital?.name}</span></div>
-                          <div><span className="font-semibold text-gray-600">Performed By:</span> <span>Nurse {selectedRecord.nurse?.name}</span></div>
-                          <div><span className="font-semibold text-gray-600">Status:</span> <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">{selectedRecord.status}</span></div>
-                        </div>
-                        <div className="space-y-3">
-                          {selectedRecord.results && (
-                            <div>
-                              <span className="font-semibold text-gray-600 block mb-1">Test Results:</span>
-                              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded text-sm whitespace-pre-wrap">
-                                {selectedRecord.results}
-                              </div>
-                            </div>
-                          )}
-                          {selectedRecord.notes && (
-                            <div>
-                              <span className="font-semibold text-gray-600 block mb-1">Notes:</span>
-                              <div className="bg-gray-50 p-3 rounded text-sm whitespace-pre-wrap">
-                                {selectedRecord.notes}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Test Reports */}
-                          {selectedRecord.resultDocuments?.filter(d => d.category === 'test_report').length > 0 && (
-                            <div>
-                              <span className="font-semibold text-gray-600 block mb-2">🧪 Test Reports:</span>
-                              <div className="space-y-2">
-                                {selectedRecord.resultDocuments
-                                  .filter(d => d.category === 'test_report')
-                                  .map((doc, i) => (
-                                    <a
-                                      key={i}
-                                      href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center justify-between gap-2 text-green-700 hover:text-green-900 font-medium text-sm bg-green-50 border border-green-200 px-4 py-3 rounded-lg"
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        📊 {doc.filePath.split('/').pop()}
-                                      </span>
-                                      <span className="text-xs text-green-600">
-                                        {new Date(doc.uploadedAt).toLocaleDateString()}
-                                      </span>
-                                    </a>
-                                  ))}
-                              </div>
-                            </div>
-                          )}
+                      <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-8 uppercase">Test Result Details</h2>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                        <div className="lg:col-span-2 space-y-10">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                             {[
+                               { label: 'Test Name', value: selectedRecord.testType?.name, icon: '🧪', sub: selectedRecord.testType?.description },
+                               { label: 'Completed On', value: formatDate(selectedRecord.completedAt), icon: '✅' },
+                               { label: 'Hospital', value: selectedRecord.hospital?.name, icon: '🏥' },
+                               { label: 'Performed By', value: `Nurse ${selectedRecord.nurse?.name}`, icon: '👩‍⚕️' },
+                             ].map((item, idx) => (
+                               <div key={idx} className="flex gap-4">
+                                 <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-lg">{item.icon}</div>
+                                 <div className="min-w-0">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{item.label}</p>
+                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{item.value}</p>
+                                    {item.sub && <p className="text-[10px] text-slate-500 leading-tight mt-1 truncate">{item.sub}</p>}
+                                 </div>
+                               </div>
+                             ))}
+                          </div>
 
-                          {/* Diagnosis Reports */}
-                          {selectedRecord.resultDocuments?.filter(d => d.category === 'diagnosis_report').length > 0 && (
-                            <div>
-                              <span className="font-semibold text-gray-600 block mb-2">📋 Diagnosis Reports:</span>
-                              <div className="space-y-2">
-                                {selectedRecord.resultDocuments
-                                  .filter(d => d.category === 'diagnosis_report')
-                                  .map((doc, i) => (
-                                    <a
-                                      key={i}
-                                      href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center justify-between gap-2 text-purple-700 hover:text-purple-900 font-medium text-sm bg-purple-50 border border-purple-200 px-4 py-3 rounded-lg"
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        📄 {doc.filePath.split('/').pop()}
-                                      </span>
-                                      <span className="text-xs text-purple-600">
-                                        {new Date(doc.uploadedAt).toLocaleDateString()}
-                                      </span>
-                                    </a>
-                                  ))}
-                              </div>
+                          {selectedRecord.results && (
+                            <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-8 rounded-3xl border border-emerald-100 dark:border-emerald-800/50">
+                               <h4 className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">Test Observations</h4>
+                               <p className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-relaxed italic whitespace-pre-wrap">{selectedRecord.results}</p>
                             </div>
                           )}
+                        </div>
+
+                        <div className="space-y-8">
+                            <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Test Files</h3>
+                            <div className="space-y-3">
+                               {(selectedRecord.resultDocuments || []).map((doc, i) => (
+                                 <a
+                                   key={i}
+                                   href={solveFileUrl(doc.filePath)}
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent dark:border-slate-700 rounded-2xl hover:border-indigo-500 transition-all group/doc"
+                                 >
+                                   <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-lg">📁</div>
+                                   <div className="min-w-0 flex-1">
+                                      <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-0.5">Test File</p>
+                                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover/doc:text-indigo-500">{doc.filePath.split('/').pop()}</p>
+                                   </div>
+                                 </a>
+                               ))}
+                               {!selectedRecord.resultDocuments?.length && <p className="text-[10px] text-slate-400 italic">No files uploaded.</p>}
+                            </div>
                         </div>
                       </div>
-                      <p className="text-xs text-gray-400 mt-4">Test assigned: {new Date(selectedRecord.createdAt).toLocaleString()}</p>
+                      <div className="mt-12 p-6 bg-slate-50 dark:bg-slate-800/20 rounded-3xl flex items-center justify-between">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Test Reference: {selectedRecord._id.toUpperCase()}</p>
+                         <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full uppercase">{selectedRecord.status}</span>
+                      </div>
                     </>
                   )}
                 </div>
               ) : (
-                <>
+                <div className="space-y-8">
                   {groupedRecords.length === 0 ? (
-                    <div className="bg-white p-8 rounded-xl shadow-sm text-center text-gray-500">
-                      No hospital records found. Records will appear here after hospital visits.
+                    <div className="bg-white dark:bg-slate-900 p-20 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 text-center opacity-40 grayscale">
+                      <p className="text-6xl mb-6">🏥</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest italic">No clinical records found.</p>
                     </div>
                   ) : (
                     groupedRecords.map((group) => (
-                      <div key={group.hospital?._id} className="bg-white p-8 rounded-xl shadow-sm mb-5">
-                        <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                          <span>🏥</span> {group.hospital?.name || 'Unknown Hospital'}
+                      <div key={group.hospital?._id} className="bg-white dark:bg-slate-900 p-8 sm:p-12 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white mb-10 flex items-center gap-4 uppercase tracking-tight">
+                          <span className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-2xl">🏥</span> 
+                          {group.hospital?.name || 'Hospital'}
                         </h2>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left">
+                        <div className="overflow-x-auto -mx-8 sm:mx-0">
+                          <table className="w-full text-left min-w-[800px]">
                             <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Date</th>
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Type</th>
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Details</th>
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Staff</th>
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Documents</th>
-                                <th className="py-3 px-4 text-sm font-semibold text-gray-600">Action</th>
+                              <tr className="border-b border-slate-100 dark:border-slate-800">
+                                <th className="py-4 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                                <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
+                                <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Clinician</th>
+                                <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Files</th>
+                                <th className="py-4 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
                               </tr>
                             </thead>
                             <tbody>
                               {group.records.map((r) => (
-                                <tr key={r._id} className="border-b border-gray-100 hover:bg-gray-50">
-                                  <td className="py-3 px-4 text-sm">
-                                    {r.recordType === 'medical_record' 
-                                      ? formatDate(r.visitDate) 
-                                      : formatDate(r.completedAt)}
+                                <tr key={r._id} className="group border-b border-slate-50 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                                  <td className="py-6 px-8 text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                                    {r.recordType === 'medical_record' ? formatDate(r.visitDate) : formatDate(r.completedAt)}
                                   </td>
-                                  <td className="py-3 px-4 text-sm">
+                                  <td className="py-6 px-4">
                                     {r.recordType === 'medical_record' ? (
-                                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium">
-                                        👨‍⚕️ Doctor Visit
+                                      <span className="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                                        👨‍⚕️ Clinician Visit
                                       </span>
                                     ) : (
-                                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">
-                                        🧪 {r.testType?.name || 'Test'}
+                                      <span className="bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                                        🧪 {r.testType?.name || 'Diagnostic'}
                                       </span>
                                     )}
                                   </td>
-                                  <td className="py-3 px-4 text-sm">
-                                    {r.recordType === 'medical_record' 
-                                      ? r.diagnosis 
-                                      : (r.results || r.notes || 'Test completed')}
+                                  <td className="py-6 px-4">
+                                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                        {r.recordType === 'medical_record' ? `Dr. ${r.doctor?.name}` : `Nurse ${r.nurse?.name}`}
+                                      </p>
+                                      {r.recordType === 'medical_record' && <p className="text-[9px] text-slate-400 mt-0.5">{r.doctor?.specialization}</p>}
                                   </td>
-                                  <td className="py-3 px-4 text-sm">
-                                    {r.recordType === 'medical_record' ? (
-                                      <>Dr. {r.doctor?.name} <span className="text-gray-400 text-xs">({r.doctor?.specialization})</span></>
-                                    ) : (
-                                      <>Nurse {r.nurse?.name}</>
-                                    )}
+                                  <td className="py-6 px-4">
+                                    <div className="flex gap-1.5">
+                                      {((r.recordType === 'medical_record' ? r.categorizedDocuments : r.resultDocuments) || []).slice(0, 3).map((d, i) => (
+                                        <div key={i} className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] ${d.category === 'test_report' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                          {d.category === 'test_report' ? '🧪' : '📄'}
+                                        </div>
+                                      ))}
+                                      {((r.recordType === 'medical_record' ? r.categorizedDocuments : r.resultDocuments) || []).length > 3 && (
+                                        <span className="text-[10px] text-slate-400 font-bold">+{((r.recordType === 'medical_record' ? r.categorizedDocuments : r.resultDocuments) || []).length - 3}</span>
+                                      )}
+                                      {!((r.recordType === 'medical_record' ? r.categorizedDocuments : r.resultDocuments) || []).length && <span className="text-slate-300 dark:text-slate-700">--</span>}
+                                    </div>
                                   </td>
-                                  <td className="py-3 px-4 text-xs">
-                                    {r.recordType === 'medical_record' && r.categorizedDocuments?.length > 0 ? (
-                                      <div className="flex gap-2">
-                                        {r.categorizedDocuments.filter(d => d.category === 'test_report').length > 0 && (
-                                          <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
-                                            🧪 {r.categorizedDocuments.filter(d => d.category === 'test_report').length}
-                                          </span>
-                                        )}
-                                        {r.categorizedDocuments.filter(d => d.category === 'diagnosis_report').length > 0 && (
-                                          <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                                            📋 {r.categorizedDocuments.filter(d => d.category === 'diagnosis_report').length}
-                                          </span>
-                                        )}
-                                      </div>
-                                    ) : r.recordType === 'test_assignment' && r.resultDocuments?.length > 0 ? (
-                                      <div className="flex gap-2">
-                                        {r.resultDocuments.filter(d => d.category === 'test_report').length > 0 && (
-                                          <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
-                                            🧪 {r.resultDocuments.filter(d => d.category === 'test_report').length}
-                                          </span>
-                                        )}
-                                        {r.resultDocuments.filter(d => d.category === 'diagnosis_report').length > 0 && (
-                                          <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                                            📋 {r.resultDocuments.filter(d => d.category === 'diagnosis_report').length}
-                                          </span>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <span className="text-gray-400">—</span>
-                                    )}
-                                  </td>
-                                  <td className="py-3 px-4 text-sm">
-                                    <button onClick={() => setSelectedRecord(r)} className="text-purple-600 hover:text-purple-800 font-medium bg-transparent border-none cursor-pointer text-sm">
-                                      View Details
+                                  <td className="py-6 px-8 text-right">
+                                    <button 
+                                      onClick={() => setSelectedRecord(r)} 
+                                      className="text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest hover:translate-x-1 transition-transform"
+                                    >
+                                      View Details →
                                     </button>
                                   </td>
                                 </tr>
@@ -524,390 +428,232 @@ const PatientMedicalRecords = () => {
                       </div>
                     ))
                   )}
-                </>
+                </div>
               )}
-            </>
+            </div>
           )}
+
           {/* ==================== ALL DOCUMENTS ==================== */}
           {tab === 'documents' && (
-            <div className="bg-white p-8 rounded-xl shadow-sm">
-              <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-2">Medical Documents</h2>
-                <p className="text-sm text-gray-500">All test reports and diagnosis documents from your hospital visits</p>
-              </div>
-
-              {/* Filter Buttons */}
-              <div className="flex gap-3 mb-6">
-                <button
-                  onClick={() => setDocumentFilter('all')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                    documentFilter === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  All Documents ({allDocuments.length})
-                </button>
-                <button
-                  onClick={() => setDocumentFilter('test')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                    documentFilter === 'test' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  🧪 Test Reports ({testReports.length})
-                </button>
-                <button
-                  onClick={() => setDocumentFilter('diagnosis')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                    documentFilter === 'diagnosis' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  📋 Diagnosis Reports ({diagnosisReports.length})
-                </button>
-              </div>
-
-              {allDocuments.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <p className="text-6xl mb-4">📄</p>
-                  <p>No medical documents found yet.</p>
-                  <p className="text-sm mt-2">Documents will appear here after hospital visits and tests.</p>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-white dark:bg-slate-900 p-8 sm:p-12 rounded-[3.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+                <div className="mb-10">
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Medical Reports</h2>
+                  <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Access all your test results and diagnostic reports.</p>
                 </div>
-              ) : (
-                <>
-                  {/* Test Reports Section */}
-                  {(documentFilter === 'all' || documentFilter === 'test') && testReports.length > 0 && (
-                    <div className="mb-8">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <span>🧪</span> Test Reports ({testReports.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {testReports.map((doc, idx) => (
-                          <div key={idx} className="border-l-4 border-green-500 bg-green-50 p-4 rounded-lg hover:bg-green-100 transition-colors">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <a
-                                    href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-green-700 hover:text-green-900 font-semibold flex items-center gap-2 no-underline"
-                                  >
-                                    <span className="text-2xl">📊</span>
-                                    <span>{doc.filePath.split('/').pop()}</span>
-                                  </a>
-                                  <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full font-medium">
-                                    {new Date(doc.uploadedAt).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
-                                  {doc.record.recordType === 'medical_record' ? (
-                                    <>
-                                      <div>
-                                        <span className="font-medium">Visit Date:</span> {formatDate(doc.record.visitDate)}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Doctor:</span> Dr. {doc.record.doctor?.name} ({doc.record.doctor?.specialization})
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Hospital:</span> {doc.record.hospital?.name}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Diagnosis:</span> {doc.record.diagnosis}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div>
-                                        <span className="font-medium">Test Date:</span> {formatDate(doc.record.completedAt)}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Test Type:</span> 🧪 {doc.record.testType?.name}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Hospital:</span> {doc.record.hospital?.name}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Performed By:</span> Nurse {doc.record.nurse?.name}
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
+
+                <div className="flex flex-wrap gap-2 mb-10 overflow-x-auto pb-2 no-scrollbar">
+                  {[
+                    { id: 'all', label: `All Reports (${allDocuments.length})`, color: 'bg-indigo-600', icon: '📄' },
+                    { id: 'test', label: `Test Results (${testReports.length})`, color: 'bg-emerald-600', icon: '🧪' },
+                    { id: 'diagnosis', label: `Doctor Reports (${diagnosisReports.length})`, color: 'bg-blue-600', icon: '📋' }
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setDocumentFilter(f.id)}
+                      className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shrink-0 ${
+                        documentFilter === f.id 
+                          ? `${f.color} text-white shadow-lg` 
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      <span>{f.icon}</span> {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {allDocuments.length === 0 ? (
+                  <div className="text-center py-20 opacity-40 grayscale">
+                    <p className="text-6xl mb-6">📂</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest italic">No reports found.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {allDocuments
+                      .filter(d => documentFilter === 'all' || (documentFilter === 'test' && d.category === 'test_report') || (documentFilter === 'diagnosis' && d.category === 'diagnosis_report'))
+                      .map((doc, idx) => (
+                        <div key={idx} className="group p-6 bg-slate-50 dark:bg-slate-800/40 rounded-[2.5rem] border border-transparent dark:border-slate-800/50 hover:border-indigo-500/50 transition-all">
+                           <div className="flex items-start justify-between mb-6">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl ${doc.category === 'test_report' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+                                 {doc.category === 'test_report' ? '📊' : '📄'}
                               </div>
+                              <span className="text-[9px] font-black text-slate-400 uppercase bg-white dark:bg-slate-800 px-3 py-1 rounded-full border dark:border-slate-700">{formatDate(doc.uploadedAt)}</span>
+                           </div>
+                           <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 mb-2 truncate">{doc.filePath.split('/').pop()}</h4>
+                           <div className="space-y-1 mb-6">
+                              <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Origin: {doc.record.hospital?.name}</p>
+                           </div>
+                           <div className="flex gap-2">
+                              <a href={solveFileUrl(doc.filePath)} target="_blank" rel="noopener noreferrer" className="flex-1 text-center py-2.5 bg-white dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 rounded-xl border dark:border-slate-700">Preview</a>
                               <button
                                 onClick={() => {
                                   const record = groupedRecords.flatMap(g => g.records).find(r => r._id === doc.record._id);
                                   setSelectedRecord(record);
                                   setTab('hospital');
                                 }}
-                                className="text-green-700 hover:text-green-900 font-medium text-sm bg-white border border-green-300 px-3 py-2 rounded-lg hover:bg-green-50 transition-colors"
+                                className="flex-1 text-center py-2.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl"
                               >
-                                View Record
+                                Source
                               </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Diagnosis Reports Section */}
-                  {(documentFilter === 'all' || documentFilter === 'diagnosis') && diagnosisReports.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <span>📋</span> Diagnosis Reports ({diagnosisReports.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {diagnosisReports.map((doc, idx) => (
-                          <div key={idx} className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition-colors">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <a
-                                    href={doc.filePath.startsWith('http') ? doc.filePath : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.filePath}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-700 hover:text-blue-900 font-semibold flex items-center gap-2 no-underline"
-                                  >
-                                    <span className="text-2xl">📄</span>
-                                    <span>{doc.filePath.split('/').pop()}</span>
-                                  </a>
-                                  <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full font-medium">
-                                    {new Date(doc.uploadedAt).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
-                                  {doc.record.recordType === 'medical_record' ? (
-                                    <>
-                                      <div>
-                                        <span className="font-medium">Visit Date:</span> {formatDate(doc.record.visitDate)}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Doctor:</span> Dr. {doc.record.doctor?.name} ({doc.record.doctor?.specialization})
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Hospital:</span> {doc.record.hospital?.name}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Diagnosis:</span> {doc.record.diagnosis}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div>
-                                        <span className="font-medium">Test Date:</span> {formatDate(doc.record.completedAt)}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Test Type:</span> 🧪 {doc.record.testType?.name}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Hospital:</span> {doc.record.hospital?.name}
-                                      </div>
-                                      <div>
-                                        <span className="font-medium">Performed By:</span> Nurse {doc.record.nurse?.name}
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  const record = groupedRecords.flatMap(g => g.records).find(r => r._id === doc.record._id);
-                                  setSelectedRecord(record);
-                                  setTab('hospital');
-                                }}
-                                className="text-blue-700 hover:text-blue-900 font-medium text-sm bg-white border border-blue-300 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-                              >
-                                View Record
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* No documents message for filtered view */}
-                  {documentFilter === 'test' && testReports.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                      <p className="text-4xl mb-2">🧪</p>
-                      <p>No test reports found.</p>
-                    </div>
-                  )}
-                  {documentFilter === 'diagnosis' && diagnosisReports.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                      <p className="text-4xl mb-2">📋</p>
-                      <p>No diagnosis reports found.</p>
-                    </div>
-                  )}
-                </>
-              )}
+                           </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
-          {/* ==================== SELF-UPLOADED RECORDS ==================== */}
+
+          {/* ==================== MY UPLOADS (SELF) ==================== */}
           {tab === 'self' && (
-            <div className="bg-white p-8 rounded-xl shadow-sm">
-              <div className="flex justify-between items-center mb-5">
-                <h2 className="text-xl font-semibold text-gray-800">Self-Uploaded Documents</h2>
-                <button
-                  onClick={() => setShowForm(!showForm)}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-md font-medium text-sm hover:bg-purple-700 transition-colors border-none cursor-pointer"
-                >
-                  {showForm ? 'Cancel' : '+ Upload Document'}
-                </button>
-              </div>
-
-              {showForm && (
-                <form onSubmit={handleCreateSelfRecord} className="bg-gray-50 p-5 rounded-lg mb-5 space-y-4">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-white dark:bg-slate-900 p-8 sm:p-12 rounded-[3.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      rows="2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Document *</label>
-                    {/* Toggle */}
-                    <div className="flex gap-1 mb-3 bg-gray-200 rounded-lg p-1 w-fit">
-                      <button
-                        type="button"
-                        onClick={() => setDocMode('file')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors border-none cursor-pointer ${
-                          docMode === 'file' ? 'bg-white text-purple-700 shadow-sm' : 'bg-transparent text-gray-500'
-                        }`}
-                      >
-                        📁 Upload File
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDocMode('link')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors border-none cursor-pointer ${
-                          docMode === 'link' ? 'bg-white text-purple-700 shadow-sm' : 'bg-transparent text-gray-500'
-                        }`}
-                      >
-                        🔗 Paste Link
-                      </button>
-                    </div>
-
-                    {docMode === 'file' ? (
-                      <div>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(e) => setFormFile(e.target.files[0] || null)}
-                          className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG — max 5 MB</p>
-                        {formFile && <p className="text-xs text-green-600 mt-1">✓ {formFile.name}</p>}
-                      </div>
-                    ) : (
-                      <div>
-                        <input
-                          type="url"
-                          value={formLink}
-                          onChange={(e) => setFormLink(e.target.value)}
-                          placeholder="https://drive.google.com/... or any document URL"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">Google Drive, Dropbox, OneDrive, or any public link</p>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Record Date</label>
-                    <input
-                      type="date"
-                      value={formData.recordDate}
-                      onChange={(e) => setFormData({ ...formData, recordDate: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    />
+                    <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">My Uploads</h2>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Medical documents uploaded by you.</p>
                   </div>
                   <button
-                    type="submit"
-                    disabled={formLoading}
-                    className="bg-green-600 text-white px-6 py-2 rounded-md font-medium text-sm hover:bg-green-700 transition-colors border-none cursor-pointer disabled:opacity-50"
+                    onClick={() => setShowForm(!showForm)}
+                    className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                      showForm ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600' : 'bg-indigo-600 text-white shadow-lg'
+                    }`}
                   >
-                    {formLoading ? 'Saving...' : 'Save Record'}
+                    {showForm ? 'Cancel' : 'Upload New +'}
                   </button>
-                </form>
-              )}
-
-              {selfRecords.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No self-uploaded documents yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  {selfRecords.map((r) => (
-                    <div key={r._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div>
-                        <p className="font-semibold text-gray-800">{r.title}</p>
-                        {r.description && <p className="text-sm text-gray-500 mt-1">{r.description}</p>}
-                        <p className="text-xs text-gray-400 mt-1">Uploaded: {formatDate(r.createdAt)} | Record Date: {formatDate(r.recordDate)}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <a
-                          href={r.documentPath}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-purple-600 hover:text-purple-800 font-medium text-sm"
-                        >
-                          📄 View
-                        </a>
-                        <button
-                          onClick={() => handleDeleteSelfRecord(r._id)}
-                          className="text-red-600 hover:text-red-800 font-medium bg-transparent border-none cursor-pointer text-sm"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
-              )}
+
+                {showForm && (
+                  <form onSubmit={handleCreateSelfRecord} className="p-8 bg-slate-50 dark:bg-slate-800/30 rounded-[2.5rem] border dark:border-slate-800 mb-10 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div className="space-y-6">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Record Title *</label>
+                            <input
+                              type="text"
+                              value={formData.title}
+                              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                              className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-xs font-bold text-slate-800 dark:text-white ring-1 ring-slate-200 dark:ring-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                              placeholder="E.g., Blood Test Result"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Record Date</label>
+                            <input
+                              type="date"
+                              value={formData.recordDate}
+                              onChange={(e) => setFormData({ ...formData, recordDate: e.target.value })}
+                              className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-xs font-bold text-slate-800 dark:text-white ring-1 ring-slate-200 dark:ring-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+                       </div>
+                       <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Description / Notes</label>
+                          <textarea
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            className="w-full h-[155px] px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-xs font-bold text-slate-800 dark:text-white ring-1 ring-slate-200 dark:ring-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                            placeholder="Add any notes here..."
+                          />
+                       </div>
+                    </div>
+
+                    <div className="space-y-4">
+                       <div className="flex gap-2 bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl w-fit">
+                          {['file', 'link'].map(m => (
+                            <button key={m} type="button" onClick={() => setDocMode(m)} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase ${docMode === m ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+                              {m === 'file' ? 'File' : 'Link'}
+                            </button>
+                          ))}
+                       </div>
+                       <div className="mt-4">
+                          {docMode === 'file' ? (
+                             <input type="file" onChange={(e) => setFormFile(e.target.files[0] || null)} className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-indigo-50 file:text-indigo-700" />
+                          ) : (
+                             <input type="url" value={formLink} onChange={(e) => setFormLink(e.target.value)} placeholder="URL link..." className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-xs font-bold ring-1 ring-slate-200 dark:ring-slate-800 outline-none" />
+                          )}
+                       </div>
+                    </div>
+
+                    <button type="submit" disabled={formLoading} className="w-full py-4 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-2xl shadow-lg disabled:opacity-50">
+                      {formLoading ? 'Uploading...' : 'Save Record'}
+                    </button>
+                  </form>
+                )}
+
+                {selfRecords.length === 0 ? (
+                  <div className="text-center py-20 opacity-40 grayscale">
+                    <p className="text-6xl mb-6">📝</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest italic">No records uploaded by you.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {selfRecords.map((r) => (
+                      <div key={r._id} className="group p-8 bg-slate-50 dark:bg-slate-800/40 rounded-[2.5rem] border border-transparent dark:border-slate-800/50 hover:border-indigo-500/50 transition-all">
+                         <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center text-2xl mb-6">📄</div>
+                         <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 mb-2 truncate">{r.title}</h3>
+                         <div className="flex justify-between items-center pt-6 border-t dark:border-slate-800/50 mt-6">
+                            <div className="space-y-1">
+                               <p className="text-[8px] font-black text-slate-400 uppercase">{formatDate(r.recordDate)}</p>
+                            </div>
+                            <div className="flex gap-2">
+                               <a href={r.documentPath} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm border dark:border-slate-700 hover:scale-110 transition-all">👁️</a>
+                               <button onClick={() => handleDeleteSelfRecord(r._id)} className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center text-rose-500 shadow-sm border dark:border-slate-700 hover:scale-110 transition-all">🗑️</button>
+                            </div>
+                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {/* ==================== TRUSTED DOCTORS ==================== */}
+          {/* ==================== DOCTOR ACCESS ==================== */}
           {tab === 'doctors' && (
-            <div className="bg-white p-8 rounded-xl shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-800 mb-5">Trusted Doctors</h2>
-              <p className="text-sm text-gray-500 mb-5">
-                These doctors have access to your medical records. You can revoke access at any time.
-              </p>
-
-              {trustedDoctors.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No trusted doctors yet. Generate an OTP from your dashboard to grant a doctor access.</p>
-              ) : (
-                <div className="space-y-3">
-                  {trustedDoctors.map((access) => (
-                    <div key={access._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div>
-                        <p className="font-semibold text-gray-800">Dr. {access.doctor?.name}</p>
-                        <p className="text-sm text-gray-500">{access.doctor?.specialization} | {access.doctor?.email}</p>
-                        <p className="text-xs text-gray-400 mt-1">Access granted: {formatDate(access.grantedAt)} via {access.accessMethod?.toUpperCase()}</p>
-                      </div>
-                      <button
-                        onClick={() => handleRevokeAccess(access.doctor?._id)}
-                        className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-md font-medium text-sm border border-red-200 cursor-pointer transition-colors"
-                      >
-                        Revoke Access
-                      </button>
-                    </div>
-                  ))}
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-white dark:bg-slate-900 p-8 sm:p-12 rounded-[3.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+                <div className="mb-10">
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Doctor Access</h2>
+                  <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Clinicians authorized to view your medical records.</p>
                 </div>
-              )}
+
+                {trustedDoctors.length === 0 ? (
+                  <div className="text-center py-20 opacity-40 grayscale">
+                    <p className="text-6xl mb-6">👨‍⚕️</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest italic leading-relaxed">No doctors currently have access to your records.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {trustedDoctors.map((access) => (
+                      <div key={access._id} className="group p-8 bg-slate-50 dark:bg-slate-800/40 rounded-[2.5rem] border border-transparent dark:border-slate-800/50 hover:border-indigo-500 transition-all flex flex-col">
+                         <div className="flex items-center gap-6 mb-8">
+                            <div className="w-16 h-16 rounded-[1.25rem] bg-indigo-600 text-white flex items-center justify-center text-3xl font-black shadow-lg">
+                               {access.doctor?.name?.[0].toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                               <p className="text-sm font-black text-slate-900 dark:text-white truncate">Dr. {access.doctor?.name}</p>
+                               <p className="text-[10px] font-black text-indigo-500 uppercase">{access.doctor?.specialization}</p>
+                            </div>
+                         </div>
+                         <div className="space-y-2 mb-8 flex-1">
+                            <div className="flex justify-between items-center bg-white/50 dark:bg-slate-800/50 p-3 rounded-xl border dark:border-slate-700">
+                               <span className="text-[9px] font-black text-slate-400">STATUS</span>
+                               <span className="text-[9px] font-black text-emerald-500 uppercase">ACCESS GRANTED</span>
+                            </div>
+                         </div>
+                         <button onClick={() => handleRevokeAccess(access.doctor?._id)} className="w-full py-4 bg-rose-50 dark:bg-rose-900/10 text-rose-600 text-[10px] font-black uppercase rounded-2xl border border-rose-100 dark:border-rose-900/30 hover:bg-rose-600 hover:text-white transition-all">
+                           Revoke Access
+                         </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </DashboardLayout>
   );

@@ -15,8 +15,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files as static assets
-// Files are accessible at  http://localhost:5001/uploads/<filename>
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Dedicated route for assignments
+app.use('/uploads/assignments', express.static(path.join(__dirname, 'uploads', 'assignments')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -36,7 +37,7 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-
+  
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -50,8 +51,8 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 const API_URL = process.env.VITE_API_URL || `http://localhost:${PORT}`;
 
-// app.listen(PORT, '0.0.0.0', () => {
-app.listen(PORT, () => { 
+app.listen(PORT, '0.0.0.0', () => {
+// app.listen(PORT, () => { 
   console.log(`Server is running on port ${PORT}`);
   console.log(`Access locally: http://localhost:${PORT}`);
   console.log(`Access on network: http://10.102.106.107:${PORT}`);

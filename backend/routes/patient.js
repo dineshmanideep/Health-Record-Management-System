@@ -212,6 +212,37 @@ router.get('/records', async (req, res) => {
       .populate('hospital', 'name')
       .lean();
 
+    const normalizedMedicalRecords = medicalRecords.map((record) => {
+      const existingCategorized = Array.isArray(record.categorizedDocuments)
+        ? record.categorizedDocuments
+        : [];
+
+      if (existingCategorized.length > 0) {
+        return record;
+      }
+
+      const legacyPaths = [];
+      if (Array.isArray(record.prescriptionDocuments) && record.prescriptionDocuments.length > 0) {
+        legacyPaths.push(...record.prescriptionDocuments);
+      }
+      if (record.prescriptionDocument) {
+        legacyPaths.push(record.prescriptionDocument);
+      }
+
+      const normalizedDocs = legacyPaths
+        .filter(Boolean)
+        .map((filePath) => ({
+          filePath,
+          category: 'diagnosis_report',
+          uploadedAt: record.updatedAt || record.createdAt || new Date()
+        }));
+
+      return {
+        ...record,
+        categorizedDocuments: normalizedDocs
+      };
+    });
+
     // Fetch completed test assignments
     const testAssignments = await TestAssignment.find({ 
       patient: req.user._id,
@@ -227,7 +258,7 @@ router.get('/records', async (req, res) => {
     const grouped = {};
     
     // Add medical records
-    medicalRecords.forEach((r) => {
+    normalizedMedicalRecords.forEach((r) => {
       const hId = r.hospital?._id?.toString() || 'unknown';
       if (!grouped[hId]) {
         grouped[hId] = { hospital: r.hospital, records: [] };

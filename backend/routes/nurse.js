@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
 const Nurse = require('../models/Nurse');
 const Hospital = require('../models/Hospital');
@@ -19,8 +20,18 @@ const TestType = require('../models/TestType');
 const { protect, authorize } = require('../middleware/auth');
 
 // Multer config for prescription uploads
+const ensureUploadDir = (dirPath) => {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+};
+
 const prescriptionStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads', 'prescriptions')),
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads', 'prescriptions');
+    ensureUploadDir(dir);
+    cb(null, dir);
+  },
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
 const upload = multer({ 
@@ -35,7 +46,11 @@ const upload = multer({
 
 // Multer config for test result uploads
 const testResultStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads', 'test-results')),
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads', 'test-results');
+    ensureUploadDir(dir);
+    cb(null, dir);
+  },
   filename: (req, file, cb) => cb(null, `test-${Date.now()}-${file.originalname}`)
 });
 const uploadTestResults = multer({ 
@@ -448,7 +463,14 @@ router.post('/assignments/:id/complete', upload.array('medicalFiles', 10), async
     const categorizedDocuments = [];
     if (req.files && req.files.length > 0) {
       req.files.forEach((file, index) => {
-        const category = req.body[`fileCategories[${index}]`] || 'test_report';
+        const categoryFromIndexedKey = req.body[`fileCategories[${index}]`];
+        const categoryFromArray = Array.isArray(req.body.fileCategories)
+          ? req.body.fileCategories[index]
+          : undefined;
+        const rawCategory = categoryFromIndexedKey || categoryFromArray || 'test_report';
+        const category = ['test_report', 'diagnosis_report'].includes(rawCategory)
+          ? rawCategory
+          : 'test_report';
         categorizedDocuments.push({
           filePath: `/uploads/prescriptions/${file.filename}`,
           category: category,
@@ -466,7 +488,9 @@ router.post('/assignments/:id/complete', upload.array('medicalFiles', 10), async
       visitDate: Date.now(),
       diagnosis: 'See Prescription',
       prescriptionNotes: prescription,
-      categorizedDocuments
+      categorizedDocuments,
+      prescriptionDocuments: categorizedDocuments.map((doc) => doc.filePath),
+      prescriptionDocument: categorizedDocuments[0]?.filePath
     });
 
     // Add to patient's medicalRecords array
@@ -646,15 +670,20 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
       });
     }
 
-    // Process uploaded documents with categories
+    // Process uploaded documents (using categories from frontend if available)
     const resultDocuments = [];
     if (req.files && req.files.length > 0) {
       req.files.forEach((file, index) => {
-        // Extract category from req.body
-        const categoryKey = `documentCategories[${index}]`;
-        const category = req.body[categoryKey] || 'test_report';
+        const categoryFromIndexedKey = req.body[`documentCategories[${index}]`];
+        const categoryFromArray = Array.isArray(req.body.documentCategories)
+          ? req.body.documentCategories[index]
+          : undefined;
+        const rawCategory = categoryFromIndexedKey || categoryFromArray || 'test_report';
+        const category = ['test_report', 'diagnosis_report'].includes(rawCategory)
+          ? rawCategory
+          : 'test_report';
         resultDocuments.push({
-          filePath: file.path,
+          filePath: `/uploads/test-results/${file.filename}`,
           category: category,
           uploadedAt: new Date()
         });

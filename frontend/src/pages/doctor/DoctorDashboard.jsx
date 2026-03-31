@@ -320,7 +320,7 @@ const DoctorDashboard = () => {
         )}
 
       </div>
-      {showQRScanner && <QRScanner onScan={handleQRScan} onError={() => setShowQRScanner(false)} onClose={() => setShowQRScanner(false)} />}
+      {showQRScanner && <QRScanner onScan={handleQRScan} onError={() => {}} onClose={() => setShowQRScanner(false)} />}
     </DashboardLayout>
   );
 };
