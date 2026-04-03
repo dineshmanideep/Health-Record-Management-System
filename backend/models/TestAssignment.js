@@ -38,6 +38,16 @@ const testAssignmentSchema = new mongoose.Schema({
   resultDocuments: [{
     filePath: { type: String, required: true },
     category: { type: String, enum: ['test_report', 'diagnosis_report'], default: 'test_report' },
+    reportTag: { type: String, trim: true },
+    parsedMetrics: [{
+      name: { type: String, trim: true },
+      value: { type: Number },
+      unit: { type: String, trim: true },
+      reference: { type: String, trim: true },
+      referenceMin: { type: Number },
+      referenceMax: { type: Number },
+      status: { type: String, enum: ['low', 'normal', 'high', 'unknown'], default: 'unknown' }
+    }],
     uploadedAt: { type: Date, default: Date.now }
   }],
   startedAt: {

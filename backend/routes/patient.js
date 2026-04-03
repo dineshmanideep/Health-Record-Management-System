@@ -16,6 +16,7 @@ const Hospital = require('../models/Hospital');
 const TestAssignment = require('../models/TestAssignment');
 const TestType = require('../models/TestType');
 const SmartwatchConnection = require('../models/SmartwatchConnection');
+const { extractReportInsightsFromPdf, inferReportTag } = require('../utils/reportParser');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'user' (patient) role.
@@ -475,6 +476,113 @@ router.patch('/revoke-access/:doctorId', async (req, res) => {
 // @desc    Aggregate health metrics from all medical records for trend graphs
 router.get('/health-analytics', async (req, res) => {
   try {
+    const [medicalDocsToBackfill, testDocsToBackfill] = await Promise.all([
+      MedicalRecord.find({
+        patient: req.user._id,
+        categorizedDocuments: {
+          $elemMatch: {
+            category: 'test_report',
+            filePath: { $regex: /\.pdf$/i }
+          }
+        }
+      }).select('categorizedDocuments'),
+      TestAssignment.find({
+        patient: req.user._id,
+        status: 'completed',
+        resultDocuments: {
+          $elemMatch: {
+            category: 'test_report',
+            filePath: { $regex: /\.pdf$/i }
+          }
+        }
+      }).select('testType resultDocuments')
+    ]);
+
+    for (const record of medicalDocsToBackfill) {
+      let hasChanges = false;
+      for (const doc of record.categorizedDocuments || []) {
+        const isTestPdf = doc?.category === 'test_report' && /\.pdf$/i.test(doc?.filePath || '');
+        if (!isTestPdf) continue;
+        if (doc?.parsedMetrics?.length && doc?.reportTag) continue;
+
+        const relativePath = String(doc.filePath || '').replace(/^\/+/, '');
+        const absolutePath = path.join(__dirname, '..', relativePath);
+
+        if (!fs.existsSync(absolutePath)) {
+          if (!doc.reportTag) {
+            doc.reportTag = inferReportTag(path.basename(doc.filePath || ''));
+            hasChanges = true;
+          }
+          continue;
+        }
+
+        try {
+          const parsed = await extractReportInsightsFromPdf(absolutePath);
+          if (!doc.reportTag) {
+            doc.reportTag = parsed.reportTag || inferReportTag(path.basename(doc.filePath || ''));
+          }
+          if (!doc.parsedMetrics?.length && Array.isArray(parsed.parsedMetrics) && parsed.parsedMetrics.length) {
+            doc.parsedMetrics = parsed.parsedMetrics;
+          }
+          hasChanges = true;
+        } catch {
+          if (!doc.reportTag) {
+            doc.reportTag = inferReportTag(path.basename(doc.filePath || ''));
+            hasChanges = true;
+          }
+        }
+      }
+
+      if (hasChanges) {
+        record.markModified('categorizedDocuments');
+        await record.save();
+      }
+    }
+
+    for (const assignment of testDocsToBackfill) {
+      let hasChanges = false;
+      for (const doc of assignment.resultDocuments || []) {
+        const isTestPdf = doc?.category === 'test_report' && /\.pdf$/i.test(doc?.filePath || '');
+        if (!isTestPdf) continue;
+        if (doc?.parsedMetrics?.length && doc?.reportTag) continue;
+
+        const relativePath = String(doc.filePath || '').replace(/^\/+/, '');
+        const absolutePath = path.join(__dirname, '..', relativePath);
+
+        if (!fs.existsSync(absolutePath)) {
+          if (!doc.reportTag) {
+            const fallbackLabel = assignment?.testType?.name || path.basename(doc.filePath || '');
+            doc.reportTag = inferReportTag(fallbackLabel);
+            hasChanges = true;
+          }
+          continue;
+        }
+
+        try {
+          const parsed = await extractReportInsightsFromPdf(absolutePath);
+          if (!doc.reportTag) {
+            const fallbackLabel = assignment?.testType?.name || path.basename(doc.filePath || '');
+            doc.reportTag = parsed.reportTag || inferReportTag(fallbackLabel);
+          }
+          if (!doc.parsedMetrics?.length && Array.isArray(parsed.parsedMetrics) && parsed.parsedMetrics.length) {
+            doc.parsedMetrics = parsed.parsedMetrics;
+          }
+          hasChanges = true;
+        } catch {
+          if (!doc.reportTag) {
+            const fallbackLabel = assignment?.testType?.name || path.basename(doc.filePath || '');
+            doc.reportTag = inferReportTag(fallbackLabel);
+            hasChanges = true;
+          }
+        }
+      }
+
+      if (hasChanges) {
+        assignment.markModified('resultDocuments');
+        await assignment.save();
+      }
+    }
+
     const records = await MedicalRecord.find({
       patient: req.user._id,
       $or: [
@@ -489,7 +597,104 @@ router.get('/health-analytics', async (req, res) => {
       .select('visitDate healthMetrics')
       .lean();
 
-    res.json({ success: true, data: records });
+    const [medicalRecordsWithParsedDocs, completedTestsWithParsedDocs] = await Promise.all([
+      MedicalRecord.find({
+        patient: req.user._id,
+        'categorizedDocuments.parsedMetrics.0': { $exists: true }
+      })
+        .select('visitDate hospital categorizedDocuments')
+        .populate('hospital', 'name')
+        .lean(),
+      TestAssignment.find({
+        patient: req.user._id,
+        status: 'completed',
+        'resultDocuments.parsedMetrics.0': { $exists: true }
+      })
+        .select('completedAt testType hospital resultDocuments')
+        .populate('hospital', 'name')
+        .populate('testType', 'name')
+        .lean()
+    ]);
+
+    const parsedReports = [];
+
+    medicalRecordsWithParsedDocs.forEach((record) => {
+      (record.categorizedDocuments || []).forEach((doc) => {
+        if (doc?.category !== 'test_report') return;
+        if (!doc?.parsedMetrics?.length) return;
+        parsedReports.push({
+          reportTag: doc.reportTag || 'general test report',
+          reportDate: record.visitDate || record.createdAt || new Date(),
+          sourceLabel: record.hospital?.name || 'Hospital Record',
+          metrics: doc.parsedMetrics
+        });
+      });
+    });
+
+    completedTestsWithParsedDocs.forEach((test) => {
+      (test.resultDocuments || []).forEach((doc) => {
+        if (doc?.category !== 'test_report') return;
+        if (!doc?.parsedMetrics?.length) return;
+        parsedReports.push({
+          reportTag: doc.reportTag || test.testType?.name || 'general test report',
+          reportDate: test.completedAt || test.createdAt || new Date(),
+          sourceLabel: test.testType?.name || test.hospital?.name || 'Test Assignment',
+          metrics: doc.parsedMetrics
+        });
+      });
+    });
+
+    const reportGroupMap = new Map();
+
+    parsedReports.forEach((report) => {
+      const tag = report.reportTag || 'general test report';
+      if (!reportGroupMap.has(tag)) {
+        reportGroupMap.set(tag, {
+          reportTag: tag,
+          metricSeries: new Map()
+        });
+      }
+
+      const group = reportGroupMap.get(tag);
+      report.metrics.forEach((metric) => {
+        const name = metric.name || 'Unknown Metric';
+        const metricKey = `${name.toLowerCase()}|${metric.unit || ''}`;
+
+        if (!group.metricSeries.has(metricKey)) {
+          group.metricSeries.set(metricKey, {
+            attribute: name,
+            unit: metric.unit || '',
+            points: []
+          });
+        }
+
+        group.metricSeries.get(metricKey).points.push({
+          date: report.reportDate,
+          value: metric.value,
+          reference: metric.reference || '',
+          referenceMin: metric.referenceMin ?? null,
+          referenceMax: metric.referenceMax ?? null,
+          status: metric.status || 'unknown',
+          sourceLabel: report.sourceLabel
+        });
+      });
+    });
+
+    const reportAnalytics = Array.from(reportGroupMap.values()).map((group) => ({
+      reportTag: group.reportTag,
+      metricSeries: Array.from(group.metricSeries.values()).map((series) => ({
+        ...series,
+        points: series.points.sort((a, b) => new Date(a.date) - new Date(b.date))
+      }))
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        records,
+        reportAnalytics
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

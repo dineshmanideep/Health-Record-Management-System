@@ -15,6 +15,14 @@ const NurseAssignments = () => {
   const [prescription, setPrescription] = useState('');
   const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState({ show: false, type: 'error', text: '' });
+
+  const showToast = (type, text) => {
+    setToast({ show: true, type, text });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, show: false }));
+    }, 3500);
+  };
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
@@ -101,7 +109,25 @@ const NurseAssignments = () => {
     setFiles([...files, { file: null, category: 'test_report' }]);
   };
 
-  const handleFileChange = (index, file) => {
+  const handleFileChange = (index, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.doc', '.docx'];
+    const fileName = file.name?.toLowerCase() || '';
+    const isAllowed = allowedExtensions.some((ext) => fileName.endsWith(ext));
+
+    if (!isAllowed) {
+      const clearedFiles = [...files];
+      if (clearedFiles[index]) {
+        clearedFiles[index].file = null;
+      }
+      setFiles(clearedFiles);
+      event.target.value = '';
+      showToast('error', 'Unsupported file. Use PDF, JPG, PNG, WEBP, HEIC, DOC, or DOCX.');
+      return;
+    }
+
     const newFiles = [...files];
     newFiles[index].file = file;
     setFiles(newFiles);
@@ -121,6 +147,7 @@ const NurseAssignments = () => {
     e.preventDefault();
     if (!prescription.trim()) {
       setMessage({ type: 'error', text: 'Please provide prescription text' });
+      showToast('error', 'Please provide prescription text.');
       return;
     }
 
@@ -151,6 +178,7 @@ const NurseAssignments = () => {
         fetchAssignments(); // Refresh the list
       }, 1500);
     } catch (error) {
+      showToast('error', error?.response?.data?.message || 'Failed to complete assignment');
       setMessage({ 
         type: 'error', 
         text: error?.response?.data?.message || 'Failed to complete assignment' 
@@ -184,6 +212,12 @@ const NurseAssignments = () => {
 
   return (
     <DashboardLayout title="My Assignments">
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-110 px-4 py-3 rounded-xl shadow-xl border text-xs font-black uppercase tracking-widest animate-in slide-in-from-top-2 duration-200 ${toast.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+          {toast.text}
+        </div>
+      )}
+
       {/* Global Message */}
       {message.text && !showCompletionForm && (
         <div className={`mb-6 p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center animate-in slide-in-from-top-2 duration-300 ${
@@ -464,7 +498,7 @@ const NurseAssignments = () => {
                   
                   {files.length === 0 ? (
                     <div className="bg-slate-50 dark:bg-slate-800 p-8 rounded-[2rem] text-center border-2 border-dashed border-slate-200 dark:border-slate-700">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic tracking-wider">No files added</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">No files added</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -494,8 +528,8 @@ const NurseAssignments = () => {
                                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">Choose File</label>
                                <input
                                  type="file"
-                                 onChange={(e) => handleFileChange(index, e.target.files[0])}
-                                 accept=".jpg,.jpeg,.png,.pdf"
+                                 onChange={(e) => handleFileChange(index, e)}
+                                 accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf,.doc,.docx"
                                  className="w-full text-[10px] font-bold dark:text-slate-400 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer"
                                />
                                {item.file && <p className="text-[9px] font-black text-emerald-500 mt-1 truncate">{item.file.name}</p>}

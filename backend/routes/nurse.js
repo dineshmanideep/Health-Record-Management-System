@@ -17,6 +17,7 @@ const HospitalAuditLog = require('../models/HospitalAuditLog');
 const RecordAssignment = require('../models/RecordAssignment');
 const TestAssignment = require('../models/TestAssignment');
 const TestType = require('../models/TestType');
+const { extractReportInsightsFromPdf, inferReportTag } = require('../utils/reportParser');
 const { protect, authorize } = require('../middleware/auth');
 
 // Multer config for prescription uploads
@@ -38,11 +39,26 @@ const upload = multer({
   storage: prescriptionStorage, 
   limits: { fileSize: 10 * 1024 * 1024 }, 
   fileFilter: (req, file, cb) => {
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.doc', '.docx'];
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, allowed.includes(ext));
+    if (!allowed.includes(ext)) {
+      return cb(new Error('Unsupported file type. Use PDF, JPG, JPEG, PNG, WEBP, HEIC, HEIF, DOC, or DOCX.'));
+    }
+    cb(null, true);
   }
 });
+
+const uploadMedicalFiles = (req, res, next) => {
+  upload.array('medicalFiles', 10)(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'File upload failed'
+      });
+    }
+    next();
+  });
+};
 
 // Multer config for test result uploads
 const testResultStorage = multer.diskStorage({
@@ -428,7 +444,7 @@ router.patch('/assignments/:id/start', async (req, res) => {
 
 // @route   POST /api/nurse/assignments/:id/complete
 // @desc    Complete an assignment by creating the medical record with prescription and categorized files
-router.post('/assignments/:id/complete', upload.array('medicalFiles', 10), async (req, res) => {
+router.post('/assignments/:id/complete', uploadMedicalFiles, async (req, res) => {
   try {
     const assignment = await RecordAssignment.findOne({ 
       _id: req.params.id, 
@@ -462,7 +478,8 @@ router.post('/assignments/:id/complete', upload.array('medicalFiles', 10), async
     // Build categorized documents array
     const categorizedDocuments = [];
     if (req.files && req.files.length > 0) {
-      req.files.forEach((file, index) => {
+      for (let index = 0; index < req.files.length; index += 1) {
+        const file = req.files[index];
         const categoryFromIndexedKey = req.body[`fileCategories[${index}]`];
         const categoryFromArray = Array.isArray(req.body.fileCategories)
           ? req.body.fileCategories[index]
@@ -471,12 +488,30 @@ router.post('/assignments/:id/complete', upload.array('medicalFiles', 10), async
         const category = ['test_report', 'diagnosis_report'].includes(rawCategory)
           ? rawCategory
           : 'test_report';
+
+        const absolutePath = path.join(__dirname, '..', 'uploads', 'prescriptions', file.filename);
+        let reportTag = '';
+        let parsedMetrics = [];
+
+        if (category === 'test_report' && path.extname(file.originalname || '').toLowerCase() === '.pdf') {
+          try {
+            const parsed = await extractReportInsightsFromPdf(absolutePath);
+            reportTag = parsed.reportTag || inferReportTag(file.originalname || '');
+            parsedMetrics = parsed.parsedMetrics || [];
+          } catch {
+            // keep fallback tag and empty metrics
+            reportTag = inferReportTag(file.originalname || '');
+          }
+        }
+
         categorizedDocuments.push({
           filePath: `/uploads/prescriptions/${file.filename}`,
           category: category,
+          reportTag,
+          parsedMetrics,
           uploadedAt: new Date()
         });
-      });
+      }
     }
 
     // Create the medical record
@@ -673,7 +708,8 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
     // Process uploaded documents (using categories from frontend if available)
     const resultDocuments = [];
     if (req.files && req.files.length > 0) {
-      req.files.forEach((file, index) => {
+      for (let index = 0; index < req.files.length; index += 1) {
+        const file = req.files[index];
         const categoryFromIndexedKey = req.body[`documentCategories[${index}]`];
         const categoryFromArray = Array.isArray(req.body.documentCategories)
           ? req.body.documentCategories[index]
@@ -682,12 +718,30 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
         const category = ['test_report', 'diagnosis_report'].includes(rawCategory)
           ? rawCategory
           : 'test_report';
+
+        const absolutePath = path.join(__dirname, '..', 'uploads', 'test-results', file.filename);
+        let reportTag = '';
+        let parsedMetrics = [];
+
+        if (category === 'test_report' && path.extname(file.originalname || '').toLowerCase() === '.pdf') {
+          try {
+            const parsed = await extractReportInsightsFromPdf(absolutePath);
+            reportTag = parsed.reportTag || inferReportTag(file.originalname || assignment?.testType?.name || '');
+            parsedMetrics = parsed.parsedMetrics || [];
+          } catch {
+            // keep fallback tag and empty metrics
+            reportTag = inferReportTag(file.originalname || assignment?.testType?.name || '');
+          }
+        }
+
         resultDocuments.push({
           filePath: `/uploads/test-results/${file.filename}`,
           category: category,
+          reportTag,
+          parsedMetrics,
           uploadedAt: new Date()
         });
-      });
+      }
     }
 
     assignment.status = 'completed';
