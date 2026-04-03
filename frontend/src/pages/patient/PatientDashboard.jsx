@@ -87,161 +87,162 @@ const PatientDashboard = () => {
     return map[action] || action;
   };
 
-  const StatCard = ({ label, value, icon, gradient }) => (
-    <div className={`p-6 rounded-3xl shadow-sm border border-slate-200/50 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden relative group hover:shadow-xl hover:-translate-y-1 transition-all duration-300`}>
-      <div className={`absolute top-0 right-0 w-24 h-24 ${gradient} opacity-10 dark:opacity-20 blur-2xl rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform`} />
+  const StatCard = ({ label, value, icon, color }) => (
+    <div className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800 hover-lift transition-all duration-300 relative overflow-hidden">
+      <div className={`absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br ${color} opacity-10 dark:opacity-15 blur-xl rounded-full group-hover:scale-150 transition-transform duration-500`} />
       <div className="relative z-10">
-        <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-2xl mb-4 shadow-sm group-hover:rotate-6 transition-transform">
-          {icon}
+        <div className="flex items-center justify-between mb-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+            {icon}
+          </div>
+          <span className={`text-3xl font-extrabold text-slate-900 dark:text-white`}>{value ?? 0}</span>
         </div>
-        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">{label}</h3>
-        <p className="text-3xl font-black text-slate-900 dark:text-white">{value ?? 0}</p>
+        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">{label}</p>
       </div>
     </div>
   );
 
   return (
-    <DashboardLayout title="Overview">
+    <DashboardLayout title="Dashboard">
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-           <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-           <p className="mt-4 text-slate-500 font-medium">Analyzing dashboard data...</p>
+        <div className="flex flex-col items-center justify-center py-24">
+           <div className="w-10 h-10 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4" />
+           <p className="text-sm text-slate-400 font-medium">Loading dashboard...</p>
         </div>
       ) : (
-        <div className="space-y-8 pb-12">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard label="Records" value={data?.recordCount} icon="📂" gradient="bg-blue-500" />
-            <StatCard label="Documents" value={data?.selfRecordCount} icon="📄" gradient="bg-indigo-500" />
-            <StatCard label="Doctors" value={data?.trustedDoctorCount} icon="👨‍⚕️" gradient="bg-emerald-500" />
-            <StatCard label="Reminders" value={data?.upcomingReminders?.length} icon="⏰" gradient="bg-amber-500" />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-              {/* Profile Card */}
-              <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-sm border border-slate-200/50 dark:border-slate-800 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 pointer-events-none group-hover:scale-110 transition-transform">
-                  <span className="text-9xl">🩺</span>
-                </div>
-                <div className="relative z-10">
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-4">Welcome back, {user?.name.split(' ')[0]}!</h2>
-                  <p className="text-slate-500 dark:text-slate-400 max-w-lg mb-8 leading-relaxed">
-                    Your medical history is unified and secure. Access your latest records or generate a code to share access with your doctor.
-                  </p>
-                  <div className="flex flex-wrap gap-4">
-                    <button onClick={() => navigate('/patient/records')} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">
-                      View Medical Records
-                    </button>
-                    <button onClick={handleGenerateOTP} disabled={otpLoading} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition-all disabled:opacity-50">
-                      {otpLoading ? 'Generating...' : 'Get Access Code'}
-                    </button>
-                    <button onClick={() => setShowQR(!showQR)} className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
-                      {showQR ? 'Hide QR' : 'Show QR Code'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* OTP & QR Displays */}
-                {(otpInfo || showQR) && (
-                  <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-8">
-                     {otpInfo && (
-                        <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/50 animate-fadeInRotate">
-                          <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-3">Doctor Access Code</p>
-                          <div className="text-4xl font-black text-emerald-600 dark:text-emerald-300 tracking-[0.5em] font-mono mb-2">{otpInfo.otp}</div>
-                          <p className="text-[10px] font-bold text-emerald-600/70 dark:text-emerald-500">Valid for {otpInfo.expiresInMinutes}m • Single-use only.</p>
-                        </div>
-                     )}
-                     {showQR && (
-                        <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-900/50 animate-fadeInRotate flex flex-col items-center">
-                           <div className="bg-white p-3 rounded-2xl shadow-sm mb-4">
-                              <QRCodeSVG value={`hrms:patient:${data.qrToken}`} size={140} level="H" />
-                           </div>
-                           <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 text-center leading-relaxed">Let your doctor scan this to see your records.</p>
-                        </div>
-                     )}
-                  </div>
-                )}
-              </div>
-
-              {/* Recent Records Table */}
-              <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
-                <h3 className="text-xl font-black text-slate-900 dark:text-white mb-6">Latest Hospital Visits</h3>
-                {data?.recentRecords?.length > 0 ? (
-                  <div className="overflow-x-auto -mx-8">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/50">
-                          <th className="py-4 px-8 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Date</th>
-                          <th className="py-4 px-8 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Hospital</th>
-                          <th className="py-4 px-8 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Diagnosis</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.recentRecords.map((r) => (
-                          <tr key={r._id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors border-b dark:border-slate-800 last:border-0 cursor-pointer">
-                            <td className="py-5 px-8 text-sm font-bold text-slate-600 dark:text-slate-300">{formatDate(r.visitDate)}</td>
-                            <td className="py-5 px-8">
-                              <p className="text-sm font-black text-slate-800 dark:text-white group-hover:text-indigo-600 transition-colors">{r.hospital?.name}</p>
-                              <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">Dr. {r.doctor?.name}</p>
-                            </td>
-                            <td className="py-5 px-8 text-sm font-medium text-slate-500 dark:text-slate-400">{r.diagnosis}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="py-12 text-center text-slate-400 dark:text-slate-600 font-medium italic">No visits recorded yet.</div>
-                )}
+        <div className="space-y-6 pb-12 stagger-children">
+          {/* Welcome Banner */}
+          <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl relative overflow-hidden shadow-lg dark:shadow-xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 dark:bg-emerald-500/8 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-teal-500/5 rounded-full translate-y-1/2 -translate-x-1/3 blur-2xl" />
+            <div className="relative z-10">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">Welcome back, {user?.name?.split(' ')[0]}! 👋</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-sm max-w-lg mb-6 leading-relaxed">
+                Your medical records are unified and secure. View your latest records or generate a code to share access with your doctor.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={() => navigate('/patient/records')} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
+                  View Records
+                </button>
+                <button onClick={handleGenerateOTP} disabled={otpLoading} className="px-5 py-2.5 bg-slate-100 dark:bg-white/15 hover:bg-slate-200 dark:hover:bg-white/25 text-slate-700 dark:text-white rounded-xl font-semibold text-sm active:scale-95 transition-all disabled:opacity-50 border border-slate-200 dark:border-white/20">
+                  {otpLoading ? 'Generating...' : '🔑 Get Access Code'}
+                </button>
+                <button onClick={() => setShowQR(!showQR)} className="px-5 py-2.5 bg-slate-100 dark:bg-white/15 hover:bg-slate-200 dark:hover:bg-white/25 text-slate-700 dark:text-white rounded-xl font-semibold text-sm active:scale-95 transition-all border border-slate-200 dark:border-white/20">
+                  {showQR ? 'Hide QR' : '📱 Show QR'}
+                </button>
               </div>
             </div>
 
-            <div className="space-y-8">
-              {/* Notifications */}
-              <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white">Alerts</h3>
+            {/* OTP & QR Displays */}
+            {(otpInfo || showQR) && (
+              <div className="mt-6 pt-6 border-t border-slate-200 dark:border-white/20 grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                 {otpInfo && (
+                    <div className="bg-slate-50 dark:bg-white/10 backdrop-blur-md p-5 rounded-xl border border-slate-200 dark:border-white/20 animate-fadeIn">
+                      <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">Doctor Access Code</p>
+                      <div className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-[0.4em] font-mono mb-1">{otpInfo.otp}</div>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500">Valid for {otpInfo.expiresInMinutes}m · Single-use</p>
+                    </div>
+                 )}
+                 {showQR && (
+                    <div className="bg-slate-50 dark:bg-white/10 backdrop-blur-md p-5 rounded-xl border border-slate-200 dark:border-white/20 animate-fadeIn flex flex-col items-center">
+                       <div className="bg-white p-3 rounded-xl shadow-md mb-3">
+                          <QRCodeSVG value={`hrms:patient:${data.qrToken}`} size={120} level="H" />
+                       </div>
+                       <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center">Let your doctor scan this code</p>
+                    </div>
+                 )}
+              </div>
+            )}
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn" style={{ animationDelay: '0.1s' }}>
+            <StatCard label="Medical Records" value={data?.recordCount} icon="📂" color="from-blue-500 to-cyan-500" />
+            <StatCard label="Self Documents" value={data?.selfRecordCount} icon="📄" color="from-teal-500 to-emerald-500" />
+            <StatCard label="Trusted Doctors" value={data?.trustedDoctorCount} icon="👨‍⚕️" color="from-emerald-500 to-teal-500" />
+            <StatCard label="Reminders" value={data?.upcomingReminders?.length} icon="⏰" color="from-amber-500 to-orange-500" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Recent Records */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 animate-fadeIn" style={{ animationDelay: '0.15s' }}>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-5">Recent Visits</h3>
+              {data?.recentRecords?.length > 0 ? (
+                <div className="overflow-x-auto -mx-6">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50/80 dark:bg-slate-800/50">
+                        <th className="py-3 px-6 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Date</th>
+                        <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Hospital</th>
+                        <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Diagnosis</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.recentRecords.map((r) => (
+                        <tr key={r._id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0">
+                          <td className="py-4 px-6 text-sm font-medium text-slate-600 dark:text-slate-300">{formatDate(r.visitDate)}</td>
+                          <td className="py-4 px-4">
+                            <p className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{r.hospital?.name}</p>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500">Dr. {r.doctor?.name}</p>
+                          </td>
+                          <td className="py-4 px-4 text-sm text-slate-500 dark:text-slate-400">{r.diagnosis}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-10 text-center text-slate-400 dark:text-slate-500 text-sm italic">No visits recorded yet.</div>
+              )}
+            </div>
+
+            {/* Notifications */}
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 animate-fadeIn" style={{ animationDelay: '0.2s' }}>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Notifications</h3>
                   {notifications.some(n => !n.read) && (
-                    <button onClick={handleMarkAllRead} className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:underline uppercase tracking-widest">Clear All</button>
+                    <button onClick={handleMarkAllRead} className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">Mark all read</button>
                   )}
                 </div>
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
                   {notifications.length > 0 ? notifications.map((n) => (
-                    <div key={n._id} className={`p-4 rounded-2xl border transition-all ${n.read ? 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800' : 'bg-indigo-50/30 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900/50 shadow-sm'}`}>
-                      <div className="flex gap-3">
-                        <span className="text-xl mt-1">{getNotificationIcon(n.type)}</span>
+                    <div key={n._id} className={`p-3 rounded-xl border transition-all ${n.read ? 'bg-slate-50/50 dark:bg-slate-800/20 border-slate-100 dark:border-slate-800' : 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/50'}`}>
+                      <div className="flex gap-2.5">
+                        <span className="text-base mt-0.5">{getNotificationIcon(n.type)}</span>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-bold mb-1 ${n.read ? 'text-slate-500' : 'text-slate-900 dark:text-white'}`}>{n.title}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 leading-normal mb-2">{n.message}</p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{new Date(n.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                            {!n.read && <button onClick={() => handleMarkRead(n._id)} className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 hover:scale-105 transition-transform">Mark read</button>}
+                          <p className={`text-xs font-semibold mb-0.5 ${n.read ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-white'}`}>{n.title}</p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal">{n.message}</p>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-[10px] text-slate-400">{new Date(n.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                            {!n.read && <button onClick={() => handleMarkRead(n._id)} className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Mark read</button>}
                           </div>
                         </div>
                       </div>
                     </div>
                   )) : (
-                    <div className="text-center py-10 opacity-30 italic text-sm">Quiet for now...</div>
+                    <div className="text-center py-8 text-sm text-slate-400 italic">No notifications</div>
                   )}
                 </div>
               </div>
 
-              {/* Activity Log */}
-              <div className="bg-indigo-600 dark:bg-indigo-900 p-8 rounded-[2rem] shadow-xl shadow-indigo-500/10 text-white overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-10"><span className="text-6xl italic">LOG</span></div>
-                <h3 className="text-xl font-black mb-6 relative z-10">Live Feed</h3>
-                <div className="space-y-6 relative z-10">
-                  {data?.recentActivity?.slice(0, 5).map((log) => (
-                    <div key={log._id} className="flex gap-4 border-l-2 border-white/20 pl-4 py-1">
+              {/* Activity Feed */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 relative overflow-hidden animate-fadeIn" style={{ animationDelay: '0.25s' }}>
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 dark:bg-emerald-500/10 blur-2xl rounded-full" />
+                <h3 className="text-base font-bold mb-4 relative z-10 text-slate-900 dark:text-white">Recent Activity</h3>
+                <div className="space-y-4 relative z-10">
+                  {data?.recentActivity?.slice(0, 4).map((log) => (
+                    <div key={log._id} className="flex gap-3 border-l-2 border-slate-200 dark:border-slate-700 pl-3 py-0.5">
                       <div className="flex-1">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">{actionLabel(log.action)}</p>
-                        <p className="text-xs font-semibold leading-relaxed opacity-90">{log.details}</p>
+                        <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-0.5">{actionLabel(log.action)}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{log.details}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button onClick={() => navigate('/patient/activity-logs')} className="w-full mt-8 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">See full audit</button>
+                <button onClick={() => navigate('/patient/activity-logs')} className="w-full mt-5 py-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700">
+                  View All Activity →
+                </button>
               </div>
             </div>
           </div>
