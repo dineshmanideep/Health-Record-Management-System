@@ -23,86 +23,115 @@ const DoctorPatients = () => {
   });
 
   return (
-    <DashboardLayout title="My Patients">
-      <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800 mb-6 transition-all">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-8">
-          <div>
-            <h2 className="text-slate-900 dark:text-white text-2xl font-black tracking-tight">
-              Clinical Subjects
-            </h2>
-            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">
-              {patients.length} Synchronized Nodes
-            </p>
-          </div>
-          <div className="relative w-full sm:w-72">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search Subject ID or Alias..."
-              className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-sm font-bold dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-            />
+    <DashboardLayout title="Clinical Intelligence">
+      <div className="pb-20">
+        {/* Search & Stats Header */}
+        <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 mb-10 transition-all">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div>
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase flex items-center gap-4">
+                <span className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-emerald-100/50 dark:border-emerald-800/30">👥</span>
+                Subject Directory
+              </h2>
+              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-3 ml-16 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 
+                {patients.length} Authenticated Synaptic Links
+              </p>
+            </div>
+            <div className="relative w-full lg:w-96">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 text-lg">🔍</span>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search Subject ID or Alias..."
+                className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-[2rem] text-sm font-black dark:text-white placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all outline-none uppercase tracking-widest"
+              />
+            </div>
           </div>
         </div>
 
         {loading ? (
-          <p className="text-gray-500">Loading patients...</p>
+          <div className="flex flex-col items-center justify-center py-40 animate-pulse">
+             <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+             <p className="mt-8 text-slate-400 font-black tracking-[0.3em] uppercase text-[10px]">Scanning Subject Registry...</p>
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-6xl mb-4">👥</p>
-            <p className="text-gray-500 text-lg">No patients found</p>
-            <p className="text-gray-400 text-sm mt-1">Patients will appear here once they grant you access.</p>
+          <div className="bg-white dark:bg-slate-900 p-32 rounded-[3.5rem] shadow-sm text-center border border-slate-200/50 dark:border-slate-800">
+            <p className="text-8xl mb-10 grayscale opacity-10">👥</p>
+            <p className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.4em] text-[11px] mb-4">Registry Null</p>
+            <p className="text-slate-400 dark:text-slate-600 text-sm font-bold max-w-xs mx-auto leading-relaxed">No subjects discovered matching the search vector.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {filtered.map((item) => (
-              <div key={item._id} className="bg-slate-50 dark:bg-slate-800/50 border border-transparent dark:border-slate-700 rounded-[2rem] p-6 hover:shadow-xl transition-all group relative overflow-hidden">
-                <div className="flex items-start justify-between mb-4 relative z-10">
+              <div 
+                key={item._id} 
+                className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-[3rem] p-10 hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden"
+              >
+                {/* Decorative accent */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-emerald-500/10 transition-colors" />
+                
+                <div className="flex items-start justify-between mb-8 relative z-10">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-black text-slate-900 dark:text-white text-lg truncate group-hover:text-indigo-600 transition-colors">{item.patient?.name || 'N/A'}</h3>
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 italic truncate">{item.patient?.email || 'N/A'}</p>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 
+                       Subject_{item.patient?.patientId?.substring(0, 8)}
+                    </p>
+                    <h3 className="font-black text-slate-900 dark:text-white text-2xl uppercase tracking-tight truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mb-2">
+                      {item.patient?.name || 'Anonymous Subject'}
+                    </h3>
+                    <p className="text-[11px] font-bold text-slate-400 dark:text-slate-600 truncate italic">
+                      {item.patient?.email || 'Unauthorized Data Access'}
+                    </p>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${item.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'}`}>
+                  <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${
+                    item.isActive 
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/30' 
+                      : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800/30'
+                  }`}>
                     {item.isActive ? 'Active' : 'Revoked'}
                   </span>
                 </div>
 
-                <div className="space-y-3 text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-6 relative z-10">
-                  {item.patient?.phone && (
-                    <div className="flex items-center gap-3">
-                      <span className="w-5 h-5 bg-white dark:bg-slate-700 rounded-md flex items-center justify-center text-[10px]">📞</span> 
-                      <span className="font-mono">{item.patient.phone}</span>
-                    </div>
-                  )}
+                <div className="grid grid-cols-2 gap-4 mb-8 relative z-10">
                   {item.patient?.gender && (
-                    <div className="flex items-center gap-3">
-                      <span className="w-5 h-5 bg-white dark:bg-slate-700 rounded-md flex items-center justify-center text-[10px]">👤</span> 
-                      <span className="capitalize">{item.patient.gender}</span>
+                    <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5 italic">Genotype</p>
+                      <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase">{item.patient.gender}</p>
                     </div>
                   )}
                   {item.patient?.bloodGroup && (
-                    <div className="flex items-center gap-3">
-                      <span className="w-5 h-5 bg-white dark:bg-slate-700 rounded-md flex items-center justify-center text-[10px]">🩸</span> 
-                      {item.patient.bloodGroup}
-                    </div>
-                  )}
-                  {item.lastVisitDate && (
-                    <div className="flex items-center gap-3">
-                      <span className="w-5 h-5 bg-white dark:bg-slate-700 rounded-md flex items-center justify-center text-[10px]">📅</span> 
-                      Last visit: {new Date(item.lastVisitDate).toLocaleDateString()}
+                    <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-4 rounded-2xl border border-emerald-100/50 dark:border-emerald-800/20">
+                      <p className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-1.5 italic">Blood Type</p>
+                      <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase">{item.patient.bloodGroup}</p>
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest mb-6 border-t dark:border-slate-700 pt-4 relative z-10">
-                  <span>{item.accessMethod?.toUpperCase() || 'OTP'} LINK</span>
-                  <span>SINCE {new Date(item.grantedAt).toLocaleDateString()}</span>
+                <div className="space-y-4 mb-10 relative z-10">
+                  {item.patient?.phone && (
+                    <div className="flex items-center gap-3 text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">
+                      <span className="w-6 h-6 bg-slate-50 dark:bg-slate-950 rounded-lg flex items-center justify-center border border-slate-100 dark:border-slate-800">📞</span> 
+                      <span>{item.patient.phone}</span>
+                    </div>
+                  )}
+                  {item.lastVisitDate && (
+                    <div className="flex items-center gap-3 text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest bg-emerald-50/30 dark:bg-emerald-900/10 px-4 py-2 rounded-xl border border-emerald-100/50 dark:border-emerald-800/20">
+                      <span className="text-sm">📅</span> 
+                      <span>Last Synchronization: {new Date(item.lastVisitDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em] mb-10 border-t dark:border-slate-800 pt-6 relative z-10 italic">
+                  <span>VECTOR: {item.accessMethod?.toUpperCase() || 'OTP'}</span>
+                  <span>EST: {new Date(item.grantedAt).toLocaleDateString()}</span>
                 </div>
 
                 <Link
                   to={`/doctor/patient-records/${item.patient?._id}`}
-                  className="w-full block text-center py-3.5 bg-indigo-600 hover:bg-slate-900 dark:hover:bg-white dark:hover:text-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/10 transition-all no-underline"
+                  className="w-full block text-center py-4.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all no-underline hover:-translate-y-1 active:scale-95"
                 >
                   Access Medical Vault
                 </Link>

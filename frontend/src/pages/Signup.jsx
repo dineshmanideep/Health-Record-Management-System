@@ -1,9 +1,29 @@
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getPasswordError } from '../utils/passwordValidation';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
+
+// ── Memoized to prevent re-renders when parent state changes ──
+const InputField = memo(({ label, id, type = 'text', value, onChange, placeholder, required = false, hint }) => (
+  <div className="group">
+    <label htmlFor={id} className="block text-[10px] font-black text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-[0.2em] group-focus-within:text-emerald-500 transition-colors">{label}</label>
+    <input
+      type={type}
+      id={id}
+      name={id}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      required={required}
+      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all uppercase tracking-widest"
+    />
+    {hint && <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 mt-2 ml-1 italic">{hint}</p>}
+  </div>
+));
+
+InputField.displayName = 'InputField';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -25,11 +45,11 @@ const Signup = () => {
   if (authLoading) return null;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
-  const handleChange = (e) => {
+  const handleChange = useCallback((e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
-  };
+  }, []);
 
   const validatePassword = () => {
     const errorMessage = getPasswordError(formData.password);
@@ -113,23 +133,6 @@ const Signup = () => {
       </div>
     );
   }
-
-  const InputField = ({ label, id, type = 'text', value, onChange, placeholder, required = false, hint }) => (
-    <div>
-      <label htmlFor={id} className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wider">{label}</label>
-      <input
-        type={type}
-        id={id}
-        name={id}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all"
-      />
-      {hint && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 ml-1">{hint}</p>}
-    </div>
-  );
 
   return (
     <div className={`min-h-screen flex ${theme === 'dark' ? 'dark' : ''}`}>

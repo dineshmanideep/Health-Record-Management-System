@@ -199,390 +199,355 @@ const HospitalTestAssignments = () => {
   };
 
   return (
-    <DashboardLayout title="Test Assignments">
-      {/* Message Alert */}
-      {message.text && (
-        <div className={`mb-5 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-          {message.text}
-        </div>
-      )}
+    <DashboardLayout title="Clinical Deployments">
+      <div className="space-y-6 pb-12">
+        {/* Message Alert */}
+        {message.text && (
+          <div className={`p-4 rounded-2xl text-sm font-medium animate-fadeIn flex items-center gap-3 border ${
+            message.type === 'success' 
+              ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50' 
+              : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800/50'
+          }`}>
+            <span>{message.type === 'success' ? '✅' : '⚠️'}</span>
+            {message.text}
+          </div>
+        )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
-        <div className="bg-white p-5 rounded-xl shadow-sm">
-          <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Total Assignments</h3>
-          <p className="text-3xl font-bold text-purple-600">{stats.total}</p>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Total', value: stats.total, icon: '📋', color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
+            { label: 'Pending', value: stats.pending, icon: '⏳', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+            { label: 'In Progress', value: stats.in_progress, icon: '⚙️', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+            { label: 'Completed', value: stats.completed, icon: '✅', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' }
+          ].map((s) => (
+            <div key={s.label} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800 relative overflow-hidden group hover:shadow-md transition-all">
+              <div className={`absolute top-0 right-0 w-16 h-16 ${s.bg} blur-xl rounded-full -translate-y-1/2 translate-x-1/2 opacity-60`} />
+              <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{s.label}</p>
+              <div className="flex items-end justify-between">
+                <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
+                <span className="text-xl opacity-40">{s.icon}</span>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="bg-white p-5 rounded-xl shadow-sm">
-          <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Pending</h3>
-          <p className="text-3xl font-bold text-orange-600">{stats.pending}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl shadow-sm">
-          <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">In Progress</h3>
-          <p className="text-3xl font-bold text-blue-600">{stats.in_progress}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl shadow-sm">
-          <h3 className="text-xs uppercase text-gray-600 font-medium mb-2">Completed</h3>
-          <p className="text-3xl font-bold text-green-600">{stats.completed}</p>
-        </div>
-      </div>
 
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Test Assignments</h2>
-          <p className="text-gray-600 text-sm mt-1">Assign tests to nurses for patient care</p>
+        {/* Header Action Bar */}
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight">Test Administration</h2>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">Manage patient diagnostics and nurse protocols</p>
+            </div>
+            <div className="flex gap-3">
+              <Link 
+                to="/hospital/tests" 
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-750 transition-all no-underline flex items-center gap-2"
+              >
+                🔬 Protocol Library
+              </Link>
+              {!showCreateForm && (
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  className="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 uppercase tracking-widest hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
+                >
+                  ✚ Deploy Team
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <Link 
-            to="/hospital/tests" 
-            className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors no-underline"
-          >
-            🧪 Manage Tests
-          </Link>
-          {!showCreateForm && (
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors"
-            >
-              ✚ Create Assignment
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Create Assignment Form */}
-      {showCreateForm && (
-        <div className="bg-white p-6 rounded-xl shadow-sm mb-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-5">Create Test Assignment</h3>
+        {/* Create Assignment Form */}
+        {showCreateForm && (
+          <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border-4 border-emerald-500/10 mb-8 animate-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-10">
+               <div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">New Assignment Protocol</h3>
+                  <p className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase mt-1">Initiating secure deployment sequence</p>
+               </div>
+               <button onClick={resetForm} className="text-slate-400 hover:text-rose-500 transition-all text-2xl font-black">×</button>
+            </div>
 
-          {/* Step 1: Verify Patient */}
-          <div className="mb-6 p-5 bg-blue-50 border-2 border-blue-200 rounded-lg">
-            <h4 className="font-bold text-gray-800 mb-3">Step 1: Verify Patient</h4>
-            
-            {!verifiedPatient ? (
-              <>
-                <div className="flex flex-wrap gap-4 mb-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="email"
-                      checked={verificationMethod === 'email'}
-                      onChange={(e) => setVerificationMethod(e.target.value)}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-semibold">Email + OTP</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="qr"
-                      checked={verificationMethod === 'qr'}
-                      onChange={(e) => setVerificationMethod(e.target.value)}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-semibold">QR Code Scanner</span>
-                  </label>
-                  {/* <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      value="otp"
-                      checked={verificationMethod === 'otp'}
-                      onChange={(e) => setVerificationMethod(e.target.value)}
-                      className="w-4 h-4"
-                    />
-                    <span className="font-semibold">OTP Only</span>
-                  </label> */}
-                </div>
+            {/* Step 1: Verify Patient */}
+            <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-800/80 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-700">
+              <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Phase I: Subject Verification
+              </h4>
+              
+              {!verifiedPatient ? (
+                <div className="space-y-8">
+                  <div className="flex gap-4 p-1.5 bg-white dark:bg-slate-900 rounded-2xl w-fit border border-slate-100 dark:border-slate-800">
+                    {[
+                      { id: 'email', label: 'EMAIL & OTP', icon: '📧' },
+                      { id: 'qr', label: 'QR SCANNER', icon: '📷' }
+                    ].map((mode) => (
+                      <button
+                        key={mode.id}
+                        onClick={() => setVerificationMethod(mode.id)}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all flex items-center gap-2 ${
+                          verificationMethod === mode.id
+                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                            : 'text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400'
+                        }`}
+                      >
+                        {mode.icon} {mode.label}
+                      </button>
+                    ))}
+                  </div>
 
-                {verificationMethod === 'email' ? (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Patient Email Address
-                      </label>
-                      <input
-                        type="email"
-                        value={patientEmail}
-                        onChange={(e) => setPatientEmail(e.target.value)}
-                        placeholder="patient@example.com"
-                        className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600"
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Patient OTP (6 digits)
+                  {verificationMethod === 'email' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-1">
+                          Subject Email Node
                         </label>
                         <input
-                          type="text"
-                          value={patientOtp}
-                          onChange={(e) => setPatientOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="000000"
-                          maxLength={6}
-                          className="w-40 px-4 py-2.5 border-2 border-gray-200 rounded-lg font-mono text-lg focus:outline-none focus:border-purple-600"
+                          type="email"
+                          value={patientEmail}
+                          onChange={(e) => setPatientEmail(e.target.value)}
+                          placeholder="target@clinical_node.com"
+                          className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-sm font-bold dark:text-white placeholder:opacity-30 focus:ring-2 focus:ring-emerald-500 transition-all outline-none"
                         />
                       </div>
-                      <div className="flex items-end">
+                      <div className="flex gap-3 items-end">
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-1">
+                            Auth Key (OTP)
+                          </label>
+                          <input
+                            type="text"
+                            value={patientOtp}
+                            onChange={(e) => setPatientOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            placeholder="000 000"
+                            maxLength={6}
+                            className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl font-black text-lg text-emerald-500 tracking-[0.2em] focus:ring-2 focus:ring-emerald-500 transition-all outline-none text-center"
+                          />
+                        </div>
                         <button
                           onClick={handleVerifyPatient}
                           disabled={verifyingPatient || !patientEmail || patientOtp.length !== 6}
-                          className="px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50"
+                          className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-all disabled:opacity-50 h-[56px]"
                         >
-                          {verifyingPatient ? 'Verifying...' : 'Verify Patient'}
+                          {verifyingPatient ? 'Verifying...' : 'Verify'}
                         </button>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600 mt-2">
-                      💡 Ask the patient to generate an OTP from their dashboard and provide their email address.
-                    </p>
-                  </div>
-                ) : verificationMethod === 'qr' ? (
-                  <button
-                    onClick={() => setShowQRScanner(true)}
-                    disabled={verifyingPatient}
-                    className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 text-white rounded-xl font-bold hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg disabled:opacity-50"
-                  >
-                    📷 Scan Patient QR Code
-                  </button>
-                ) : (
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      value={patientOtp}
-                      onChange={(e) => setPatientOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="Enter 6-digit OTP"
-                      maxLength={6}
-                      className="w-40 px-4 py-2.5 border-2 border-gray-200 rounded-lg font-mono text-lg focus:outline-none focus:border-purple-600"
-                    />
-                    <button
-                      onClick={handleVerifyPatient}
-                      disabled={verifyingPatient || patientOtp.length !== 6}
-                      className="px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50"
-                    >
-                      {verifyingPatient ? 'Verifying...' : 'Verify'}
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex items-center justify-between p-4 bg-green-50 border-2 border-green-300 rounded-lg">
-                <div>
-                  <p className="font-bold text-green-800 text-lg">{String(verifiedPatient?.name || 'N/A')}</p>
-                  <p className="text-sm text-green-600">{String(verifiedPatient?.email || 'N/A')}</p>
+                  ) : (
+                    <div className="flex flex-col items-center py-10 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                      <div className="text-4xl mb-6 opacity-40">📷</div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-6">Scanner ready for subject identification</p>
+                      <button
+                        onClick={() => setShowQRScanner(true)}
+                        disabled={verifyingPatient}
+                        className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all disabled:opacity-50"
+                      >
+                        Launch QR Interface
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => {
-                    setVerifiedPatient(null);
-                    setPatientEmail('');
-                    setPatientOtp('');
-                  }}
-                  className="px-4 py-2 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200"
-                >
-                  Change Patient
-                </button>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center justify-between p-8 bg-emerald-50/50 dark:bg-emerald-900/10 border-2 border-emerald-500/20 rounded-[2rem] animate-fadeIn">
+                  <div className="flex items-center gap-6 mb-4 sm:mb-0">
+                    <div className="w-16 h-16 rounded-[1.5rem] bg-emerald-600 flex items-center justify-center text-white text-3xl font-black">
+                       {verifiedPatient?.name?.[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-xl font-black text-slate-900 dark:text-white leading-none uppercase tracking-tight">{verifiedPatient?.name}</p>
+                      <p className="text-[10px] font-black text-emerald-500/80 uppercase tracking-widest mt-2">{verifiedPatient?.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setVerifiedPatient(null); setPatientEmail(''); setPatientOtp(''); }}
+                    className="px-6 py-3 bg-white dark:bg-slate-900 text-slate-400 hover:text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all"
+                  >
+                    Abort Verification
+                  </button>
+                </div>
+              )}
+            </div>
 
-          {/* Step 2: Assignment Details (only shown after patient verification) */}
-          {verifiedPatient && (
-            <form onSubmit={handleCreateAssignment} className="space-y-4">
-              <div className="mb-6 p-5 bg-purple-50 border-2 border-purple-200 rounded-lg">
-                <h4 className="font-bold text-gray-800 mb-3">Step 2: Assignment Details</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Step 2: Assignment Details */}
+            {verifiedPatient && (
+              <form onSubmit={handleCreateAssignment} className="space-y-10 animate-fadeInUp">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-8 bg-slate-50 dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-750">
+                  <div className="lg:col-span-3 mb-2">
+                    <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Phase II: Lab Assignment Data
+                    </h4>
+                  </div>
+                  
                   <div>
-                    <label className="block text-sm font-semibold text-gray-600 mb-2">Test Type *</label>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-1">Protocol Type *</label>
                     <select
                       value={formData.testTypeId}
                       onChange={(e) => setFormData({ ...formData, testTypeId: e.target.value })}
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600"
+                      className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-xs font-black dark:text-white focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none cursor-pointer uppercase tracking-tight"
                       required
                     >
-                      <option value="">Select test type...</option>
+                      <option value="">-- SELECT PROTOCOL --</option>
                       {testTypes.map((test) => (
-                        <option key={test._id} value={test._id}>
-                          {String(test?.name || 'Unknown Test')} ({String(test?.category || 'N/A')})
-                        </option>
+                        <option key={test._id} value={test._id}>{test?.name} ({test?.category})</option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-600 mb-2">Assign to Nurse *</label>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-1">Assigned Personnel *</label>
                     <select
                       value={formData.nurseId}
                       onChange={(e) => setFormData({ ...formData, nurseId: e.target.value })}
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600"
+                      className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-xs font-black dark:text-white focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none appearance-none cursor-pointer uppercase tracking-tight"
                       required
                     >
-                      <option value="">Select nurse...</option>
+                      <option value="">-- CHOOSE NURSE --</option>
                       {nurses.map((nurse) => (
-                        <option key={nurse.affiliationId} value={nurse.nurse._id}>
-                          {String(nurse.nurse?.name || 'Unknown Nurse')} - {String(nurse.department || 'General')}
-                        </option>
+                        <option key={nurse.affiliationId} value={nurse.nurse._id}>{nurse.nurse?.name} [{nurse.department}]</option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-600 mb-2">Scheduled Date (Optional)</label>
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-1">Deployment Time (Est)</label>
                     <input
                       type="datetime-local"
                       value={formData.scheduledDate}
                       onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
-                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600"
+                      className="w-full px-6 py-4 bg-white dark:bg-slate-900 border-none rounded-2xl text-[10px] font-black dark:text-white focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+                    />
+                  </div>
+
+                  <div className="lg:col-span-3">
+                    <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 ml-1">Clinical Directives</label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Enter special instructions for field personnel..."
+                      rows="4"
+                      className="w-full px-8 py-6 bg-white dark:bg-slate-900 border-none rounded-[2.5rem] text-sm font-bold dark:text-white focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none resize-none"
                     />
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Additional Notes</label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Any special instructions or notes..."
-                    rows="3"
-                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600"
-                  />
+                <div className="flex gap-4">
+                  <button
+                    type="submit"
+                    disabled={creatingAssignment}
+                    className="flex-1 py-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    {creatingAssignment ? 'Synchronizing Pipeline...' : 'Authorize Full Deployment'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="px-10 py-5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-[2rem] active:scale-95 transition-transform"
+                  >
+                    Abort
+                  </button>
                 </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={creatingAssignment}
-                  className="px-6 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50"
-                >
-                  {creatingAssignment ? 'Creating...' : 'Create Assignment'}
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
-      {/* Filter Buttons */}
-      <div className="flex gap-3 mb-5">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-            filter === 'all'
-              ? 'bg-purple-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          All ({stats.total})
-        </button>
-        <button
-          onClick={() => setFilter('pending')}
-          className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-            filter === 'pending'
-              ? 'bg-orange-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          Pending ({stats.pending})
-        </button>
-        <button
-          onClick={() => setFilter('in_progress')}
-          className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-            filter === 'in_progress'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          In Progress ({stats.in_progress})
-        </button>
-        <button
-          onClick={() => setFilter('completed')}
-          className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-            filter === 'completed'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          Completed ({stats.completed})
-        </button>
-      </div>
-
-      {/* Assignments List */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        {loading ? (
-          <p className="p-6 text-gray-500">Loading assignments...</p>
-        ) : filteredAssignments.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-5xl mb-4">📋</p>
-            <p className="text-gray-500 text-lg">No {filter !== 'all' ? filter : ''} assignments found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Patient</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Test</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Nurse</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Scheduled</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredAssignments.map((assignment) => (
-                  <tr key={assignment._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-800">{String(assignment.patient?.name || 'N/A')}</div>
-                      <div className="text-sm text-gray-500">{String(assignment.patient?.email || 'N/A')}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-800">{assignment.testType?.name || 'N/A'}</div>
-                      <div className="text-sm text-gray-500">{assignment.testType?.category || 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-800">{String(assignment.nurse?.name || 'N/A')}</div>
-                      <div className="text-sm text-gray-500">{String(assignment.nurse?.email || 'N/A')}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        assignment.status === 'completed' ? 'bg-green-100 text-green-700' :
-                        assignment.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                        assignment.status === 'pending' ? 'bg-orange-100 text-orange-700' :
-                        'bg-gray-100 text-gray-500'
-                      }`}>
-                        {String(assignment.status || 'unknown').replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600 text-sm">
-                      {assignment.scheduledDate 
-                        ? new Date(assignment.scheduledDate).toLocaleString()
-                        : 'Not scheduled'
-                      }
-                    </td>
-                    <td className="px-6 py-4">
-                      {assignment.status !== 'completed' && assignment.status !== 'cancelled' && (
-                        <button
-                          onClick={() => handleCancelAssignment(assignment._id)}
-                          className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-semibold hover:bg-red-200"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              </form>
+            )}
           </div>
         )}
+
+        {/* Filter Toolbar */}
+        <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-800 overflow-x-auto">
+          <div className="flex items-center gap-2">
+            {[
+              { id: 'all', label: 'All Assignments', count: stats.total, color: 'emerald' },
+              { id: 'pending', label: 'Queued', count: stats.pending, color: 'amber' },
+              { id: 'in_progress', label: 'Active Lab', count: stats.in_progress, color: 'blue' },
+              { id: 'completed', label: 'Archived', count: stats.completed, color: 'indigo' }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${
+                  filter === f.id
+                    ? `bg-${f.color}-600 text-white shadow-lg shadow-${f.color}-500/20`
+                    : 'text-slate-400 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {f.label} ({f.count})
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Assignments Table */}
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200/60 dark:border-slate-800 overflow-hidden shadow-sm">
+          {loading ? (
+             <div className="flex items-center justify-center py-24">
+                <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+             </div>
+          ) : filteredAssignments.length === 0 ? (
+            <div className="py-24 text-center grayscale opacity-30">
+              <span className="text-6xl mb-6 block">📂</span>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Deployment Database Empty</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                  <tr>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Subject Entity</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Lab Protocol</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Personnel</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Phase</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-right">Target Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                  {filteredAssignments.map((assignment) => (
+                    <tr key={assignment._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">{assignment.patient?.name}</div>
+                        <div className="text-[10px] font-bold text-slate-400 italic mt-0.5">{assignment.patient?.email}</div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-black uppercase inline-block whitespace-nowrap">
+                           {assignment.testType?.name}
+                        </div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1.5">{assignment.testType?.category}</p>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">{assignment.nurse?.name}</div>
+                        <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">RN-CERTIFIED</div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter shadow-sm border ${
+                          assignment.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50' :
+                          assignment.status === 'in_progress' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/50' :
+                          assignment.status === 'pending' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800/50' :
+                          'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200'
+                        }`}>
+                          {assignment.status === 'pending' ? '● QUEUED' : 
+                           assignment.status === 'in_progress' ? '● PROCESSING' : 
+                           assignment.status === 'completed' ? '● FINALIZED' : 
+                           assignment.status?.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        {assignment.status !== 'completed' && assignment.status !== 'cancelled' ? (
+                          <button
+                            onClick={() => handleCancelAssignment(assignment._id)}
+                            className="w-10 h-10 bg-rose-50 dark:bg-rose-900/20 text-rose-500 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all ml-auto opacity-0 group-hover:opacity-100"
+                            title="Cancel Assignment"
+                          >
+                            ×
+                          </button>
+                        ) : (
+                           <div className="text-[10px] font-bold text-slate-300 dark:text-slate-600 uppercase italic">Locked</div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* QR Scanner Modal */}
