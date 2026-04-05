@@ -17,7 +17,7 @@ const InputField = memo(({ label, id, type = 'text', value, onChange, placeholde
       onChange={onChange}
       placeholder={placeholder}
       required={required}
-      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all uppercase tracking-widest"
+      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all"
     />
     {hint && <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 mt-2 ml-1 italic">{hint}</p>}
   </div>
