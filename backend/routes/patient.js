@@ -17,6 +17,8 @@ const TestAssignment = require('../models/TestAssignment');
 const TestType = require('../models/TestType');
 const SmartwatchConnection = require('../models/SmartwatchConnection');
 const { extractReportInsightsFromPdf, inferReportTag } = require('../utils/reportParser');
+const { extractDocumentText } = require('../utils/aiDocumentTextExtractor');
+const { summarizeTask } = require('../utils/aiSummarizer');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'user' (patient) role.
@@ -26,6 +28,68 @@ router.use(authorize('user'));
 // ---------- helpers ----------
 function logActivity(patient, action, performedBy, details) {
   ActivityLog.create({ patient, action, performedBy, details }).catch(() => {});
+}
+
+function toAbsoluteUploadPath(filePath = '') {
+  const relativePath = String(filePath || '').replace(/^\/+/, '');
+  return path.join(__dirname, '..', relativePath);
+}
+
+async function ensureDocumentAiSummaries(patientId) {
+  const [medicalRecords, completedTests] = await Promise.all([
+    MedicalRecord.find({ patient: patientId }).select('categorizedDocuments visitDate').limit(100),
+    TestAssignment.find({ patient: patientId, status: 'completed' }).select('resultDocuments completedAt').limit(100)
+  ]);
+
+  for (const record of medicalRecords) {
+    let hasChanges = false;
+    for (const doc of record.categorizedDocuments || []) {
+      if (doc?.aiSummary) continue;
+      if (!doc?.filePath) continue;
+
+      const absolutePath = toAbsoluteUploadPath(doc.filePath);
+      const text = await extractDocumentText(absolutePath);
+      const task = doc.category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
+      const summary = await summarizeTask(task, {
+        reportTag: doc.reportTag || '',
+        text: text || `Category: ${doc.category || 'document'}\nDate: ${record.visitDate || ''}`
+      });
+
+      doc.aiSummary = summary;
+      doc.aiSummaryGeneratedAt = new Date();
+      hasChanges = true;
+    }
+
+    if (hasChanges) {
+      record.markModified('categorizedDocuments');
+      await record.save();
+    }
+  }
+
+  for (const assignment of completedTests) {
+    let hasChanges = false;
+    for (const doc of assignment.resultDocuments || []) {
+      if (doc?.aiSummary) continue;
+      if (!doc?.filePath) continue;
+
+      const absolutePath = toAbsoluteUploadPath(doc.filePath);
+      const text = await extractDocumentText(absolutePath);
+      const task = doc.category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
+      const summary = await summarizeTask(task, {
+        reportTag: doc.reportTag || '',
+        text: text || `Category: ${doc.category || 'document'}\nDate: ${assignment.completedAt || ''}`
+      });
+
+      doc.aiSummary = summary;
+      doc.aiSummaryGeneratedAt = new Date();
+      hasChanges = true;
+    }
+
+    if (hasChanges) {
+      assignment.markModified('resultDocuments');
+      await assignment.save();
+    }
+  }
 }
 
 const ALLOWED_SMARTWATCH_PROVIDERS = new Set(['apple_health', 'google_fit', 'fitbit', 'garmin', 'other']);
@@ -205,6 +269,8 @@ router.get('/dashboard', async (req, res) => {
 // @desc    Get all hospital-created medical records and test assignments, grouped by hospital
 router.get('/records', async (req, res) => {
   try {
+    await ensureDocumentAiSummaries(req.user._id);
+
     // Fetch doctor-created medical records
     const medicalRecords = await MedicalRecord.find({ patient: req.user._id })
       .sort({ visitDate: -1 })
@@ -680,13 +746,36 @@ router.get('/health-analytics', async (req, res) => {
       });
     });
 
-    const reportAnalytics = Array.from(reportGroupMap.values()).map((group) => ({
-      reportTag: group.reportTag,
-      metricSeries: Array.from(group.metricSeries.values()).map((series) => ({
+    const reportAnalytics = [];
+    for (const group of Array.from(reportGroupMap.values())) {
+      const metricSeries = Array.from(group.metricSeries.values()).map((series) => ({
         ...series,
         points: series.points.sort((a, b) => new Date(a.date) - new Date(b.date))
-      }))
-    }));
+      }));
+
+      const aiTrendSummary = await summarizeTask('trend_graph', {
+        text: JSON.stringify({
+          reportTag: group.reportTag,
+          metricCount: metricSeries.length,
+          metrics: metricSeries.map((series) => ({
+            attribute: series.attribute,
+            unit: series.unit,
+            points: series.points.map((point) => ({
+              date: point.date,
+              value: point.value,
+              status: point.status,
+              reference: point.reference
+            }))
+          }))
+        })
+      });
+
+      reportAnalytics.push({
+        reportTag: group.reportTag,
+        metricSeries,
+        aiTrendSummary
+      });
+    }
 
     res.json({
       success: true,

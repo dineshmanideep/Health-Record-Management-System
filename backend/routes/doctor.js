@@ -17,6 +17,7 @@ const HospitalAuditLog = require('../models/HospitalAuditLog');
 const NurseAccessRequest = require('../models/NurseAccessRequest');
 const Nurse = require('../models/Nurse');
 const RecordAssignment = require('../models/RecordAssignment');
+const { transcribeVoiceNote } = require('../utils/aiSummarizer');
 const { protect, authorize } = require('../middleware/auth');
 
 // Multer config for doctor's attachments
@@ -28,7 +29,7 @@ const upload = multer({
   storage, 
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.mp3', '.wav', '.m4a', '.ogg', '.webm'];
     const ext = path.extname(file.originalname).toLowerCase();
     cb(null, allowed.includes(ext));
   }
@@ -565,7 +566,10 @@ router.get('/assigned-nurses', async (req, res) => {
 
 // @route   POST /api/doctor/assign-record
 // @desc    Doctor creates a record assignment for a nurse
-router.post('/assign-record', upload.array('attachments', 5), async (req, res) => {
+router.post('/assign-record', upload.fields([
+  { name: 'attachments', maxCount: 5 },
+  { name: 'voiceNote', maxCount: 1 }
+]), async (req, res) => {
   try {
     const { nurseId, patientId, hospitalId, instructions, dueDate } = req.body;
 
@@ -604,9 +608,30 @@ router.post('/assign-record', upload.array('attachments', 5), async (req, res) =
     }
 
     // Build attachment URLs
-    const attachments = req.files ? req.files.map(file => 
+    const attachmentFiles = Array.isArray(req.files)
+      ? req.files
+      : (req.files?.attachments || []);
+
+    const attachments = attachmentFiles.map(file => 
       `${req.protocol}://${req.get('host')}/uploads/assignments/${file.filename}`
-    ) : [];
+    );
+
+    const voiceNoteFile = Array.isArray(req.files?.voiceNote) ? req.files.voiceNote[0] : null;
+    let voiceNote;
+
+    if (voiceNoteFile) {
+      const voicePath = path.join(__dirname, '..', 'uploads', 'assignments', voiceNoteFile.filename);
+      const transcription = await transcribeVoiceNote(voicePath, voiceNoteFile.mimetype);
+
+      voiceNote = {
+        filePath: `${req.protocol}://${req.get('host')}/uploads/assignments/${voiceNoteFile.filename}`,
+        mimeType: voiceNoteFile.mimetype || '',
+        transcript: transcription.transcript,
+        transcriptStatus: transcription.status,
+        transcriptError: transcription.error,
+        uploadedAt: new Date()
+      };
+    }
 
     const assignment = await RecordAssignment.create({
       doctor: req.user._id,
@@ -615,6 +640,7 @@ router.post('/assign-record', upload.array('attachments', 5), async (req, res) =
       hospital: hospitalId,
       instructions,
       attachments,
+      voiceNote,
       dueDate: dueDate || undefined
     });
 

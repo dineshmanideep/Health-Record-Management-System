@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useTheme } from '../../context/ThemeContext';
+import { useAccessibility } from '../../context/useAccessibility';
 import { patientService } from '../../services/api';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine
@@ -8,6 +9,7 @@ import {
 
 const PatientHealthAnalytics = () => {
   const { theme } = useTheme();
+  const { profile } = useAccessibility();
   const [reportAnalytics, setReportAnalytics] = useState([]);
   const [selectedMetricByReport, setSelectedMetricByReport] = useState({});
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,20 @@ const PatientHealthAnalytics = () => {
 
   const referenceLineColor = '#f59e0b';
   const reportMarkerColor = theme === 'dark' ? '#334155' : '#e2e8f0';
+
+  const statusBadge = (status) => {
+    if (status === 'high') return { label: 'High ▲', tone: 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30' };
+    if (status === 'low') return { label: 'Low ▼', tone: 'text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30' };
+    if (status === 'normal') return { label: 'Normal ✓', tone: 'text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30' };
+    return { label: 'Review', tone: 'text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30' };
+  };
+
+  const explainStatus = (attribute, status, reference) => {
+    if (status === 'high') return `${attribute} is above the healthy range${reference ? ` (${reference})` : ''}.`;
+    if (status === 'low') return `${attribute} is below the healthy range${reference ? ` (${reference})` : ''}.`;
+    if (status === 'normal') return `${attribute} is within the healthy range${reference ? ` (${reference})` : ''}.`;
+    return `No clear range match for ${attribute}${reference ? ` (reference: ${reference})` : ''}.`;
+  };
 
   const tooltipStyle = {
     borderRadius: '12px',
@@ -107,12 +123,33 @@ const PatientHealthAnalytics = () => {
                         sourceLabel: point.sourceLabel
                       }));
 
+                      const latestPoint = graphData.length ? graphData[graphData.length - 1] : null;
+                      const latestStatus = statusBadge(latestPoint?.status);
+                      const abnormalPoints = graphData.filter((point) => point.status === 'high' || point.status === 'low');
+
+                      const readableTrend = (() => {
+                        if (graphData.length < 2) return 'Not enough data points to describe trend yet.';
+                        const first = graphData[0].value;
+                        const last = graphData[graphData.length - 1].value;
+                        if (last > first) return 'Overall trend is increasing.';
+                        if (last < first) return 'Overall trend is decreasing.';
+                        return 'Overall trend is stable.';
+                      })();
+
                       return (
                         <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-xl border border-slate-200/60 dark:border-slate-800">
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                             <div>
                               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">{selectedSeries.attribute}</h4>
                               <p className="text-[11px] text-slate-500 dark:text-slate-400">Unit: {selectedSeries.unit || '-'}</p>
+                              {latestPoint && (
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <span className={`text-[10px] font-semibold px-2 py-1 rounded-md ${latestStatus.tone}`}>{latestStatus.label}</span>
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    {explainStatus(selectedSeries.attribute, latestPoint.status, latestPoint.reference)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                             <div className="min-w-55">
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select Attribute</label>
@@ -140,8 +177,9 @@ const PatientHealthAnalytics = () => {
                                   formatter={(value, name, props) => {
                                     const ref = props?.payload?.reference;
                                     const source = props?.payload?.sourceLabel;
+                                    const status = statusBadge(props?.payload?.status).label;
                                     return [
-                                      `${value}${selectedSeries.unit ? ` ${selectedSeries.unit}` : ''}${ref ? ` (Ref: ${ref})` : ''}${source ? ` • ${source}` : ''}`,
+                                      `${value}${selectedSeries.unit ? ` ${selectedSeries.unit}` : ''}${ref ? ` (Ref: ${ref})` : ''}${source ? ` • ${source}` : ''} • ${status}`,
                                       name
                                     ];
                                   }}
@@ -202,6 +240,59 @@ const PatientHealthAnalytics = () => {
                               </LineChart>
                             </ResponsiveContainer>
                           </div>
+
+                          <div className="mt-4 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700">
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Trend Summary</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{readableTrend}</p>
+                            {abnormalPoints.length > 0 ? (
+                              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                                {abnormalPoints.length} abnormal reading(s) detected. Review highlighted points for follow-up.
+                              </p>
+                            ) : (
+                              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">No abnormal values detected in this selection.</p>
+                            )}
+                            {group.aiTrendSummary && (
+                              <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">AI-generated trend note</p>
+                                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{group.aiTrendSummary}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {(profile.accessibleChartsMode || profile.modeEnabled) && (
+                            <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200/70 dark:border-slate-700 bg-white dark:bg-slate-900">
+                              <table className="w-full text-left min-w-160">
+                                <thead>
+                                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                                    <th className="px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Timestamp</th>
+                                    <th className="px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Value</th>
+                                    <th className="px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Reference</th>
+                                    <th className="px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Status</th>
+                                    <th className="px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Meaning</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {graphData.map((row, rowIndex) => {
+                                    const badge = statusBadge(row.status);
+                                    return (
+                                      <tr
+                                        key={`${row.date}-${rowIndex}`}
+                                        className={`border-b border-slate-100 dark:border-slate-800 last:border-0 ${row.status === 'high' || row.status === 'low' ? 'bg-red-50/60 dark:bg-red-950/10' : ''}`}
+                                      >
+                                        <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200">{row.date}</td>
+                                        <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200">{row.value}{selectedSeries.unit ? ` ${selectedSeries.unit}` : ''}</td>
+                                        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{row.reference || '-'}</td>
+                                        <td className="px-3 py-2">
+                                          <span className={`text-[10px] font-semibold px-2 py-1 rounded-md ${badge.tone}`}>{badge.label}</span>
+                                        </td>
+                                        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{explainStatus(selectedSeries.attribute, row.status, row.reference)}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
                       );
                     })()

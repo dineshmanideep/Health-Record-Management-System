@@ -129,3 +129,63 @@ body {
   background-color: rgba(99, 102, 241, 0.3);
   color: #e0e7ff;
 }
+
+/* ===== Accessibility Mode ===== */
+html[data-a11y-text-size='normal'] {
+  font-size: 100%;
+}
+
+html[data-a11y-text-size='large'] {
+  font-size: 112.5%;
+}
+
+html[data-a11y-text-size='extra-large'] {
+  font-size: 125%;
+}
+
+html[data-a11y-mode='on'] body {
+  filter: contrast(1.08);
+}
+
+html[data-a11y-mode='on'] .animate-fadeIn,
+html[data-a11y-mode='on'] .animate-fadeInScale,
+html[data-a11y-mode='on'] .animate-slideUp,
+html[data-a11y-mode='on'] .animate-float,
+html[data-a11y-mode='on'] .animate-pulse,
+html[data-a11y-mode='on'] .animate-pulse-glow {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+html.a11y-keyboard :focus-visible {
+  outline: 3px solid #0f766e !important;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+html.a11y-dyslexia body,
+html.a11y-dyslexia p,
+html.a11y-dyslexia li,
+html.a11y-dyslexia label,
+html.a11y-dyslexia input,
+html.a11y-dyslexia textarea,
+html.a11y-dyslexia select,
+html.a11y-dyslexia button,
+html.a11y-dyslexia h1,
+html.a11y-dyslexia h2,
+html.a11y-dyslexia h3,
+html.a11y-dyslexia h4 {
+  letter-spacing: 0.02em;
+  line-height: 1.75 !important;
+  text-align: left;
+  font-style: normal !important;
+}
+
+html.a11y-target-boost button,
+html.a11y-target-boost a,
+html.a11y-target-boost input,
+html.a11y-target-boost select,
+html.a11y-target-boost textarea,
+html.a11y-target-boost [role='button'] {
+  min-height: 44px;
+}

@@ -49,12 +49,14 @@ import AdminDoctors from './pages/admin/AdminDoctors';
 import AdminNurses from './pages/admin/AdminNurses';
 
 import { ThemeProvider } from './context/ThemeContext';
+import { AccessibilityProvider } from './context/AccessibilityContext';
 
 function App() {
   return (
     <ThemeProvider>
       <Router>
         <AuthProvider>
+        <AccessibilityProvider>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -324,6 +326,7 @@ function App() {
           {/* Final catch-all → role-aware redirect via /dashboard */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </AccessibilityProvider>
       </AuthProvider>
     </Router>
   </ThemeProvider>

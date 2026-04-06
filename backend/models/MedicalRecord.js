@@ -67,6 +67,8 @@ const medicalRecordSchema = new mongoose.Schema({
       referenceMax: { type: Number },
       status: { type: String, enum: ['low', 'normal', 'high', 'unknown'], default: 'unknown' }
     }],
+    aiSummary: { type: String, trim: true },
+    aiSummaryGeneratedAt: { type: Date },
     uploadedAt: { type: Date, default: Date.now }
   }],
   // Multiple prescription links (URLs)

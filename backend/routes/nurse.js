@@ -18,6 +18,8 @@ const RecordAssignment = require('../models/RecordAssignment');
 const TestAssignment = require('../models/TestAssignment');
 const TestType = require('../models/TestType');
 const { extractReportInsightsFromPdf, inferReportTag } = require('../utils/reportParser');
+const { extractDocumentText } = require('../utils/aiDocumentTextExtractor');
+const { summarizeTask } = require('../utils/aiSummarizer');
 const { protect, authorize } = require('../middleware/auth');
 
 // Multer config for prescription uploads
@@ -504,11 +506,20 @@ router.post('/assignments/:id/complete', uploadMedicalFiles, async (req, res) =>
           }
         }
 
+        const extractedText = await extractDocumentText(absolutePath);
+        const summaryTask = category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
+        const aiSummary = await summarizeTask(summaryTask, {
+          reportTag,
+          text: extractedText || `File: ${file.originalname || 'document'}\nCategory: ${category}`
+        });
+
         categorizedDocuments.push({
           filePath: `/uploads/prescriptions/${file.filename}`,
           category: category,
           reportTag,
           parsedMetrics,
+          aiSummary,
+          aiSummaryGeneratedAt: new Date(),
           uploadedAt: new Date()
         });
       }
@@ -734,11 +745,20 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
           }
         }
 
+        const extractedText = await extractDocumentText(absolutePath);
+        const summaryTask = category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
+        const aiSummary = await summarizeTask(summaryTask, {
+          reportTag,
+          text: extractedText || `File: ${file.originalname || 'document'}\nCategory: ${category}`
+        });
+
         resultDocuments.push({
           filePath: `/uploads/test-results/${file.filename}`,
           category: category,
           reportTag,
           parsedMetrics,
+          aiSummary,
+          aiSummaryGeneratedAt: new Date(),
           uploadedAt: new Date()
         });
       }

@@ -8,6 +8,32 @@ const Nurse = require('../models/Nurse');
 const Admin = require('../models/Admin');
 const { protect } = require('../middleware/auth');
 
+const DEFAULT_ACCESSIBILITY_PROFILE = {
+  modeEnabled: false,
+  textSize: 'normal',
+  keyboardMode: false,
+  dyslexiaMode: false,
+  targetBoost: false,
+  formAssistMode: false,
+  accessibleChartsMode: false
+};
+
+const normalizeAccessibilityProfile = (input = {}) => {
+  const textSize = ['normal', 'large', 'extra-large'].includes(input.textSize)
+    ? input.textSize
+    : DEFAULT_ACCESSIBILITY_PROFILE.textSize;
+
+  return {
+    modeEnabled: Boolean(input.modeEnabled),
+    textSize,
+    keyboardMode: Boolean(input.keyboardMode),
+    dyslexiaMode: Boolean(input.dyslexiaMode),
+    targetBoost: Boolean(input.targetBoost),
+    formAssistMode: Boolean(input.formAssistMode),
+    accessibleChartsMode: Boolean(input.accessibleChartsMode)
+  };
+};
+
 // Generate JWT Token
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, {
@@ -235,6 +261,71 @@ router.get('/me', protect, async (req, res) => {
     res.json({
       success: true,
       data: req.user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   GET /api/auth/accessibility-profile
+// @desc    Get current user's accessibility profile
+// @access  Private
+router.get('/accessibility-profile', protect, async (req, res) => {
+  try {
+    const profile = {
+      ...DEFAULT_ACCESSIBILITY_PROFILE,
+      ...(req.user.accessibilityProfile || {})
+    };
+
+    res.json({
+      success: true,
+      data: profile
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   PUT /api/auth/accessibility-profile
+// @desc    Update current user's accessibility profile
+// @access  Private
+router.put('/accessibility-profile', protect, async (req, res) => {
+  try {
+    const Model = getModelByRole(req.user.role);
+    if (!Model) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role'
+      });
+    }
+
+    const normalized = normalizeAccessibilityProfile(req.body || {});
+
+    const updatedUser = await Model.findByIdAndUpdate(
+      req.user._id,
+      { $set: { accessibilityProfile: normalized } },
+      { new: true }
+    ).select('accessibilityProfile');
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...DEFAULT_ACCESSIBILITY_PROFILE,
+        ...(updatedUser.accessibilityProfile || {})
+      }
     });
   } catch (error) {
     res.status(500).json({

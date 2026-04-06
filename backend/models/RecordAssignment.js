@@ -31,6 +31,14 @@ const recordAssignmentSchema = new mongoose.Schema({
   attachments: [{
     type: String
   }],
+  voiceNote: {
+    filePath: { type: String, trim: true },
+    mimeType: { type: String, trim: true },
+    transcript: { type: String, trim: true },
+    transcriptStatus: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
+    transcriptError: { type: String, trim: true },
+    uploadedAt: { type: Date }
+  },
   // Status tracking
   status: {
     type: String,

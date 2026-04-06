@@ -90,6 +90,19 @@ const hospitalSchema = new mongoose.Schema({
     type: String,
     default: 'default-hospital.png'
   },
+  accessibilityProfile: {
+    modeEnabled: { type: Boolean, default: false },
+    textSize: {
+      type: String,
+      enum: ['normal', 'large', 'extra-large'],
+      default: 'normal'
+    },
+    keyboardMode: { type: Boolean, default: false },
+    dyslexiaMode: { type: Boolean, default: false },
+    targetBoost: { type: Boolean, default: false },
+    formAssistMode: { type: Boolean, default: false },
+    accessibleChartsMode: { type: Boolean, default: false }
+  },
   website: {
     type: String
   },

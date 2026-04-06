@@ -204,6 +204,11 @@ const PatientMedicalRecords = () => {
                                   {doc.reportTag && (
                                     <p className="text-[10px] text-indigo-500 dark:text-indigo-400 truncate mt-0.5">Tag: {doc.reportTag}</p>
                                   )}
+                                  {doc.aiSummary && (
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-3">
+                                      AI-generated summary: {doc.aiSummary}
+                                    </p>
+                                  )}
                                 </div>
                               </a>
                             ))}
@@ -275,6 +280,11 @@ const PatientMedicalRecords = () => {
                                   <p className="text-xs font-semibold text-slate-700 dark:text-white truncate group-hover/doc:text-indigo-500">{doc.filePath.split('/').pop()}</p>
                                   {doc.reportTag && (
                                     <p className="text-[10px] text-indigo-500 dark:text-indigo-400 truncate mt-0.5">Tag: {doc.reportTag}</p>
+                                  )}
+                                  {doc.aiSummary && (
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-3">
+                                      AI-generated summary: {doc.aiSummary}
+                                    </p>
                                   )}
                                 </div>
                               </a>
@@ -406,6 +416,11 @@ const PatientMedicalRecords = () => {
                         <p className="text-[10px] text-slate-400 mb-4">{doc.record.hospital?.name}</p>
                         {doc.reportTag && (
                           <p className="text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 mb-3 truncate">Tag: {doc.reportTag}</p>
+                        )}
+                        {doc.aiSummary && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-4">
+                            AI-generated summary: {doc.aiSummary}
+                          </p>
                         )}
                         <div className="flex gap-2">
                           <a href={solveFileUrl(doc.filePath)} target="_blank" rel="noopener noreferrer" className="flex-1 text-center py-2 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-400 transition-all">Preview</a>

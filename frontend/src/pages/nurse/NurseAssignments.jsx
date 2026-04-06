@@ -208,6 +208,14 @@ const NurseAssignments = () => {
     return text[status] || status;
   };
 
+  const resolveFileUrl = (filePath) => {
+    if (!filePath) return '#';
+    if (filePath.startsWith('http')) return filePath;
+    const cleanPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
+    const backendOrigin = import.meta.env.VITE_BACKEND_ORIGIN || '';
+    return backendOrigin ? `${backendOrigin}${cleanPath}` : cleanPath;
+  };
+
   const filteredAssignments = assignments;
 
   return (
@@ -415,9 +423,7 @@ const NurseAssignments = () => {
                     <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] block mb-6 ml-2 italic">Supporting Clinical Artifacts</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       {selectedAssignment.attachments.map((attachment, index) => {
-                         const fileUrl = attachment.includes('/backend/uploads/') 
-                            ? attachment.replace('/backend/uploads/', '/uploads/') 
-                            : attachment.startsWith('http') ? attachment : `/uploads/${attachment.split('/').pop()}`;
+                         const fileUrl = resolveFileUrl(attachment);
                         return (
                           <a
                             key={index}
@@ -433,6 +439,23 @@ const NurseAssignments = () => {
                           </a>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+
+                {selectedAssignment.voiceNote?.filePath && (
+                  <div className="bg-indigo-50/60 dark:bg-indigo-900/10 p-8 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-900/30">
+                    <p className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-4">Doctor Voice Note</p>
+                    <audio
+                      controls
+                      src={resolveFileUrl(selectedAssignment.voiceNote.filePath)}
+                      className="w-full mb-4"
+                    />
+                    <div className="bg-white dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-800">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Transcript</p>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                        {selectedAssignment.voiceNote.transcript || 'Transcript is not available for this voice note yet.'}
+                      </p>
                     </div>
                   </div>
                 )}

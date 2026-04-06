@@ -18,6 +18,7 @@ const DoctorAssignRecords = () => {
   const [instructions, setInstructions] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [attachments, setAttachments] = useState([]);
+  const [voiceNote, setVoiceNote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -76,6 +77,9 @@ const DoctorAssignRecords = () => {
       attachments.forEach(file => {
         formData.append('attachments', file);
       });
+      if (voiceNote) {
+        formData.append('voiceNote', voiceNote);
+      }
 
       await doctorService.createAssignment(formData);
       setMessage({ type: 'success', text: 'Assignment created successfully!' });
@@ -87,6 +91,7 @@ const DoctorAssignRecords = () => {
       setInstructions('');
       setDueDate('');
       setAttachments([]);
+      setVoiceNote(null);
       setShowForm(false);
       
       fetchData();
@@ -278,6 +283,37 @@ const DoctorAssignRecords = () => {
                       {attachments.length > 0 ? `📦 ${attachments.length} Artifacts Ready` : '📂 Upload Clinical Artifacts'}
                     </label>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
+                    Voice Note (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm"
+                    onChange={(e) => setVoiceNote(e.target.files?.[0] || null)}
+                    className="w-full px-5 py-3 opacity-0 absolute pointer-events-none"
+                    id="assignment-voice-note"
+                  />
+                  <label
+                    htmlFor="assignment-voice-note"
+                    className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-400 dark:text-slate-500 text-center cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-all block"
+                  >
+                    {voiceNote ? '🎙️ Voice Note Ready' : '🎙️ Upload Doctor Voice Note'}
+                  </label>
+                  {voiceNote && (
+                    <div className="flex items-center justify-between gap-3 px-2 py-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800/40">
+                      <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 truncate">{voiceNote.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => setVoiceNote(null)}
+                        className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {attachments.length > 0 && (

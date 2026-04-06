@@ -81,6 +81,16 @@ export const authService = {
   verifyToken: async () => {
     const response = await api.get('/auth/me');
     return response.data;
+  },
+
+  getAccessibilityProfile: async () => {
+    const response = await api.get('/auth/accessibility-profile');
+    return response.data;
+  },
+
+  updateAccessibilityProfile: async (profile) => {
+    const response = await api.put('/auth/accessibility-profile', profile);
+    return response.data;
   }
 };
 
