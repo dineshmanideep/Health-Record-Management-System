@@ -1,6 +1,5 @@
 const express = require('express');
 const crypto = require('crypto');
-const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 const { uploadSelfRecord } = require('../utils/upload');
@@ -16,9 +15,11 @@ const Hospital = require('../models/Hospital');
 const TestAssignment = require('../models/TestAssignment');
 const TestType = require('../models/TestType');
 const SmartwatchConnection = require('../models/SmartwatchConnection');
-const { extractReportInsightsFromPdf, inferReportTag } = require('../utils/reportParser');
-const { extractDocumentText } = require('../utils/aiDocumentTextExtractor');
-const { summarizeTask } = require('../utils/aiSummarizer');
+const {
+  queueMedicalRecordPostUploadProcessing,
+  queueTestAssignmentPostUploadProcessing
+} = require('../utils/postUploadMedicalPipeline');
+const { getFieldDisplayLabel } = require('../utils/medicalCanonicalization');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'user' (patient) role.
@@ -30,65 +31,15 @@ function logActivity(patient, action, performedBy, details) {
   ActivityLog.create({ patient, action, performedBy, details }).catch(() => {});
 }
 
-function toAbsoluteUploadPath(filePath = '') {
-  const relativePath = String(filePath || '').replace(/^\/+/, '');
-  return path.join(__dirname, '..', relativePath);
-}
-
-async function ensureDocumentAiSummaries(patientId) {
-  const [medicalRecords, completedTests] = await Promise.all([
-    MedicalRecord.find({ patient: patientId }).select('categorizedDocuments visitDate').limit(100),
-    TestAssignment.find({ patient: patientId, status: 'completed' }).select('resultDocuments completedAt').limit(100)
-  ]);
-
-  for (const record of medicalRecords) {
-    let hasChanges = false;
-    for (const doc of record.categorizedDocuments || []) {
-      if (doc?.aiSummary) continue;
-      if (!doc?.filePath) continue;
-
-      const absolutePath = toAbsoluteUploadPath(doc.filePath);
-      const text = await extractDocumentText(absolutePath);
-      const task = doc.category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
-      const summary = await summarizeTask(task, {
-        reportTag: doc.reportTag || '',
-        text: text || `Category: ${doc.category || 'document'}\nDate: ${record.visitDate || ''}`
-      });
-
-      doc.aiSummary = summary;
-      doc.aiSummaryGeneratedAt = new Date();
-      hasChanges = true;
-    }
-
-    if (hasChanges) {
-      record.markModified('categorizedDocuments');
-      await record.save();
-    }
-  }
-
-  for (const assignment of completedTests) {
-    let hasChanges = false;
-    for (const doc of assignment.resultDocuments || []) {
-      if (doc?.aiSummary) continue;
-      if (!doc?.filePath) continue;
-
-      const absolutePath = toAbsoluteUploadPath(doc.filePath);
-      const text = await extractDocumentText(absolutePath);
-      const task = doc.category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
-      const summary = await summarizeTask(task, {
-        reportTag: doc.reportTag || '',
-        text: text || `Category: ${doc.category || 'document'}\nDate: ${assignment.completedAt || ''}`
-      });
-
-      doc.aiSummary = summary;
-      doc.aiSummaryGeneratedAt = new Date();
-      hasChanges = true;
-    }
-
-    if (hasChanges) {
-      assignment.markModified('resultDocuments');
-      await assignment.save();
-    }
+function markDocumentsPending(documents = []) {
+  for (const document of documents || []) {
+    if (!document?.filePath) continue;
+    document.llmExtraction = {
+      ...(document.llmExtraction || {}),
+      status: 'pending',
+      validationErrors: [],
+      processedAt: null
+    };
   }
 }
 
@@ -121,6 +72,54 @@ function buildSyntheticMetric() {
     spo2: Math.round(95 + Math.random() * 4),
     sleepHours: Number((5.5 + Math.random() * 3).toFixed(1))
   };
+}
+
+function buildTrendSummary(metricSeries = []) {
+  if (!metricSeries.length) {
+    return 'No trend data is available yet.';
+  }
+
+  const abnormalSeriesCount = metricSeries.filter((series) =>
+    (series.points || []).some((point) => point.status === 'high' || point.status === 'low')
+  ).length;
+
+  const trendLines = metricSeries.slice(0, 2).map((series) => {
+    const points = series.points || [];
+    if (points.length < 2) {
+      return `${series.attribute} has only one reading so far.`;
+    }
+
+    const first = points[0].value;
+    const last = points[points.length - 1].value;
+    if (last > first) {
+      return `${series.attribute} is trending upward over time.`;
+    }
+    if (last < first) {
+      return `${series.attribute} is trending downward over time.`;
+    }
+    return `${series.attribute} is staying relatively stable.`;
+  });
+
+  if (abnormalSeriesCount > 0) {
+    trendLines.unshift(`${abnormalSeriesCount} tracked metric${abnormalSeriesCount > 1 ? 's show' : ' shows'} abnormal readings that need attention.`);
+  } else {
+    trendLines.unshift('Tracked values are currently within range or do not show a clear abnormal pattern.');
+  }
+
+  return trendLines.join(' ');
+}
+
+function getMetricDisplayName(name = '') {
+  return getFieldDisplayLabel(name || 'Unknown Metric');
+}
+
+function getMetricGroupTag(name = '', fallbackTag = '') {
+  if (String(name).startsWith('thyroid')) return 'Thyroid';
+  if (['bloodSugar', 'hbA1c'].includes(name)) return 'Blood Sugar';
+  if (String(name).startsWith('bloodPressure')) return 'Blood Pressure';
+  if (['heartRate', 'spo2', 'temperature'].includes(name)) return 'Vitals';
+  if (['weight', 'height', 'bmi'].includes(name)) return 'Body Metrics';
+  return fallbackTag || 'General Metrics';
 }
 
 async function fetchMetricsFromProvider(connection) {
@@ -181,7 +180,7 @@ router.put('/profile', async (req, res) => {
     const updated = await User.findByIdAndUpdate(
       req.user._id,
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('-password');
 
     if (!updated) {
@@ -269,8 +268,6 @@ router.get('/dashboard', async (req, res) => {
 // @desc    Get all hospital-created medical records and test assignments, grouped by hospital
 router.get('/records', async (req, res) => {
   try {
-    await ensureDocumentAiSummaries(req.user._id);
-
     // Fetch doctor-created medical records
     const medicalRecords = await MedicalRecord.find({ patient: req.user._id })
       .sort({ visitDate: -1 })
@@ -353,7 +350,8 @@ router.get('/records', async (req, res) => {
 
     res.json({ success: true, data: Object.values(grouped) });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Patient records route failed:', error.message || error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -373,6 +371,79 @@ router.get('/records/:id', async (req, res) => {
     res.json({ success: true, data: record });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/patient/records/:id/reprocess
+router.post('/records/:id/reprocess', async (req, res) => {
+  try {
+    const record = await MedicalRecord.findOne({ _id: req.params.id, patient: req.user._id });
+    if (!record) {
+      return res.status(404).json({ success: false, message: 'Record not found' });
+    }
+
+    if (!Array.isArray(record.categorizedDocuments) || record.categorizedDocuments.length === 0) {
+      return res.status(400).json({ success: false, message: 'This record has no uploaded documents to process' });
+    }
+
+    markDocumentsPending(record.categorizedDocuments);
+    record.structuredData = {
+      ...(record.structuredData?.toObject ? record.structuredData.toObject() : (record.structuredData || {})),
+      extractionStatus: 'pending'
+    };
+    record.markModified('categorizedDocuments');
+    record.markModified('structuredData');
+    await record.save();
+
+    queueMedicalRecordPostUploadProcessing(record._id);
+
+    return res.status(202).json({
+      success: true,
+      message: 'Record reprocessing started',
+      data: { id: record._id, recordType: 'medical_record', extractionStatus: 'pending' }
+    });
+  } catch (error) {
+    console.error('Patient medical record reprocess failed:', error.message || error);
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+// @route   POST /api/patient/test-assignments/:id/reprocess
+router.post('/test-assignments/:id/reprocess', async (req, res) => {
+  try {
+    const assignment = await TestAssignment.findOne({
+      _id: req.params.id,
+      patient: req.user._id,
+      status: 'completed'
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Completed test assignment not found' });
+    }
+
+    if (!Array.isArray(assignment.resultDocuments) || assignment.resultDocuments.length === 0) {
+      return res.status(400).json({ success: false, message: 'This test assignment has no uploaded documents to process' });
+    }
+
+    markDocumentsPending(assignment.resultDocuments);
+    assignment.structuredData = {
+      ...(assignment.structuredData?.toObject ? assignment.structuredData.toObject() : (assignment.structuredData || {})),
+      extractionStatus: 'pending'
+    };
+    assignment.markModified('resultDocuments');
+    assignment.markModified('structuredData');
+    await assignment.save();
+
+    queueTestAssignmentPostUploadProcessing(assignment._id);
+
+    return res.status(202).json({
+      success: true,
+      message: 'Test assignment reprocessing started',
+      data: { id: assignment._id, recordType: 'test_assignment', extractionStatus: 'pending' }
+    });
+  } catch (error) {
+    console.error('Patient test assignment reprocess failed:', error.message || error);
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -514,7 +585,7 @@ router.patch('/revoke-access/:doctorId', async (req, res) => {
     const access = await DoctorAccess.findOneAndUpdate(
       { patient: req.user._id, doctor: req.params.doctorId, isActive: true },
       { isActive: false, revokedAt: new Date() },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate('doctor', 'name');
 
     if (!access) {
@@ -542,113 +613,6 @@ router.patch('/revoke-access/:doctorId', async (req, res) => {
 // @desc    Aggregate health metrics from all medical records for trend graphs
 router.get('/health-analytics', async (req, res) => {
   try {
-    const [medicalDocsToBackfill, testDocsToBackfill] = await Promise.all([
-      MedicalRecord.find({
-        patient: req.user._id,
-        categorizedDocuments: {
-          $elemMatch: {
-            category: 'test_report',
-            filePath: { $regex: /\.pdf$/i }
-          }
-        }
-      }).select('categorizedDocuments'),
-      TestAssignment.find({
-        patient: req.user._id,
-        status: 'completed',
-        resultDocuments: {
-          $elemMatch: {
-            category: 'test_report',
-            filePath: { $regex: /\.pdf$/i }
-          }
-        }
-      }).select('testType resultDocuments')
-    ]);
-
-    for (const record of medicalDocsToBackfill) {
-      let hasChanges = false;
-      for (const doc of record.categorizedDocuments || []) {
-        const isTestPdf = doc?.category === 'test_report' && /\.pdf$/i.test(doc?.filePath || '');
-        if (!isTestPdf) continue;
-        if (doc?.parsedMetrics?.length && doc?.reportTag) continue;
-
-        const relativePath = String(doc.filePath || '').replace(/^\/+/, '');
-        const absolutePath = path.join(__dirname, '..', relativePath);
-
-        if (!fs.existsSync(absolutePath)) {
-          if (!doc.reportTag) {
-            doc.reportTag = inferReportTag(path.basename(doc.filePath || ''));
-            hasChanges = true;
-          }
-          continue;
-        }
-
-        try {
-          const parsed = await extractReportInsightsFromPdf(absolutePath);
-          if (!doc.reportTag) {
-            doc.reportTag = parsed.reportTag || inferReportTag(path.basename(doc.filePath || ''));
-          }
-          if (!doc.parsedMetrics?.length && Array.isArray(parsed.parsedMetrics) && parsed.parsedMetrics.length) {
-            doc.parsedMetrics = parsed.parsedMetrics;
-          }
-          hasChanges = true;
-        } catch {
-          if (!doc.reportTag) {
-            doc.reportTag = inferReportTag(path.basename(doc.filePath || ''));
-            hasChanges = true;
-          }
-        }
-      }
-
-      if (hasChanges) {
-        record.markModified('categorizedDocuments');
-        await record.save();
-      }
-    }
-
-    for (const assignment of testDocsToBackfill) {
-      let hasChanges = false;
-      for (const doc of assignment.resultDocuments || []) {
-        const isTestPdf = doc?.category === 'test_report' && /\.pdf$/i.test(doc?.filePath || '');
-        if (!isTestPdf) continue;
-        if (doc?.parsedMetrics?.length && doc?.reportTag) continue;
-
-        const relativePath = String(doc.filePath || '').replace(/^\/+/, '');
-        const absolutePath = path.join(__dirname, '..', relativePath);
-
-        if (!fs.existsSync(absolutePath)) {
-          if (!doc.reportTag) {
-            const fallbackLabel = assignment?.testType?.name || path.basename(doc.filePath || '');
-            doc.reportTag = inferReportTag(fallbackLabel);
-            hasChanges = true;
-          }
-          continue;
-        }
-
-        try {
-          const parsed = await extractReportInsightsFromPdf(absolutePath);
-          if (!doc.reportTag) {
-            const fallbackLabel = assignment?.testType?.name || path.basename(doc.filePath || '');
-            doc.reportTag = parsed.reportTag || inferReportTag(fallbackLabel);
-          }
-          if (!doc.parsedMetrics?.length && Array.isArray(parsed.parsedMetrics) && parsed.parsedMetrics.length) {
-            doc.parsedMetrics = parsed.parsedMetrics;
-          }
-          hasChanges = true;
-        } catch {
-          if (!doc.reportTag) {
-            const fallbackLabel = assignment?.testType?.name || path.basename(doc.filePath || '');
-            doc.reportTag = inferReportTag(fallbackLabel);
-            hasChanges = true;
-          }
-        }
-      }
-
-      if (hasChanges) {
-        assignment.markModified('resultDocuments');
-        await assignment.save();
-      }
-    }
-
     const records = await MedicalRecord.find({
       patient: req.user._id,
       $or: [
@@ -663,20 +627,29 @@ router.get('/health-analytics', async (req, res) => {
       .select('visitDate healthMetrics')
       .lean();
 
-    const [medicalRecordsWithParsedDocs, completedTestsWithParsedDocs] = await Promise.all([
+    const [
+      medicalRecordsWithStructuredData,
+      completedTestsWithStructuredData
+    ] = await Promise.all([
       MedicalRecord.find({
         patient: req.user._id,
-        'categorizedDocuments.parsedMetrics.0': { $exists: true }
+        $or: [
+          { 'categorizedDocuments.parsedMetrics.0': { $exists: true } },
+          { 'structuredData.numericFields': { $exists: true } }
+        ]
       })
-        .select('visitDate hospital categorizedDocuments')
+        .select('visitDate createdAt hospital structuredData categorizedDocuments')
         .populate('hospital', 'name')
         .lean(),
       TestAssignment.find({
         patient: req.user._id,
         status: 'completed',
-        'resultDocuments.parsedMetrics.0': { $exists: true }
+        $or: [
+          { 'resultDocuments.parsedMetrics.0': { $exists: true } },
+          { 'structuredData.numericFields': { $exists: true } }
+        ]
       })
-        .select('completedAt testType hospital resultDocuments')
+        .select('completedAt createdAt testType hospital structuredData resultDocuments')
         .populate('hospital', 'name')
         .populate('testType', 'name')
         .lean()
@@ -684,51 +657,103 @@ router.get('/health-analytics', async (req, res) => {
 
     const parsedReports = [];
 
-    medicalRecordsWithParsedDocs.forEach((record) => {
-      (record.categorizedDocuments || []).forEach((doc) => {
-        if (doc?.category !== 'test_report') return;
-        if (!doc?.parsedMetrics?.length) return;
-        parsedReports.push({
-          reportTag: doc.reportTag || 'general test report',
-          reportDate: record.visitDate || record.createdAt || new Date(),
+    medicalRecordsWithStructuredData.forEach((record) => {
+      const documentMetrics = (record.categorizedDocuments || [])
+        .map((doc) => ({
+          reportTag: doc?.llmExtraction?.specialization || record?.structuredData?.specialization || doc?.category || 'structured medical fields',
+          reportDate: doc?.reportDate || doc?.llmExtraction?.reportDate || record.visitDate || record.createdAt || new Date(),
           sourceLabel: record.hospital?.name || 'Hospital Record',
-          metrics: doc.parsedMetrics
-        });
+          metrics: (doc?.parsedMetrics || []).filter((metric) => typeof metric?.value === 'number' && Number.isFinite(metric.value))
+        }))
+        .filter((entry) => entry.metrics.length > 0);
+
+      if (documentMetrics.length > 0) {
+        parsedReports.push(...documentMetrics);
+        return;
+      }
+
+      const numericFields = record?.structuredData?.numericFields || {};
+      const metrics = Object.entries(numericFields)
+        .filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
+        .map(([name, value]) => ({
+          name,
+          value,
+          unit: '',
+          reference: '',
+          referenceMin: null,
+          referenceMax: null,
+          status: 'unknown'
+        }));
+
+      if (!metrics.length) return;
+
+      parsedReports.push({
+        reportTag: record?.structuredData?.specialization || 'structured medical fields',
+        reportDate: record?.structuredData?.reportDate || record.visitDate || record.createdAt || new Date(),
+        sourceLabel: record.hospital?.name || 'Hospital Record',
+        metrics
       });
     });
 
-    completedTestsWithParsedDocs.forEach((test) => {
-      (test.resultDocuments || []).forEach((doc) => {
-        if (doc?.category !== 'test_report') return;
-        if (!doc?.parsedMetrics?.length) return;
-        parsedReports.push({
-          reportTag: doc.reportTag || test.testType?.name || 'general test report',
-          reportDate: test.completedAt || test.createdAt || new Date(),
+    completedTestsWithStructuredData.forEach((test) => {
+      const documentMetrics = (test.resultDocuments || [])
+        .map((doc) => ({
+          reportTag: doc?.llmExtraction?.specialization || test?.structuredData?.specialization || test?.testType?.name || doc?.category || 'structured medical fields',
+          reportDate: doc?.reportDate || doc?.llmExtraction?.reportDate || test.completedAt || test.createdAt || new Date(),
           sourceLabel: test.testType?.name || test.hospital?.name || 'Test Assignment',
-          metrics: doc.parsedMetrics
-        });
+          metrics: (doc?.parsedMetrics || []).filter((metric) => typeof metric?.value === 'number' && Number.isFinite(metric.value))
+        }))
+        .filter((entry) => entry.metrics.length > 0);
+
+      if (documentMetrics.length > 0) {
+        parsedReports.push(...documentMetrics);
+        return;
+      }
+
+      const numericFields = test?.structuredData?.numericFields || {};
+      const metrics = Object.entries(numericFields)
+        .filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
+        .map(([name, value]) => ({
+          name,
+          value,
+          unit: '',
+          reference: '',
+          referenceMin: null,
+          referenceMax: null,
+          status: 'unknown'
+        }));
+
+      if (!metrics.length) return;
+
+      parsedReports.push({
+        reportTag: test?.structuredData?.specialization || test?.testType?.name || 'structured medical fields',
+        reportDate: test?.structuredData?.reportDate || test.completedAt || test.createdAt || new Date(),
+        sourceLabel: test.testType?.name || test.hospital?.name || 'Test Assignment',
+        metrics
       });
     });
 
     const reportGroupMap = new Map();
 
     parsedReports.forEach((report) => {
-      const tag = report.reportTag || 'general test report';
-      if (!reportGroupMap.has(tag)) {
-        reportGroupMap.set(tag, {
-          reportTag: tag,
-          metricSeries: new Map()
-        });
-      }
-
-      const group = reportGroupMap.get(tag);
       report.metrics.forEach((metric) => {
-        const name = metric.name || 'Unknown Metric';
-        const metricKey = `${name.toLowerCase()}|${metric.unit || ''}`;
+        const rawName = metric.name || 'Unknown Metric';
+        const displayName = getMetricDisplayName(rawName);
+        const tag = getMetricGroupTag(rawName, report.reportTag || 'general test report');
+
+        if (!reportGroupMap.has(tag)) {
+          reportGroupMap.set(tag, {
+            reportTag: tag,
+            metricSeries: new Map()
+          });
+        }
+
+        const group = reportGroupMap.get(tag);
+        const metricKey = `${rawName.toLowerCase()}|${metric.unit || ''}`;
 
         if (!group.metricSeries.has(metricKey)) {
           group.metricSeries.set(metricKey, {
-            attribute: name,
+            attribute: displayName,
             unit: metric.unit || '',
             points: []
           });
@@ -753,27 +778,10 @@ router.get('/health-analytics', async (req, res) => {
         points: series.points.sort((a, b) => new Date(a.date) - new Date(b.date))
       }));
 
-      const aiTrendSummary = await summarizeTask('trend_graph', {
-        text: JSON.stringify({
-          reportTag: group.reportTag,
-          metricCount: metricSeries.length,
-          metrics: metricSeries.map((series) => ({
-            attribute: series.attribute,
-            unit: series.unit,
-            points: series.points.map((point) => ({
-              date: point.date,
-              value: point.value,
-              status: point.status,
-              reference: point.reference
-            }))
-          }))
-        })
-      });
-
       reportAnalytics.push({
         reportTag: group.reportTag,
         metricSeries,
-        aiTrendSummary
+        aiTrendSummary: buildTrendSummary(metricSeries)
       });
     }
 
@@ -785,7 +793,8 @@ router.get('/health-analytics', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Patient health analytics route failed:', error.message || error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -851,7 +860,7 @@ router.post('/smartwatch/connect', async (req, res) => {
           isConnected: true
         }
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 
     logActivity(
@@ -892,7 +901,7 @@ router.post('/smartwatch/disconnect', async (req, res) => {
           metricsHistory: []
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     logActivity(
@@ -1010,7 +1019,8 @@ router.get('/activity-logs', async (req, res) => {
       pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Patient activity logs route failed:', error.message || error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 

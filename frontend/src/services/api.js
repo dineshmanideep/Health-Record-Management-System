@@ -159,6 +159,8 @@ export const patientService = {
   // Hospital medical records
   getRecords: () => api.get('/patient/records').then((r) => r.data),
   getRecord: (id) => api.get(`/patient/records/${id}`).then((r) => r.data),
+  reprocessRecord: (id) => api.post(`/patient/records/${id}/reprocess`).then((r) => r.data),
+  reprocessTestAssignment: (id) => api.post(`/patient/test-assignments/${id}/reprocess`).then((r) => r.data),
   // Self-uploaded records
   getSelfRecords: () => api.get('/patient/self-records').then((r) => r.data),
   createSelfRecord: (formData) =>

@@ -1,8 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const path = require('path');
-const multer = require('multer');
 const Hospital = require('../models/Hospital');
 const HospitalOTP = require('../models/HospitalOTP');
 const HospitalAffiliation = require('../models/HospitalAffiliation');
@@ -17,36 +15,11 @@ const Notification = require('../models/Notification');
 const ActivityLog = require('../models/ActivityLog');
 const MedicalRecord = require('../models/MedicalRecord');
 const { protect, authorize } = require('../middleware/auth');
+const { hashOtp, createAsyncSideEffect, buildActor } = require('../utils/routeHelpers');
 
 // All routes below require a valid JWT AND the 'hospital' role.
 router.use(protect);
 router.use(authorize('hospital'));
-
-// Configure multer for test result uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/test-results/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `test-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|pdf|doc|docx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    if (extname && mimetype) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image and document files are allowed'));
-    }
-  }
-});
 
 // Helper to log hospital audit actions
 const logAudit = (hospitalId, action, performedBy, details) =>
@@ -75,7 +48,7 @@ router.put('/profile', async (req, res) => {
     const updated = await Hospital.findByIdAndUpdate(
       req.user._id,
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('-password');
 
     if (!updated) {
@@ -131,7 +104,7 @@ router.post('/otp/generate', async (req, res) => {
     await HospitalOTP.deleteMany({ hospitalId: req.user._id, targetRole, used: false });
 
     const otp = crypto.randomInt(100000, 999999).toString();
-    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const otpHash = hashOtp(otp);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await HospitalOTP.create({ hospitalId: req.user._id, otpHash, targetRole, expiresAt });
@@ -244,7 +217,7 @@ router.patch('/affiliations/:id/revoke', async (req, res) => {
     const affiliation = await HospitalAffiliation.findOneAndUpdate(
       { _id: req.params.id, hospitalId: req.user._id, status: 'active' },
       { status: 'inactive', leftAt: new Date() },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!affiliation) {
@@ -541,7 +514,7 @@ router.post('/patient-access/verify-otp', async (req, res) => {
     }
 
     // Hash the OTP to match database storage
-    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    const otpHash = hashOtp(otp);
 
     // Verify OTP
     const otpRecord = await PatientAccessOTP.findOne({
@@ -564,16 +537,12 @@ router.post('/patient-access/verify-otp', async (req, res) => {
     // await otpRecord.save();
 
     // Log access activity
-    ActivityLog.create({
+    createAsyncSideEffect(ActivityLog.create({
       patient: patient._id,
       action: 'hospital_access_granted',
-      performedBy: { 
-        id: req.user._id, 
-        role: 'hospital', 
-        name: req.user.name 
-      },
+      performedBy: buildActor(req.user, 'hospital'),
       details: `${req.user.name} granted access via email + OTP`
-    }).catch(() => {});
+    }));
 
     // Return patient details
     res.json({
@@ -617,7 +586,7 @@ router.post('/verify-patient', async (req, res) => {
       }
 
       // Hash the OTP to match database storage
-      const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+      const otpHash = hashOtp(otp);
 
       const otpRecord = await PatientAccessOTP.findOne({
         otpHash,
@@ -905,4 +874,3 @@ router.patch('/test-assignments/:id/cancel', async (req, res) => {
 });
 
 module.exports = router;
-

@@ -221,7 +221,11 @@ const NurseAssignments = () => {
   return (
     <DashboardLayout title="My Assignments">
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-110 px-4 py-3 rounded-xl shadow-xl border text-xs font-black uppercase tracking-widest animate-in slide-in-from-top-2 duration-200 ${toast.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed top-20 md:top-6 right-4 z-[60] px-4 py-3 rounded-xl shadow-xl border text-xs font-black uppercase tracking-widest animate-in slide-in-from-top-2 duration-200 ${toast.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
+        >
           {toast.text}
         </div>
       )}
@@ -582,7 +586,7 @@ const NurseAssignments = () => {
                                    <div className="relative">
                                      <input
                                        type="file"
-                                       onChange={(e) => handleFileChange(index, e.target.files[0])}
+                                       onChange={(e) => handleFileChange(index, e)}
                                        accept=".jpg,.jpeg,.png,.pdf"
                                        className="w-full text-[10px] font-bold dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-900 dark:file:bg-white file:text-white dark:file:text-slate-900 hover:file:opacity-80 transition-all cursor-pointer"
                                      />

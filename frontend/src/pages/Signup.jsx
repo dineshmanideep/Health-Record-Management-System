@@ -42,14 +42,14 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [pendingState, setPendingState] = useState({ isPending: false, message: '', role: '' });
 
-  if (authLoading) return null;
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
-
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
   }, []);
+
+  if (authLoading) return null;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   const validatePassword = () => {
     const errorMessage = getPasswordError(formData.password);

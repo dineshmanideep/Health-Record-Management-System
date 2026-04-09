@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useTheme } from '../../context/ThemeContext';
 import { patientService } from '../../services/api';
@@ -24,7 +24,7 @@ const PatientSmartwatchInsights = () => {
   const [message, setMessage] = useState('');
   const [form, setForm] = useState({ provider: 'google_fit', deviceId: '', apiBaseUrl: '', apiToken: '' });
 
-  const loadData = async (selectedDays = days) => {
+  const loadData = useCallback(async (selectedDays = days) => {
     try {
       const [statusRes, metricsRes] = await Promise.all([
         patientService.getSmartwatchStatus(), patientService.getSmartwatchMetrics(selectedDays)
@@ -35,16 +35,16 @@ const PatientSmartwatchInsights = () => {
         setForm((prev) => ({ ...prev, provider: statusRes.data.provider, deviceId: statusRes.data.deviceId || '', apiBaseUrl: statusRes.data.apiBaseUrl || '' }));
       }
     } catch { setMessage('Failed to load data.'); }
-  };
+  }, [days]);
 
-  useEffect(() => { loadData().finally(() => setLoading(false)); }, []);
+  useEffect(() => { loadData().finally(() => setLoading(false)); }, [loadData]);
   useEffect(() => {
     let interval;
     if (status?.isConnected) {
       interval = setInterval(() => { patientService.syncSmartwatch().then(() => loadData(days)).catch(() => {}); }, 30000);
     }
     return () => clearInterval(interval);
-  }, [status?.isConnected, days]);
+  }, [status?.isConnected, days, loadData]);
 
   const chartData = useMemo(() => metricsData.map((m) => ({
     time: new Date(m.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

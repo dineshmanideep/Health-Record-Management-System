@@ -36,7 +36,7 @@ router.put('/profile', async (req, res) => {
     const updated = await Admin.findByIdAndUpdate(
       req.user._id,
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('-password');
 
     if (!updated) {
@@ -110,7 +110,7 @@ router.patch('/users/:id/deactivate', async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { isActive: false },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     res.json({ success: true, data: user });
@@ -140,7 +140,7 @@ router.patch('/hospitals/:id/approve', async (req, res) => {
     const hospital = await Hospital.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'active' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found' });
     res.json({ success: true, data: hospital });
@@ -156,7 +156,7 @@ router.patch('/hospitals/:id/reject', async (req, res) => {
     const hospital = await Hospital.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'rejected' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found' });
     res.json({ success: true, data: hospital });
@@ -183,7 +183,7 @@ router.patch('/doctors/:id/verify', async (req, res) => {
     const doctor = await Doctor.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'verified' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!doctor) return res.status(404).json({ success: false, message: 'Doctor not found' });
     res.json({ success: true, data: doctor });
@@ -210,7 +210,7 @@ router.patch('/nurses/:id/verify', async (req, res) => {
     const nurse = await Nurse.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'verified' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!nurse) return res.status(404).json({ success: false, message: 'Nurse not found' });
     res.json({ success: true, data: nurse });
@@ -227,7 +227,7 @@ router.patch('/hospitals/:id/suspend', async (req, res) => {
     const hospital = await Hospital.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'suspended' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found' });
     res.json({ success: true, data: hospital });
@@ -244,7 +244,7 @@ router.patch('/hospitals/:id/reactivate', async (req, res) => {
     const hospital = await Hospital.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'active' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found' });
     res.json({ success: true, data: hospital });
@@ -261,7 +261,7 @@ router.patch('/doctors/:id/suspend', async (req, res) => {
     const doctor = await Doctor.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'suspended' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!doctor) return res.status(404).json({ success: false, message: 'Doctor not found' });
     res.json({ success: true, data: doctor });
@@ -278,7 +278,7 @@ router.patch('/doctors/:id/reinstate', async (req, res) => {
     const doctor = await Doctor.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'verified' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!doctor) return res.status(404).json({ success: false, message: 'Doctor not found' });
     res.json({ success: true, data: doctor });
@@ -295,7 +295,7 @@ router.patch('/nurses/:id/suspend', async (req, res) => {
     const nurse = await Nurse.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'suspended' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!nurse) return res.status(404).json({ success: false, message: 'Nurse not found' });
     res.json({ success: true, data: nurse });
@@ -312,7 +312,7 @@ router.patch('/nurses/:id/reinstate', async (req, res) => {
     const nurse = await Nurse.findByIdAndUpdate(
       req.params.id,
       { accountStatus: 'verified' },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('-password');
     if (!nurse) return res.status(404).json({ success: false, message: 'Nurse not found' });
     res.json({ success: true, data: nurse });

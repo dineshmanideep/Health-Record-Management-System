@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { profileService } from '../../services/api';
 
@@ -9,7 +9,7 @@ const HospitalAuditLogs = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchLogs = async (p = page) => {
+  const fetchLogs = useCallback(async (p = page) => {
     try {
       setLoading(true);
       const res = await profileService.hospital.getAuditLogs(p, 20);
@@ -22,9 +22,9 @@ const HospitalAuditLogs = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
 
-  useEffect(() => { fetchLogs(page); }, [page]);
+  useEffect(() => { fetchLogs(page); }, [fetchLogs, page]);
 
   const actionLabel = (action) => {
     const map = {

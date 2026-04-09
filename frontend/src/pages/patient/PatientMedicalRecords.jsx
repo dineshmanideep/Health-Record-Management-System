@@ -17,21 +17,33 @@ const PatientMedicalRecords = () => {
   const [formLink, setFormLink] = useState('');
   const [docMode, setDocMode] = useState('file');
   const [formLoading, setFormLoading] = useState(false);
+  const [reprocessingId, setReprocessingId] = useState('');
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    let isActive = true;
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [recRes, selfRes, docRes] = await Promise.all([
-        patientService.getRecords(), patientService.getSelfRecords(), patientService.getTrustedDoctors()
-      ]);
-      if (recRes.success) setGroupedRecords(recRes.data);
-      if (selfRes.success) setSelfRecords(selfRes.data);
-      if (docRes.success) setTrustedDoctors(docRes.data);
-    } catch { setError('Failed to load records'); }
-    setLoading(false);
-  };
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [recRes, selfRes, docRes] = await Promise.all([
+          patientService.getRecords(), patientService.getSelfRecords(), patientService.getTrustedDoctors()
+        ]);
+        if (!isActive) return;
+        if (recRes.success) setGroupedRecords(recRes.data);
+        if (selfRes.success) setSelfRecords(selfRes.data);
+        if (docRes.success) setTrustedDoctors(docRes.data);
+      } catch {
+        if (isActive) setError('Failed to load records');
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    };
+
+    void loadData();
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const handleCreateSelfRecord = async (e) => {
     e.preventDefault();
@@ -79,7 +91,51 @@ const PatientMedicalRecords = () => {
     } catch { alert('Failed to revoke access'); }
   };
 
+  const handleReprocessRecord = async (record) => {
+    if (!record?._id) return;
+    setReprocessingId(record._id);
+    try {
+      const response = record.recordType === 'test_assignment'
+        ? await patientService.reprocessTestAssignment(record._id)
+        : await patientService.reprocessRecord(record._id);
+
+      if (response.success) {
+        alert('Reprocessing started. Refresh this page after a short time to see updated findings.');
+      } else {
+        alert(response.message || 'Failed to start reprocessing');
+      }
+    } catch (error) {
+      alert(error?.response?.data?.message || 'Failed to start reprocessing');
+    } finally {
+      setReprocessingId('');
+    }
+  };
+
   const formatDate = (d) => d ? new Date(d).toLocaleDateString() : 'N/A';
+  const formatFieldLabel = (field) =>
+    String(field || '')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  const formatMetricValue = (metric) => `${metric?.value ?? '--'}${metric?.unit ? ` ${metric.unit}` : ''}`;
+  const findingTone = (status) => {
+    if (status === 'high' || status === 'low') {
+      return {
+        wrap: 'border-red-200/70 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20',
+        label: 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30'
+      };
+    }
+    if (status === 'normal') {
+      return {
+        wrap: 'border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/20',
+        label: 'text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30'
+      };
+    }
+    return {
+      wrap: 'border-amber-200/70 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20',
+      label: 'text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30'
+    };
+  };
   const solveFileUrl = (path) => {
     if (!path) return '#';
     if (path.startsWith('http')) return path;
@@ -109,6 +165,20 @@ const PatientMedicalRecords = () => {
   const allDocuments = getAllDocuments();
   const testReports = allDocuments.filter(d => d.category === 'test_report');
   const diagnosisReports = allDocuments.filter(d => d.category === 'diagnosis_report');
+
+  const getImportantFields = (record) =>
+    ((record?.recordType === 'medical_record' ? record?.categorizedDocuments : record?.resultDocuments) || [])
+      .flatMap((doc) => (doc?.parsedMetrics || []).map((metric) => ({
+        ...metric,
+        documentName: doc?.filePath?.split('/').pop() || '',
+        reportDate: doc?.reportDate || doc?.uploadedAt || null
+      })))
+      .sort((a, b) => {
+        const aRank = a.status === 'high' || a.status === 'low' ? 2 : (a.status === 'unknown' ? 1 : 0);
+        const bRank = b.status === 'high' || b.status === 'low' ? 2 : (b.status === 'unknown' ? 1 : 0);
+        return bRank - aRank;
+      })
+      .slice(0, 8);
 
   const tabs = [
     { key: 'hospital', label: 'Hospital Records', icon: '🏥' },
@@ -160,6 +230,43 @@ const PatientMedicalRecords = () => {
                   
                   {selectedRecord.recordType === 'medical_record' ? (
                     <>
+                      {getImportantFields(selectedRecord).length > 0 && (
+                        <div className="mb-6 p-5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
+                          <h3 className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">Important Findings</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                            {getImportantFields(selectedRecord).map((finding, index) => {
+                              const tone = findingTone(finding.status);
+                              return (
+                              <div key={`${finding.name}-${index}`} className={`p-3 rounded-lg border ${tone.wrap}`}>
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{formatFieldLabel(finding.name)}</p>
+                                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${tone.label}`}>{finding.status || 'review'}</span>
+                                </div>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 break-words">{formatMetricValue(finding)}</p>
+                                {finding.reference && <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Ref: {finding.reference}</p>}
+                                {finding.reportDate && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Report Date: {formatDate(finding.reportDate)}</p>}
+                              </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {(selectedRecord.categorizedDocuments || []).some((doc) => doc.reportDate) && (
+                        <div className="mb-6 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/30">
+                          <h3 className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Report Dates</h3>
+                          <div className="flex flex-wrap gap-2">
+                            {(selectedRecord.categorizedDocuments || [])
+                              .filter((doc) => doc.reportDate)
+                              .map((doc, index) => (
+                                <span key={`${doc.filePath}-${index}`} className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                                  {doc.filePath.split('/').pop()}: {formatDate(doc.reportDate)}
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 space-y-6">
                           <div>
@@ -204,6 +311,9 @@ const PatientMedicalRecords = () => {
                                   {doc.reportTag && (
                                     <p className="text-[10px] text-indigo-500 dark:text-indigo-400 truncate mt-0.5">Tag: {doc.reportTag}</p>
                                   )}
+                                  {doc.reportDate && (
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">Report Date: {formatDate(doc.reportDate)}</p>
+                                  )}
                                   {doc.aiSummary && (
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-3">
                                       AI-generated summary: {doc.aiSummary}
@@ -236,12 +346,43 @@ const PatientMedicalRecords = () => {
                       )}
                       <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-xl flex flex-wrap gap-4 items-center justify-between border border-slate-100 dark:border-slate-800">
                         <p className="text-[10px] font-medium text-slate-400">ID: {selectedRecord._id}</p>
-                        <p className="text-[10px] font-medium text-slate-400">Created: {new Date(selectedRecord.createdAt).toLocaleString()}</p>
+                        <div className="flex items-center gap-3">
+                          <p className="text-[10px] font-medium text-slate-400">Created: {new Date(selectedRecord.createdAt).toLocaleString()}</p>
+                          <button
+                            onClick={() => handleReprocessRecord(selectedRecord)}
+                            disabled={reprocessingId === selectedRecord._id}
+                            className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold disabled:opacity-50"
+                          >
+                            {reprocessingId === selectedRecord._id ? 'Reprocessing...' : 'Reprocess With LLM'}
+                          </button>
+                        </div>
                       </div>
                     </>
                   ) : (
                     <>
                       <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Test Result Details</h2>
+                      {getImportantFields(selectedRecord).length > 0 && (
+                        <div className="mb-6 p-5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
+                          <h3 className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">Important Findings</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                            {getImportantFields(selectedRecord).map((finding, index) => {
+                              const tone = findingTone(finding.status);
+                              return (
+                                <div key={`${finding.name}-${index}`} className={`p-3 rounded-lg border ${tone.wrap}`}>
+                                  <div className="flex items-center justify-between gap-2 mb-2">
+                                    <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{formatFieldLabel(finding.name)}</p>
+                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${tone.label}`}>{finding.status || 'review'}</span>
+                                  </div>
+                                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 break-words">{formatMetricValue(finding)}</p>
+                                  {finding.reference && <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Ref: {finding.reference}</p>}
+                                  {finding.reportDate && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Report Date: {formatDate(finding.reportDate)}</p>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 space-y-6">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -281,6 +422,9 @@ const PatientMedicalRecords = () => {
                                   {doc.reportTag && (
                                     <p className="text-[10px] text-indigo-500 dark:text-indigo-400 truncate mt-0.5">Tag: {doc.reportTag}</p>
                                   )}
+                                  {doc.reportDate && (
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">Report Date: {formatDate(doc.reportDate)}</p>
+                                  )}
                                   {doc.aiSummary && (
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-3">
                                       AI-generated summary: {doc.aiSummary}
@@ -294,7 +438,16 @@ const PatientMedicalRecords = () => {
                         </div>
                       </div>
                       <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-xl flex items-center justify-between border border-slate-100 dark:border-slate-800">
-                        <p className="text-[10px] font-medium text-slate-400">Ref: {selectedRecord._id}</p>
+                        <div className="flex items-center gap-3">
+                          <p className="text-[10px] font-medium text-slate-400">Ref: {selectedRecord._id}</p>
+                          <button
+                            onClick={() => handleReprocessRecord(selectedRecord)}
+                            disabled={reprocessingId === selectedRecord._id}
+                            className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold disabled:opacity-50"
+                          >
+                            {reprocessingId === selectedRecord._id ? 'Reprocessing...' : 'Reprocess With LLM'}
+                          </button>
+                        </div>
                         <span className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-md uppercase">{selectedRecord.status}</span>
                       </div>
                     </>
@@ -410,7 +563,7 @@ const PatientMedicalRecords = () => {
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${doc.category === 'test_report' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'}`}>
                             {doc.category === 'test_report' ? '📊' : '📄'}
                           </div>
-                          <span className="text-[10px] font-medium text-slate-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700">{formatDate(doc.uploadedAt)}</span>
+                          <span className="text-[10px] font-medium text-slate-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700">{formatDate(doc.reportDate || doc.uploadedAt)}</span>
                         </div>
                         <h4 className="text-xs font-bold text-slate-800 dark:text-white mb-1.5 truncate">{doc.filePath.split('/').pop()}</h4>
                         <p className="text-[10px] text-slate-400 mb-4">{doc.record.hospital?.name}</p>

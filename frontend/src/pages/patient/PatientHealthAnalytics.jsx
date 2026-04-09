@@ -1,11 +1,45 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useTheme } from '../../context/ThemeContext';
 import { useAccessibility } from '../../context/useAccessibility';
 import { patientService } from '../../services/api';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine
 } from 'recharts';
+
+const AutoSizedChart = ({ height = 320, children }) => {
+  const containerRef = useRef(null);
+  const [size, setSize] = useState({ width: 0, height });
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return undefined;
+
+    const updateSize = () => {
+      const nextWidth = Math.floor(element.getBoundingClientRect().width);
+      if (nextWidth > 0) {
+        setSize({ width: nextWidth, height });
+      }
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(() => updateSize());
+    observer.observe(element);
+    window.addEventListener('resize', updateSize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
+  }, [height]);
+
+  return (
+    <div ref={containerRef} className="w-full min-w-0" style={{ minHeight: `${height}px` }}>
+      {size.width > 0 ? children(size) : <div style={{ height: `${height}px` }} />}
+    </div>
+  );
+};
 
 const PatientHealthAnalytics = () => {
   const { theme } = useTheme();
@@ -34,7 +68,7 @@ const PatientHealthAnalytics = () => {
   const statusColor = (status) => {
     if (status === 'high' || status === 'low') return '#ef4444';
     if (status === 'normal') return '#10b981';
-    return '#6366f1';
+    return '#f59e0b';
   };
 
   const referenceLineColor = '#f59e0b';
@@ -44,7 +78,7 @@ const PatientHealthAnalytics = () => {
     if (status === 'high') return { label: 'High ▲', tone: 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30' };
     if (status === 'low') return { label: 'Low ▼', tone: 'text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30' };
     if (status === 'normal') return { label: 'Normal ✓', tone: 'text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30' };
-    return { label: 'Review', tone: 'text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30' };
+    return { label: 'Needs Review', tone: 'text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30' };
   };
 
   const explainStatus = (attribute, status, reference) => {
@@ -109,11 +143,10 @@ const PatientHealthAnalytics = () => {
                       const selectedSeries = group.metricSeries.find((series) => series.attribute === selectedAttr) || group.metricSeries[0];
 
                       const graphData = (selectedSeries.points || []).map((point) => ({
-                        date: new Date(point.date).toLocaleString([], {
+                        date: new Date(point.date).toLocaleDateString([], {
                           month: 'short',
                           day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
+                          year: 'numeric'
                         }),
                         value: point.value,
                         referenceMin: point.referenceMin,
@@ -165,9 +198,9 @@ const PatientHealthAnalytics = () => {
                             </div>
                           </div>
 
-                          <div className="h-70 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={graphData}>
+                          <AutoSizedChart height={340}>
+                            {({ width, height }) => (
+                              <LineChart width={width} height={height} data={graphData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
                                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={axisStyle} />
                                 <YAxis axisLine={false} tickLine={false} tick={axisStyle} />
@@ -238,8 +271,8 @@ const PatientHealthAnalytics = () => {
                                   connectNulls
                                 />
                               </LineChart>
-                            </ResponsiveContainer>
-                          </div>
+                            )}
+                          </AutoSizedChart>
 
                           <div className="mt-4 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700">
                             <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Trend Summary</p>

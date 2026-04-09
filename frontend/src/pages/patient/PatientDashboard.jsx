@@ -3,12 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
 import { patientService } from '../../services/api';
+
+const StatCard = ({ label, value, icon, color }) => (
+  <div className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800 hover-lift transition-all duration-300 relative overflow-hidden">
+    <div className={`absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br ${color} opacity-10 dark:opacity-15 blur-xl rounded-full group-hover:scale-150 transition-transform duration-500`} />
+    <div className="relative z-10">
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+          {icon}
+        </div>
+        <span className="text-3xl font-extrabold text-slate-900 dark:text-white">{value ?? 0}</span>
+      </div>
+      <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">{label}</p>
+    </div>
+  </div>
+);
 
 const PatientDashboard = () => {
   const { user } = useAuth();
-  const { theme } = useTheme();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -86,21 +99,6 @@ const PatientDashboard = () => {
     };
     return map[action] || action;
   };
-
-  const StatCard = ({ label, value, icon, color }) => (
-    <div className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800 hover-lift transition-all duration-300 relative overflow-hidden">
-      <div className={`absolute -top-6 -right-6 w-20 h-20 bg-gradient-to-br ${color} opacity-10 dark:opacity-15 blur-xl rounded-full group-hover:scale-150 transition-transform duration-500`} />
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-            {icon}
-          </div>
-          <span className={`text-3xl font-extrabold text-slate-900 dark:text-white`}>{value ?? 0}</span>
-        </div>
-        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">{label}</p>
-      </div>
-    </div>
-  );
 
   return (
     <DashboardLayout title="Dashboard">

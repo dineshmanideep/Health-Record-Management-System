@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Doctor = require('../models/Doctor');
-const Hospital = require('../models/Hospital');
-const Nurse = require('../models/Nurse');
-const Admin = require('../models/Admin');
 const { protect } = require('../middleware/auth');
+const {
+  getModelByRole,
+  getAccessStatusError,
+  buildAuthResponseData
+} = require('../utils/authRoleHelpers');
 
 const DEFAULT_ACCESSIBILITY_PROFILE = {
   modeEnabled: false,
@@ -39,24 +39,6 @@ const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '24h'
   });
-};
-
-// Helper function to get model based on role
-const getModelByRole = (role) => {
-  switch (role) {
-    case 'user':
-      return User;
-    case 'doctor':
-      return Doctor;
-    case 'hospital':
-      return Hospital;
-    case 'nurse':
-      return Nurse;
-    case 'admin':
-      return Admin;
-    default:
-      return null;
-  }
 };
 
 // @route   POST /api/auth/signup
@@ -185,63 +167,19 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Role-specific account status checks before issuing JWT
-    if (role === 'hospital') {
-      if (user.accountStatus === 'pending_approval') {
-        return res.status(403).json({
-          success: false,
-          message: 'Your hospital registration is pending admin approval. You will be notified once approved.'
-        });
-      }
-      if (user.accountStatus === 'rejected') {
-        return res.status(403).json({
-          success: false,
-          message: 'Your hospital registration was rejected. Please contact support.'
-        });
-      }
-      if (user.accountStatus === 'suspended') {
-        return res.status(403).json({
-          success: false,
-          message: 'Your hospital account has been suspended. Please contact support.'
-        });
-      }
-    } else if (role === 'doctor' || role === 'nurse') {
-      if (user.accountStatus === 'pending_verification') {
-        return res.status(403).json({
-          success: false,
-          message: 'Your account is pending admin verification. We will verify your license and notify you.'
-        });
-      }
-      if (user.accountStatus === 'suspended') {
-        return res.status(403).json({
-          success: false,
-          message: 'Your account has been suspended. Please contact support.'
-        });
-      }
-    } else {
-      // Patient and Admin use isActive boolean
-      if (user.isActive === false) {
-        return res.status(403).json({
-          success: false,
-          message: 'Account is deactivated. Please contact support.'
-        });
-      }
+    const accessError = getAccessStatusError(role, user);
+    if (accessError) {
+      return res.status(accessError.status).json({
+        success: false,
+        message: accessError.message
+      });
     }
 
     const token = generateToken(user._id, role);
 
-    const responseData = {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token
-    };
-    if (role === 'user') responseData.patientId = user.patientId;
-
     res.json({
       success: true,
-      data: responseData
+      data: buildAuthResponseData(user, role, token)
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -310,7 +248,7 @@ router.put('/accessibility-profile', protect, async (req, res) => {
     const updatedUser = await Model.findByIdAndUpdate(
       req.user._id,
       { $set: { accessibilityProfile: normalized } },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('accessibilityProfile');
 
     if (!updatedUser) {

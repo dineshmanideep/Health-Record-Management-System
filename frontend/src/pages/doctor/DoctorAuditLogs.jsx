@@ -8,18 +8,29 @@ const DoctorAuditLogs = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchLogs = (p) => {
-    setLoading(true);
-    doctorService.getAuditLogs(p)
-      .then((res) => {
+  useEffect(() => {
+    let isActive = true;
+
+    const fetchLogs = async () => {
+      setLoading(true);
+      try {
+        const res = await doctorService.getAuditLogs(page);
+        if (!isActive) return;
         setLogs(res.data || []);
         setTotalPages(res.totalPages || 1);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
+      } catch {
+        if (!isActive) return;
+        setLogs([]);
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    };
 
-  useEffect(() => { fetchLogs(page); }, [page]);
+    void fetchLogs();
+    return () => {
+      isActive = false;
+    };
+  }, [page]);
 
   const actionIcons = {
     record_created: '📝',

@@ -147,20 +147,31 @@ html[data-a11y-mode='on'] body {
   filter: contrast(1.08);
 }
 
+html[data-a11y-mode='on'] {
+  scroll-behavior: auto;
+}
+
 html[data-a11y-mode='on'] .animate-fadeIn,
 html[data-a11y-mode='on'] .animate-fadeInScale,
 html[data-a11y-mode='on'] .animate-slideUp,
 html[data-a11y-mode='on'] .animate-float,
 html[data-a11y-mode='on'] .animate-pulse,
-html[data-a11y-mode='on'] .animate-pulse-glow {
+html[data-a11y-mode='on'] .animate-pulse-glow,
+html[data-a11y-mode='on'] .animate-spin,
+html[data-a11y-mode='on'] .transition-all,
+html[data-a11y-mode='on'] .duration-200,
+html[data-a11y-mode='on'] .duration-300,
+html[data-a11y-mode='on'] .duration-500 {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 html.a11y-keyboard :focus-visible {
   outline: 3px solid #0f766e !important;
   outline-offset: 2px;
   border-radius: 0.5rem;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.18);
 }
 
 html.a11y-dyslexia body,
@@ -179,6 +190,7 @@ html.a11y-dyslexia h4 {
   line-height: 1.75 !important;
   text-align: left;
   font-style: normal !important;
+  word-spacing: 0.08em;
 }
 
 html.a11y-target-boost button,
@@ -188,4 +200,41 @@ html.a11y-target-boost select,
 html.a11y-target-boost textarea,
 html.a11y-target-boost [role='button'] {
   min-height: 44px;
+  min-width: 44px;
+}
+
+html[data-a11y-mode='on'] body,
+html[data-a11y-mode='on'] p,
+html[data-a11y-mode='on'] li,
+html[data-a11y-mode='on'] label,
+html[data-a11y-mode='on'] input,
+html[data-a11y-mode='on'] textarea,
+html[data-a11y-mode='on'] select,
+html[data-a11y-mode='on'] button {
+  line-height: 1.65;
+}
+
+html[data-a11y-mode='on'] input,
+html[data-a11y-mode='on'] textarea,
+html[data-a11y-mode='on'] select,
+html[data-a11y-mode='on'] button {
+  border-radius: 0.9rem;
+}
+
+html[data-a11y-form-assist='on'] input:invalid,
+html[data-a11y-form-assist='on'] textarea:invalid,
+html[data-a11y-form-assist='on'] select:invalid {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

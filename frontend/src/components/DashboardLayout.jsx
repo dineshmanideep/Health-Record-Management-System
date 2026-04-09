@@ -4,6 +4,25 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAccessibility } from '../context/useAccessibility';
 
+const SectionLabel = ({ children }) => (
+  <p className="px-7 pt-5 pb-1.5 text-[10px] font-semibold text-slate-400 dark:text-white/25 uppercase tracking-[0.15em]">{children}</p>
+);
+
+const SidebarNavLink = ({ to, icon, children, isActive, onClick }) => (
+  <Link
+    to={to}
+    onClick={onClick}
+    className={`flex items-center gap-3 px-4 py-2.5 mx-3 rounded-xl text-[13px] font-medium transition-all duration-200 group ${
+      isActive
+        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+    }`}
+  >
+    <span className={`text-base transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`}>{icon}</span>
+    <span>{children}</span>
+  </Link>
+);
+
 const DashboardLayout = ({ children, title }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -22,28 +41,6 @@ const DashboardLayout = ({ children, title }) => {
     const roles = { user: 'Patient', doctor: 'Doctor', nurse: 'Nurse', hospital: 'Hospital', admin: 'Admin' };
     return roles[role] || 'User';
   };
-
-  const NavLink = ({ to, icon, children }) => {
-    const isActive = location.pathname === to;
-    return (
-      <Link
-        to={to}
-        onClick={() => setIsMobileMenuOpen(false)}
-        className={`flex items-center gap-3 px-4 py-2.5 mx-3 rounded-xl text-[13px] font-medium transition-all duration-200 group ${
-          isActive
-            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
-            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
-        }`}
-      >
-        <span className={`text-base transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`}>{icon}</span>
-        <span>{children}</span>
-      </Link>
-    );
-  };
-
-  const SectionLabel = ({ children }) => (
-    <p className="px-7 pt-5 pb-1.5 text-[10px] font-semibold text-slate-400 dark:text-white/25 uppercase tracking-[0.15em]">{children}</p>
-  );
 
   return (
     <>
@@ -123,50 +120,50 @@ const DashboardLayout = ({ children, title }) => {
           {/* Navigation */}
           <nav className="flex-1 py-2 space-y-0.5">
             <SectionLabel>Main</SectionLabel>
-            <NavLink to={`/${user?.role === 'user' ? 'patient' : user?.role}/dashboard`} icon="📊">Dashboard</NavLink>
-            <NavLink to={`/${user?.role === 'user' ? 'patient' : user?.role}/profile`} icon="👤">My Profile</NavLink>
+            <SidebarNavLink to={`/${user?.role === 'user' ? 'patient' : user?.role}/dashboard`} icon="📊" isActive={location.pathname === `/${user?.role === 'user' ? 'patient' : user?.role}/dashboard`} onClick={() => setIsMobileMenuOpen(false)}>Dashboard</SidebarNavLink>
+            <SidebarNavLink to={`/${user?.role === 'user' ? 'patient' : user?.role}/profile`} icon="👤" isActive={location.pathname === `/${user?.role === 'user' ? 'patient' : user?.role}/profile`} onClick={() => setIsMobileMenuOpen(false)}>My Profile</SidebarNavLink>
 
             {user?.role === 'user' && (
               <>
                 <SectionLabel>Medical</SectionLabel>
-                <NavLink to="/patient/records" icon="📋">Medical Records</NavLink>
-                <NavLink to="/patient/health-analytics" icon="📈">Health Analytics</NavLink>
-                <NavLink to="/patient/smartwatch-insights" icon="⌚">Watch Insights</NavLink>
-                <NavLink to="/patient/activity-logs" icon="📝">Activity Logs</NavLink>
+                <SidebarNavLink to="/patient/records" icon="📋" isActive={location.pathname === '/patient/records'} onClick={() => setIsMobileMenuOpen(false)}>Medical Records</SidebarNavLink>
+                <SidebarNavLink to="/patient/health-analytics" icon="📈" isActive={location.pathname === '/patient/health-analytics'} onClick={() => setIsMobileMenuOpen(false)}>Health Analytics</SidebarNavLink>
+                <SidebarNavLink to="/patient/smartwatch-insights" icon="⌚" isActive={location.pathname === '/patient/smartwatch-insights'} onClick={() => setIsMobileMenuOpen(false)}>Watch Insights</SidebarNavLink>
+                <SidebarNavLink to="/patient/activity-logs" icon="📝" isActive={location.pathname === '/patient/activity-logs'} onClick={() => setIsMobileMenuOpen(false)}>Activity Logs</SidebarNavLink>
               </>
             )}
             {user?.role === 'doctor' && (
               <>
                 <SectionLabel>Patient Care</SectionLabel>
-                <NavLink to="/doctor/patients" icon="👥">My Patients</NavLink>
-                <NavLink to="/doctor/assign-records" icon="✍️">Record Entry</NavLink>
-                <NavLink to="/doctor/audit-logs" icon="📋">Audit Logs</NavLink>
+                <SidebarNavLink to="/doctor/patients" icon="👥" isActive={location.pathname === '/doctor/patients'} onClick={() => setIsMobileMenuOpen(false)}>My Patients</SidebarNavLink>
+                <SidebarNavLink to="/doctor/assign-records" icon="✍️" isActive={location.pathname === '/doctor/assign-records'} onClick={() => setIsMobileMenuOpen(false)}>Record Entry</SidebarNavLink>
+                <SidebarNavLink to="/doctor/audit-logs" icon="📋" isActive={location.pathname === '/doctor/audit-logs'} onClick={() => setIsMobileMenuOpen(false)}>Audit Logs</SidebarNavLink>
               </>
             )}
             {user?.role === 'nurse' && (
               <>
                 <SectionLabel>Assignments</SectionLabel>
-                <NavLink to="/nurse/assignments" icon="📋">Doctor Tasks</NavLink>
-                <NavLink to="/nurse/test-assignments" icon="🧪">Test Center</NavLink>
-                <NavLink to="/nurse/audit-logs" icon="🔍">Activity Logs</NavLink>
+                <SidebarNavLink to="/nurse/assignments" icon="📋" isActive={location.pathname === '/nurse/assignments'} onClick={() => setIsMobileMenuOpen(false)}>Doctor Tasks</SidebarNavLink>
+                <SidebarNavLink to="/nurse/test-assignments" icon="🧪" isActive={location.pathname === '/nurse/test-assignments'} onClick={() => setIsMobileMenuOpen(false)}>Test Center</SidebarNavLink>
+                <SidebarNavLink to="/nurse/audit-logs" icon="🔍" isActive={location.pathname === '/nurse/audit-logs'} onClick={() => setIsMobileMenuOpen(false)}>Activity Logs</SidebarNavLink>
               </>
             )}
             {user?.role === 'hospital' && (
               <>
                 <SectionLabel>Management</SectionLabel>
-                <NavLink to="/hospital/doctors" icon="⚕️">Doctors</NavLink>
-                <NavLink to="/hospital/nurses" icon="👩‍⚕️">Nurses</NavLink>
-                <NavLink to="/hospital/tests" icon="🔬">Test Types</NavLink>
-                <NavLink to="/hospital/test-assignments" icon="📋">Assignments</NavLink>
-                <NavLink to="/hospital/audit-logs" icon="🔍">Safety Logs</NavLink>
+                <SidebarNavLink to="/hospital/doctors" icon="⚕️" isActive={location.pathname === '/hospital/doctors'} onClick={() => setIsMobileMenuOpen(false)}>Doctors</SidebarNavLink>
+                <SidebarNavLink to="/hospital/nurses" icon="👩‍⚕️" isActive={location.pathname === '/hospital/nurses'} onClick={() => setIsMobileMenuOpen(false)}>Nurses</SidebarNavLink>
+                <SidebarNavLink to="/hospital/tests" icon="🔬" isActive={location.pathname === '/hospital/tests'} onClick={() => setIsMobileMenuOpen(false)}>Test Types</SidebarNavLink>
+                <SidebarNavLink to="/hospital/test-assignments" icon="📋" isActive={location.pathname === '/hospital/test-assignments'} onClick={() => setIsMobileMenuOpen(false)}>Assignments</SidebarNavLink>
+                <SidebarNavLink to="/hospital/audit-logs" icon="🔍" isActive={location.pathname === '/hospital/audit-logs'} onClick={() => setIsMobileMenuOpen(false)}>Safety Logs</SidebarNavLink>
               </>
             )}
             {user?.role === 'admin' && (
               <>
                 <SectionLabel>Administration</SectionLabel>
-                <NavLink to="/admin/hospitals" icon="🏥">Hospitals</NavLink>
-                <NavLink to="/admin/doctors" icon="⚕️">Doctors</NavLink>
-                <NavLink to="/admin/nurses" icon="👩‍⚕️">Nurses</NavLink>
+                <SidebarNavLink to="/admin/hospitals" icon="🏥" isActive={location.pathname === '/admin/hospitals'} onClick={() => setIsMobileMenuOpen(false)}>Hospitals</SidebarNavLink>
+                <SidebarNavLink to="/admin/doctors" icon="⚕️" isActive={location.pathname === '/admin/doctors'} onClick={() => setIsMobileMenuOpen(false)}>Doctors</SidebarNavLink>
+                <SidebarNavLink to="/admin/nurses" icon="👩‍⚕️" isActive={location.pathname === '/admin/nurses'} onClick={() => setIsMobileMenuOpen(false)}>Nurses</SidebarNavLink>
               </>
             )}
           </nav>

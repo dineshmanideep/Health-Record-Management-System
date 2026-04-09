@@ -9,29 +9,30 @@ const NurseAuditLogs = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    nurseService.getAuditLogs(page)
-      .then((res) => {
+    let isActive = true;
+
+    const fetchLogs = async () => {
+      setLoading(true);
+      try {
+        const res = await nurseService.getAuditLogs(page);
+        if (!isActive) return;
         setLogs(res.data || []);
         setTotalPages(res.totalPages || 1);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      } catch {
+        if (!isActive) return;
+        setLogs([]);
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    };
+
+    void fetchLogs();
+    return () => {
+      isActive = false;
+    };
   }, [page]);
 
   const formatDate = (d) => new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-  const actionColors = {
-    'record_created': 'bg-green-100 text-green-700',
-    'record_updated': 'bg-blue-100 text-blue-700',
-    'login': 'bg-purple-100 text-purple-700',
-    'affiliation': 'bg-yellow-100 text-yellow-700'
-  };
-
-  const getColor = (action) => {
-    const key = Object.keys(actionColors).find(k => action?.toLowerCase().includes(k));
-    return key ? actionColors[key] : 'bg-gray-100 text-gray-700';
-  };
 
   if (loading) {
     return (

@@ -9,8 +9,15 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
+const allowedOrigins = String(process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins.length ? allowedOrigins : true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -18,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Dedicated route for assignments
 app.use('/uploads/assignments', express.static(path.join(__dirname, 'uploads', 'assignments')));
+app.use('/uploads/prescriptions', express.static(path.join(__dirname, 'uploads', 'prescriptions')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -49,13 +57,11 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-const API_URL = process.env.VITE_API_URL || `http://localhost:${PORT}`;
 
 app.listen(PORT, '0.0.0.0', () => {
-// app.listen(PORT, () => { 
   console.log(`Server is running on port ${PORT}`);
   console.log(`Access locally: http://localhost:${PORT}`);
-  console.log(`Access on network: http://10.102.106.107:${PORT}`);
+  console.log(`CORS origin policy: ${allowedOrigins.length ? allowedOrigins.join(', ') : 'open'}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
 });
 

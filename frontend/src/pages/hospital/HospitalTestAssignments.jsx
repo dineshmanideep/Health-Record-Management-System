@@ -41,7 +41,7 @@ const HospitalTestAssignments = () => {
       setAssignments(assignRes.data || []);
       setTestTypes((testRes.data || []).filter(t => t.isActive));
       setNurses(nurseRes.data || []);
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to load data' });
     } finally {
       setLoading(false);
@@ -182,7 +182,7 @@ const HospitalTestAssignments = () => {
       setMessage({ type: 'success', text: 'Assignment cancelled' });
       fetchData();
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to cancel assignment' });
     }
   };

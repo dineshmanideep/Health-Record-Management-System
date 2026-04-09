@@ -32,7 +32,7 @@ const HospitalTests = () => {
       setLoading(true);
       const res = await hospitalService.getTestTypes();
       setTestTypes(res.data || []);
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to load test types' });
     } finally {
       setLoading(false);
@@ -123,7 +123,7 @@ const HospitalTests = () => {
       setMessage({ type: 'success', text: 'Test type deactivated' });
       fetchTestTypes();
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to deactivate test type' });
     }
   };

@@ -19,6 +19,8 @@ const Nurse = require('../models/Nurse');
 const RecordAssignment = require('../models/RecordAssignment');
 const { transcribeVoiceNote } = require('../utils/aiSummarizer');
 const { protect, authorize } = require('../middleware/auth');
+const { hashOtp, createAsyncSideEffect, buildActor } = require('../utils/routeHelpers');
+const { reactivateOrCreateAffiliation, getHospitalSummary } = require('../utils/affiliationHelpers');
 
 // Multer config for doctor's attachments
 const storage = multer.diskStorage({
@@ -95,7 +97,7 @@ router.put('/profile', async (req, res) => {
     const updated = await Doctor.findByIdAndUpdate(
       req.user._id,
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('-password');
 
     if (!updated) {
@@ -116,7 +118,7 @@ router.post('/affiliate', async (req, res) => {
     const { otp, department } = req.body;
     if (!otp) return res.status(400).json({ success: false, message: 'OTP is required' });
 
-    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    const otpHash = hashOtp(otp);
     const otpRecord = await HospitalOTP.findOne({
       otpHash,
       targetRole: 'doctor',
@@ -128,40 +130,32 @@ router.post('/affiliate', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
     }
 
-    // Prevent duplicate affiliation
-    const existing = await HospitalAffiliation.findOne({
-      staffId: req.user._id,
-      hospitalId: otpRecord.hospitalId
-    });
-    if (existing) {
-      if (existing.status === 'active') {
-        return res.status(409).json({ success: false, message: 'You are already affiliated with this hospital' });
-      }
-      // Reactivate inactive affiliation
-      existing.status = 'active';
-      existing.joinedAt = new Date();
-      existing.leftAt = undefined;
-      if (department) existing.department = department;
-      await existing.save();
-      await HospitalOTP.findByIdAndUpdate(otpRecord._id, { used: true, usedBy: req.user._id });
-      const hospital = await Hospital.findById(otpRecord.hospitalId).select('name address');
-      return res.json({ success: true, data: existing, hospital });
-    }
-
-    const affiliation = await HospitalAffiliation.create({
+    const affiliationResult = await reactivateOrCreateAffiliation({
       staffId: req.user._id,
       staffRole: 'doctor',
       hospitalId: otpRecord.hospitalId,
       department: department || ''
     });
 
+    if (affiliationResult.kind === 'existing_active') {
+      return res.status(409).json({ success: false, message: 'You are already affiliated with this hospital' });
+    }
+
     await HospitalOTP.findByIdAndUpdate(otpRecord._id, { used: true, usedBy: req.user._id });
+    createAsyncSideEffect(
+      HospitalAuditLog.create({
+        hospital: otpRecord.hospitalId,
+        action: 'doctor_joined',
+        performedBy: buildActor(req.user, 'doctor'),
+        details: `Dr. ${req.user.name} joined the hospital`
+      })
+    );
 
-    const hospital = await Hospital.findById(otpRecord.hospitalId).select('name address');
-
-    HospitalAuditLog.create({ hospital: otpRecord.hospitalId, action: 'doctor_joined', performedBy: { id: req.user._id, role: 'doctor', name: req.user.name }, details: `Dr. ${req.user.name} joined the hospital` });
-
-    res.status(201).json({ success: true, data: affiliation, hospital });
+    return res.status(affiliationResult.kind === 'created' ? 201 : 200).json({
+      success: true,
+      data: affiliationResult.affiliation,
+      hospital: affiliationResult.hospital || await getHospitalSummary(otpRecord.hospitalId)
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
@@ -207,7 +201,7 @@ router.post('/patient-access/verify-otp', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
 
-    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    const otpHash = hashOtp(otp);
     const otpRecord = await PatientAccessOTP.findOne({
       patient: patient._id,
       otpHash,
@@ -244,20 +238,20 @@ router.post('/patient-access/verify-otp', async (req, res) => {
     await Doctor.findByIdAndUpdate(req.user._id, { $addToSet: { patients: patient._id } });
 
     // Log activity
-    ActivityLog.create({
+    createAsyncSideEffect(ActivityLog.create({
       patient: patient._id,
       action: 'doctor_access_granted',
-      performedBy: { id: req.user._id, role: 'doctor', name: req.user.name },
+      performedBy: buildActor(req.user, 'doctor'),
       details: `Dr. ${req.user.name} granted access via OTP`
-    }).catch(() => {});
+    }));
 
     // Notify patient
-    Notification.create({
+    createAsyncSideEffect(Notification.create({
       user: patient._id,
       type: 'doctor_access_granted',
       title: 'Doctor Access Granted',
       message: `Dr. ${req.user.name} now has access to your medical records.`
-    }).catch(() => {});
+    }));
 
     res.json({ success: true, message: 'Access granted', data: { patientName: patient.name } });
   } catch (error) {

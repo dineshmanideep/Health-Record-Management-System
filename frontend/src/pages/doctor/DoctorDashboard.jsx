@@ -1,15 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import QRScanner from '../../components/QRScanner';
-import { useAuth } from '../../context/AuthContext';
 import { profileService, doctorService } from '../../services/api';
 
 const NURSE_REQUEST_POLL = 5000;
 
+const KPICard = ({ label, value, icon, color }) => (
+  <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800 group hover:shadow-xl transition-all overflow-hidden relative">
+    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
+      <span className="text-8xl">{icon}</span>
+    </div>
+    <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 relative z-10">{label}</p>
+    <p className={`text-4xl font-black ${color} relative z-10`}>{value}</p>
+  </div>
+);
+
 const DoctorDashboard = () => {
-  const { user } = useAuth();
   const [dashboard, setDashboard] = useState(null);
-  const [affiliations, setAffiliations] = useState([]);
   const [assignedNurses, setAssignedNurses] = useState([]);
   const [otpInput, setOtpInput] = useState('');
   const [deptInput, setDeptInput] = useState('');
@@ -21,32 +28,27 @@ const DoctorDashboard = () => {
   const [accessingPatient, setAccessingPatient] = useState(false);
   const [accessMsg, setAccessMsg] = useState({ type: '', text: '' });
 
-  const [qrToken, setQrToken] = useState('');
   const [qrAccessMsg, setQrAccessMsg] = useState({ type: '', text: '' });
-  const [accessingQr, setAccessingQr] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
 
   const [accessMethod, setAccessMethod] = useState('otp');
   const [nurseRequests, setNurseRequests] = useState([]);
-  const [nurseRequestCount, setNurseRequestCount] = useState(0);
   const [showNursePopup, setShowNursePopup] = useState(false);
   const [processingRequest, setProcessingRequest] = useState(null);
   const nurseReqPollRef = useRef(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const [dashRes, affRes, nursesRes] = await Promise.all([
+      const [dashRes, nursesRes] = await Promise.all([
         doctorService.getDashboard(),
-        profileService.doctor.getAffiliations(),
         doctorService.getAssignedNurses()
       ]);
       setDashboard(dashRes.data);
-      setAffiliations(affRes.data || []);
       setAssignedNurses(nursesRes.data || []);
     } catch { /* silent */ }
-  };
+  }, []);
 
-  const fetchNurseRequests = async () => {
+  const fetchNurseRequests = useCallback(async () => {
     try {
       const [reqRes, countRes] = await Promise.all([
         doctorService.getNurseRequests('pending'),
@@ -54,17 +56,16 @@ const DoctorDashboard = () => {
       ]);
       setNurseRequests(reqRes.data || []);
       const count = countRes.data?.count || 0;
-      setNurseRequestCount(count);
       if (count > 0 && !showNursePopup) setShowNursePopup(true);
     } catch { /* silent */ }
-  };
+  }, [showNursePopup]);
 
-  useEffect(() => { fetchData(); fetchNurseRequests(); }, []);
+  useEffect(() => { fetchData(); fetchNurseRequests(); }, [fetchData, fetchNurseRequests]);
 
   useEffect(() => {
     nurseReqPollRef.current = setInterval(fetchNurseRequests, NURSE_REQUEST_POLL);
     return () => { if (nurseReqPollRef.current) clearInterval(nurseReqPollRef.current); };
-  }, []);
+  }, [fetchNurseRequests]);
 
   const handleApproveRequest = async (requestId) => {
     setProcessingRequest(requestId);
@@ -111,25 +112,14 @@ const DoctorDashboard = () => {
   const handleQRScan = async (scannedText) => {
     setShowQRScanner(false);
     let token = scannedText.startsWith('hrms:patient:') ? scannedText.replace('hrms:patient:', '') : scannedText;
-    setAccessingQr(true);
     setQrAccessMsg({ type: '', text: '' });
     try {
       const res = await doctorService.verifyQrToken(token.trim());
       setQrAccessMsg({ type: 'success', text: `✅ Access granted: ${res.data?.patientName}` });
       fetchData();
     } catch (err) { setQrAccessMsg({ type: 'error', text: err?.response?.data?.message || 'Invalid QR code.' }); }
-    finally { setAccessingQr(false); }
+    finally { /* silent */ }
   };
-
-  const KPICard = ({ label, value, icon, color }) => (
-    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800 group hover:shadow-xl transition-all overflow-hidden relative">
-      <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none`}>
-        <span className="text-8xl">{icon}</span>
-      </div>
-      <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 relative z-10">{label}</p>
-      <p className={`text-4xl font-black ${color} relative z-10`}>{value}</p>
-    </div>
-  );
 
   return (
     <DashboardLayout title="Clinical Oversight">
@@ -147,8 +137,8 @@ const DoctorDashboard = () => {
           
           {/* Patient Access Cluster */}
           <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Subject Verification</h2>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">Establish secure clinical clearance</p>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Patient Access</h2>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">Verify a patient before opening their records.</p>
 
             <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit mb-8">
               {['otp', 'qr'].map(m => (
@@ -157,7 +147,7 @@ const DoctorDashboard = () => {
                   onClick={() => setAccessMethod(m)}
                   className={`px-6 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${accessMethod === m ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-500'}`}
                 >
-                  {m === 'otp' ? 'Secure OTP' : 'Optical QR'}
+                  {m === 'otp' ? 'OTP Access' : 'QR Access'}
                 </button>
               ))}
             </div>
@@ -166,22 +156,22 @@ const DoctorDashboard = () => {
               <form onSubmit={handlePatientAccess} className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Principal Email</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Patient Email</label>
                       <input type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} placeholder="subject@node.com" className="w-full px-5 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-transparent focus:ring-2 focus:ring-indigo-500 dark:text-white font-bold transition-all outline-none" />
                    </div>
                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">6-Digit Hash</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">6-Digit OTP</label>
                       <input type="text" maxLength={6} value={patientOtp} onChange={(e) => setPatientOtp(e.target.value.replace(/\D/g, ''))} placeholder="000000" className="w-full px-5 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-transparent focus:ring-2 focus:ring-indigo-500 dark:text-white font-black tracking-[0.5em] text-center outline-none" />
                    </div>
                 </div>
                 <button type="submit" disabled={accessingPatient || !patientEmail || patientOtp.length !== 6} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50">
-                  {accessingPatient ? 'Verifying Neural Link...' : 'Synchronize Subject Access'}
+                  {accessingPatient ? 'Verifying Access...' : 'Verify Patient Access'}
                 </button>
               </form>
             ) : (
               <div className="flex flex-col items-center py-6">
                  <button onClick={() => setShowQRScanner(true)} className="w-32 h-32 bg-slate-100 dark:bg-slate-800 rounded-[2.5rem] flex items-center justify-center text-5xl hover:scale-105 transition-all shadow-inner border dark:border-slate-700 mb-6">📷</button>
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Optical scan mandatory for verification</p>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Scan a patient QR code to verify access</p>
               </div>
             )}
             {(accessMsg.text || qrAccessMsg.text) && (
@@ -193,13 +183,13 @@ const DoctorDashboard = () => {
 
           {/* Hospital Affiliation Cluster */}
           <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Network Integration</h2>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">Affiliate with clinical facilities</p>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Hospital Affiliation</h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">Use the hospital OTP to connect your account.</p>
             
             <form onSubmit={handleAffiliate} className="space-y-6">
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Facility OTP</label>
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hospital OTP</label>
                      <input type="text" maxLength={6} value={otpInput} onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))} placeholder="000000" className="w-full px-5 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-transparent focus:ring-2 focus:ring-indigo-500 dark:text-white font-black tracking-[0.5em] text-center outline-none" />
                   </div>
                   <div className="space-y-2">
@@ -208,7 +198,7 @@ const DoctorDashboard = () => {
                   </div>
                </div>
                <button type="submit" disabled={affiliating || otpInput.length !== 6} className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-50">
-                  {affiliating ? 'Integrating Node...' : 'Establish Network Affiliation'}
+                  {affiliating ? 'Connecting...' : 'Join Hospital'}
                </button>
             </form>
             {affiliateMsg.text && (
@@ -223,15 +213,15 @@ const DoctorDashboard = () => {
         <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
            <div className="flex justify-between items-center mb-10">
               <div>
-                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Clinical Support Fleet</h2>
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Nurses authorized for your operations</p>
+                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Assigned Nurses</h2>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Nurses currently assigned to support your work</p>
               </div>
               <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-black">
                  {assignedNurses.length}
               </div>
            </div>
            {assignedNurses.length === 0 ? (
-             <p className="text-center py-10 text-slate-400 font-bold uppercase tracking-widest text-[10px]">No personnel currently deployed</p>
+             <p className="text-center py-10 text-slate-400 font-bold uppercase tracking-widest text-[10px]">No assigned nurses yet</p>
            ) : (
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {assignedNurses.map((item) => (
@@ -244,8 +234,8 @@ const DoctorDashboard = () => {
                         </div>
                      </div>
                      <div className="space-y-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                        <div className="flex justify-between"><span>Node:</span> <span className="text-slate-800 dark:text-slate-200">{item.hospitalId?.name}</span></div>
-                        <div className="flex justify-between"><span>Sector:</span> <span className="text-slate-800 dark:text-slate-200">{item.department || 'N/A'}</span></div>
+                        <div className="flex justify-between"><span>Hospital:</span> <span className="text-slate-800 dark:text-slate-200">{item.hospitalId?.name}</span></div>
+                        <div className="flex justify-between"><span>Department:</span> <span className="text-slate-800 dark:text-slate-200">{item.department || 'N/A'}</span></div>
                         <div className="flex justify-between"><span>License:</span> <span className="text-slate-800 dark:text-slate-200 font-mono tracking-tighter">{item.nurse?.licenseNumber}</span></div>
                      </div>
                   </div>
@@ -292,8 +282,8 @@ const DoctorDashboard = () => {
               <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 dark:border-slate-800">
                  <div className="bg-indigo-600 p-8 flex items-center justify-between">
                     <div>
-                       <h3 className="text-xl font-black text-white">Access Protocol Authorization</h3>
-                       <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mt-1">{nurseRequests.length} Pending Actions</p>
+                    <h3 className="text-xl font-black text-white">Nurse Access Requests</h3>
+                       <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mt-1">{nurseRequests.length} Pending Requests</p>
                     </div>
                     <button onClick={() => setShowNursePopup(false)} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-2xl transition-all">&times;</button>
                  </div>
@@ -302,15 +292,15 @@ const DoctorDashboard = () => {
                        <div key={req._id} className="p-6 bg-slate-50 dark:bg-slate-800 rounded-[2rem] border border-transparent dark:border-slate-700">
                           <div className="flex justify-between items-start mb-4">
                              <div>
-                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{req.type === 'nurse_extension_request' ? 'Clock extension' : 'Data clearance'}</p>
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{req.type === 'nurse_extension_request' ? 'Access Extension' : 'Record Access'}</p>
                                 <p className="text-sm font-black dark:text-white">Nurse {req.nurse?.name}</p>
                              </div>
                              <span className="text-[9px] font-black text-slate-400 uppercase">{new Date(req.createdAt).toLocaleTimeString()}</span>
                           </div>
-                          <p className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-6 italic">Requesting {req.operation} access for Subject {req.patient?.name}</p>
+                          <p className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-6 italic">Requesting {req.operation} access for patient {req.patient?.name}</p>
                           <div className="flex gap-3">
-                             <button onClick={() => handleApproveRequest(req._id)} disabled={processingRequest === req._id} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50">Authorize</button>
-                             <button onClick={() => handleRejectRequest(req._id)} disabled={processingRequest === req._id} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50">Nullify</button>
+                             <button onClick={() => handleApproveRequest(req._id)} disabled={processingRequest === req._id} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50">Approve</button>
+                             <button onClick={() => handleRejectRequest(req._id)} disabled={processingRequest === req._id} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50">Reject</button>
                           </div>
                        </div>
                     ))}

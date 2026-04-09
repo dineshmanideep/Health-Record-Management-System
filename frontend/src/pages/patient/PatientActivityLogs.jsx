@@ -20,16 +20,31 @@ const PatientActivityLogs = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  useEffect(() => { loadLogs(page); }, [page]);
+  useEffect(() => {
+    let isActive = true;
 
-  const loadLogs = async (p) => {
-    setLoading(true);
-    try {
-      const res = await patientService.getActivityLogs(p, 15);
-      if (res.success) { setLogs(res.data); setPagination(res.pagination); }
-    } catch {}
-    setLoading(false);
-  };
+    const loadLogs = async () => {
+      setLoading(true);
+      try {
+        const res = await patientService.getActivityLogs(page, 15);
+        if (!isActive) return;
+        if (res.success) {
+          setLogs(res.data);
+          setPagination(res.pagination);
+        }
+      } catch {
+        if (!isActive) return;
+        setLogs([]);
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    };
+
+    void loadLogs();
+    return () => {
+      isActive = false;
+    };
+  }, [page]);
 
   return (
     <DashboardLayout title="Activity Logs">

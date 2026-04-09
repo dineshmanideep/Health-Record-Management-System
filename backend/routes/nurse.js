@@ -17,10 +17,15 @@ const HospitalAuditLog = require('../models/HospitalAuditLog');
 const RecordAssignment = require('../models/RecordAssignment');
 const TestAssignment = require('../models/TestAssignment');
 const TestType = require('../models/TestType');
-const { extractReportInsightsFromPdf, inferReportTag } = require('../utils/reportParser');
 const { extractDocumentText } = require('../utils/aiDocumentTextExtractor');
 const { summarizeTask } = require('../utils/aiSummarizer');
+const {
+  queueMedicalRecordPostUploadProcessing,
+  queueTestAssignmentPostUploadProcessing
+} = require('../utils/postUploadMedicalPipeline');
 const { protect, authorize } = require('../middleware/auth');
+const { hashOtp, createAsyncSideEffect, buildActor } = require('../utils/routeHelpers');
+const { getActiveAffiliation, reactivateOrCreateAffiliation } = require('../utils/affiliationHelpers');
 
 // Multer config for prescription uploads
 const ensureUploadDir = (dirPath) => {
@@ -110,7 +115,7 @@ router.put('/profile', async (req, res) => {
     const updated = await Nurse.findByIdAndUpdate(
       req.user._id,
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('-password');
 
     if (!updated) {
@@ -132,7 +137,7 @@ router.post('/affiliate', async (req, res) => {
     const { otp, department } = req.body;
     if (!otp) return res.status(400).json({ success: false, message: 'OTP is required' });
 
-    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    const otpHash = hashOtp(otp);
     const otpRecord = await HospitalOTP.findOne({
       otpHash,
       targetRole: 'nurse',
@@ -144,54 +149,44 @@ router.post('/affiliate', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
     }
 
-    // Check if nurse already has an active affiliation with ANY hospital
-    const existingAffiliation = await HospitalAffiliation.findOne({
+    const affiliationResult = await reactivateOrCreateAffiliation({
       staffId: req.user._id,
       staffRole: 'nurse',
-      status: 'active'
+      hospitalId: otpRecord.hospitalId,
+      department: department || '',
+      singleHospital: true
     });
 
-    if (existingAffiliation) {
-      const currentHospital = await Hospital.findById(existingAffiliation.hospitalId).select('name');
+    if (affiliationResult.kind === 'conflict') {
+      const currentHospital = affiliationResult.hospital;
       return res.status(409).json({ 
         success: false, 
         message: `You are already affiliated with ${currentHospital?.name || 'another hospital'}. A nurse can only work at one hospital at a time.` 
       });
     }
 
-    // Check if there's an inactive affiliation with this specific hospital
-    const existing = await HospitalAffiliation.findOne({
-      staffId: req.user._id,
-      hospitalId: otpRecord.hospitalId
-    });
-    
-    if (existing && existing.status === 'inactive') {
-      // Reactivate the affiliation
-      existing.status = 'active';
-      existing.joinedAt = new Date();
-      existing.leftAt = undefined;
-      if (department) existing.department = department;
-      await existing.save();
-      await HospitalOTP.findByIdAndUpdate(otpRecord._id, { used: true, usedBy: req.user._id });
-      const hospital = await Hospital.findById(otpRecord.hospitalId).select('name address');
-      return res.json({ success: true, data: existing, hospital });
+    if (affiliationResult.kind === 'existing_active') {
+      return res.status(409).json({
+        success: false,
+        message: 'You are already affiliated with this hospital'
+      });
     }
 
-    // Create new affiliation
-    const affiliation = await HospitalAffiliation.create({
-      staffId: req.user._id,
-      staffRole: 'nurse',
-      hospitalId: otpRecord.hospitalId,
-      department: department || ''
-    });
-
     await HospitalOTP.findByIdAndUpdate(otpRecord._id, { used: true, usedBy: req.user._id });
+    createAsyncSideEffect(
+      HospitalAuditLog.create({
+        hospital: otpRecord.hospitalId,
+        action: 'nurse_joined',
+        performedBy: buildActor(req.user, 'nurse'),
+        details: `Nurse ${req.user.name} joined the hospital`
+      })
+    );
 
-    const hospital = await Hospital.findById(otpRecord.hospitalId).select('name address');
-
-    HospitalAuditLog.create({ hospital: otpRecord.hospitalId, action: 'nurse_joined', performedBy: { id: req.user._id, role: 'nurse', name: req.user.name }, details: `Nurse ${req.user.name} joined the hospital` });
-
-    res.status(201).json({ success: true, data: affiliation, hospital });
+    res.status(affiliationResult.kind === 'created' ? 201 : 200).json({
+      success: true,
+      data: affiliationResult.affiliation,
+      hospital: affiliationResult.hospital
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
@@ -203,10 +198,9 @@ router.post('/affiliate', async (req, res) => {
 router.get('/affiliations', async (req, res) => {
   try {
     // One nurse can only be affiliated with ONE hospital
-    const affiliation = await HospitalAffiliation.findOne({
+    const affiliation = await getActiveAffiliation({
       staffId: req.user._id,
-      staffRole: 'nurse',
-      status: 'active'
+      staffRole: 'nurse'
     });
 
     if (!affiliation) {
@@ -227,10 +221,9 @@ router.get('/affiliations', async (req, res) => {
 router.get('/dashboard', async (req, res) => {
   try {
     // One nurse = one hospital
-    const affiliation = await HospitalAffiliation.findOne({ 
-      staffId: req.user._id, 
-      staffRole: 'nurse', 
-      status: 'active' 
+    const affiliation = await getActiveAffiliation({
+      staffId: req.user._id,
+      staffRole: 'nurse'
     });
 
     let hospital = null;
@@ -492,35 +485,25 @@ router.post('/assignments/:id/complete', uploadMedicalFiles, async (req, res) =>
           : 'test_report';
 
         const absolutePath = path.join(__dirname, '..', 'uploads', 'prescriptions', file.filename);
-        let reportTag = '';
-        let parsedMetrics = [];
-
-        if (category === 'test_report' && path.extname(file.originalname || '').toLowerCase() === '.pdf') {
-          try {
-            const parsed = await extractReportInsightsFromPdf(absolutePath);
-            reportTag = parsed.reportTag || inferReportTag(file.originalname || '');
-            parsedMetrics = parsed.parsedMetrics || [];
-          } catch {
-            // keep fallback tag and empty metrics
-            reportTag = inferReportTag(file.originalname || '');
-          }
-        }
-
         const extractedText = await extractDocumentText(absolutePath);
         const summaryTask = category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
         const aiSummary = await summarizeTask(summaryTask, {
-          reportTag,
+          reportTag: file.originalname || category,
           text: extractedText || `File: ${file.originalname || 'document'}\nCategory: ${category}`
         });
 
         categorizedDocuments.push({
           filePath: `/uploads/prescriptions/${file.filename}`,
           category: category,
-          reportTag,
-          parsedMetrics,
+          reportTag: '',
+          parsedMetrics: [],
           aiSummary,
           aiSummaryGeneratedAt: new Date(),
-          uploadedAt: new Date()
+          uploadedAt: new Date(),
+          llmExtraction: {
+            status: 'pending',
+            sourceType: category
+          }
         });
       }
     }
@@ -536,7 +519,12 @@ router.post('/assignments/:id/complete', uploadMedicalFiles, async (req, res) =>
       prescriptionNotes: prescription,
       categorizedDocuments,
       prescriptionDocuments: categorizedDocuments.map((doc) => doc.filePath),
-      prescriptionDocument: categorizedDocuments[0]?.filePath
+      prescriptionDocument: categorizedDocuments[0]?.filePath,
+      structuredData: {
+        extractionStatus: categorizedDocuments.length ? 'pending' : 'skipped',
+        normalizedFields: {},
+        numericFields: {}
+      }
     });
 
     // Add to patient's medicalRecords array
@@ -574,6 +562,10 @@ router.post('/assignments/:id/complete', uploadMedicalFiles, async (req, res) =>
       title: 'Assignment Completed',
       message: `Nurse ${req.user.name} completed the record assignment for patient ${assignment.patient?.name || 'Unknown'}.`
     }).catch(() => {});
+
+    if (categorizedDocuments.length > 0) {
+      queueMedicalRecordPostUploadProcessing(record._id);
+    }
 
     res.status(201).json({ 
       success: true, 
@@ -731,35 +723,25 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
           : 'test_report';
 
         const absolutePath = path.join(__dirname, '..', 'uploads', 'test-results', file.filename);
-        let reportTag = '';
-        let parsedMetrics = [];
-
-        if (category === 'test_report' && path.extname(file.originalname || '').toLowerCase() === '.pdf') {
-          try {
-            const parsed = await extractReportInsightsFromPdf(absolutePath);
-            reportTag = parsed.reportTag || inferReportTag(file.originalname || assignment?.testType?.name || '');
-            parsedMetrics = parsed.parsedMetrics || [];
-          } catch {
-            // keep fallback tag and empty metrics
-            reportTag = inferReportTag(file.originalname || assignment?.testType?.name || '');
-          }
-        }
-
         const extractedText = await extractDocumentText(absolutePath);
         const summaryTask = category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
         const aiSummary = await summarizeTask(summaryTask, {
-          reportTag,
+          reportTag: file.originalname || assignment?.testType?.name || category,
           text: extractedText || `File: ${file.originalname || 'document'}\nCategory: ${category}`
         });
 
         resultDocuments.push({
           filePath: `/uploads/test-results/${file.filename}`,
           category: category,
-          reportTag,
-          parsedMetrics,
+          reportTag: '',
+          parsedMetrics: [],
           aiSummary,
           aiSummaryGeneratedAt: new Date(),
-          uploadedAt: new Date()
+          uploadedAt: new Date(),
+          llmExtraction: {
+            status: 'pending',
+            sourceType: category
+          }
         });
       }
     }
@@ -767,6 +749,11 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
     assignment.status = 'completed';
     assignment.results = results || '';
     assignment.resultDocuments = resultDocuments;
+    assignment.structuredData = {
+      extractionStatus: resultDocuments.length ? 'pending' : 'skipped',
+      normalizedFields: {},
+      numericFields: {}
+    };
     assignment.completedAt = new Date();
     await assignment.save();
 
@@ -797,6 +784,10 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
       relatedId: assignment._id
     });
 
+    if (resultDocuments.length > 0) {
+      queueTestAssignmentPostUploadProcessing(assignment._id);
+    }
+
     res.json({ 
       success: true, 
       message: 'Test assignment completed successfully',
@@ -808,4 +799,3 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
 });
 
 module.exports = router;
-

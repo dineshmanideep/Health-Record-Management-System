@@ -1,17 +1,8 @@
-const fs = require('fs');
-const path = require('path');
-
-const AI_CONFIG = {
-  provider: 'gemini',
-  gemini: {
-    textModel: 'gemini-2.0-flash',
-    audioModel: 'gemini-2.0-flash'
-  },
-  openai: {
-    textModel: 'gpt-4.1-mini',
-    audioModel: 'gpt-4o-mini-transcribe'
-  },
-  maxInputChars: 7000
+const OLLAMA_CONFIG = {
+  model: 'qwen2.5vl:7b',
+  generateUrl: 'http://localhost:11434/api/generate',
+  maxInputChars: 7000,
+  timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS || 300000)
 };
 
 function buildPrompt(task, payload = {}) {
@@ -66,156 +57,57 @@ function fallbackSummary(task, payload = {}) {
   return 'AI summary is temporarily unavailable. Please review this report directly.';
 }
 
-async function callGeminiText(prompt) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
-  const model = AI_CONFIG.gemini.textModel;
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+async function callOllamaGenerate({ prompt, images = [] }) {
+  const response = await fetch(OLLAMA_CONFIG.generateUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(OLLAMA_CONFIG.timeoutMs),
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 400 }
+      model: OLLAMA_CONFIG.model,
+      prompt,
+      stream: false,
+      images: images.length ? images : undefined
     })
   });
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    const body = await response.text();
+    return {
+      content: null,
+      error: `Ollama request failed (${response.status}): ${body.slice(0, 800)}`
+    };
+  }
+
   const data = await response.json();
-  return data?.candidates?.[0]?.content?.parts?.map((part) => part?.text || '').join('\n').trim() || null;
-}
-
-async function callOpenAIText(prompt) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-
-  const model = AI_CONFIG.openai.textModel;
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.3,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-
-  if (!response.ok) return null;
-  const data = await response.json();
-  return data?.choices?.[0]?.message?.content?.trim() || null;
+  return {
+    content: String(data?.response || '').trim() || null,
+    error: ''
+  };
 }
 
 async function summarizeTask(task, payload = {}) {
-  const inputText = String(payload.text || '').slice(0, AI_CONFIG.maxInputChars);
+  const inputText = String(payload.text || '').slice(0, OLLAMA_CONFIG.maxInputChars);
   const prompt = buildPrompt(task, { ...payload, text: inputText });
 
   try {
-    let output = null;
-    if (AI_CONFIG.provider === 'openai') {
-      output = await callOpenAIText(prompt);
-    } else {
-      output = await callGeminiText(prompt);
-    }
-
-    return output || fallbackSummary(task, payload);
+    const result = await callOllamaGenerate({ prompt });
+    return result.content || fallbackSummary(task, payload);
   } catch {
     return fallbackSummary(task, payload);
   }
 }
 
-async function transcribeWithOpenAI(filePath, mimeType) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || !fs.existsSync(filePath)) return null;
-
-  const buffer = fs.readFileSync(filePath);
-  const blob = new Blob([buffer], { type: mimeType || 'audio/mpeg' });
-  const form = new FormData();
-  form.append('model', AI_CONFIG.openai.audioModel);
-  form.append('file', blob, path.basename(filePath));
-
-  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form
-  });
-
-  if (!response.ok) return null;
-  const data = await response.json();
-  return String(data?.text || '').trim() || null;
-}
-
-async function transcribeWithGemini(filePath, mimeType) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || !fs.existsSync(filePath)) return null;
-
-  const fileBuffer = fs.readFileSync(filePath);
-  if (fileBuffer.length > 10 * 1024 * 1024) return null;
-
-  const model = AI_CONFIG.gemini.audioModel;
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            { text: 'Transcribe this medical voice note. Return plain transcript text only.' },
-            {
-              inlineData: {
-                mimeType: mimeType || 'audio/mpeg',
-                data: fileBuffer.toString('base64')
-              }
-            }
-          ]
-        }
-      ],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 700 }
-    })
-  });
-
-  if (!response.ok) return null;
-  const data = await response.json();
-  const transcript = data?.candidates?.[0]?.content?.parts?.map((part) => part?.text || '').join('\n').trim() || null;
-  return transcript;
-}
-
-async function transcribeVoiceNote(filePath, mimeType) {
-  try {
-    let transcript = null;
-    if (AI_CONFIG.provider === 'openai') {
-      transcript = await transcribeWithOpenAI(filePath, mimeType);
-    } else {
-      transcript = await transcribeWithGemini(filePath, mimeType);
-    }
-
-    if (!transcript) {
-      return {
-        status: 'failed',
-        transcript: 'Automatic transcript is not available right now.',
-        error: 'No transcript returned from provider'
-      };
-    }
-
-    const cleaned = await summarizeTask('voice_transcript_cleanup', { text: transcript });
-    return {
-      status: 'completed',
-      transcript: cleaned || transcript,
-      error: ''
-    };
-  } catch (error) {
-    return {
-      status: 'failed',
-      transcript: 'Automatic transcript is not available right now.',
-      error: error?.message || 'Transcription failed'
-    };
-  }
+async function transcribeVoiceNote() {
+  return {
+    status: 'failed',
+    transcript: 'Automatic transcript is not available right now.',
+    error: 'Voice transcription is not supported by the local Ollama setup'
+  };
 }
 
 module.exports = {
   summarizeTask,
   transcribeVoiceNote,
-  AI_CONFIG
+  OLLAMA_CONFIG,
+  callOllamaGenerate
 };
