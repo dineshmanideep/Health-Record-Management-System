@@ -84,6 +84,24 @@ PORT=5000
 MONGODB_URI=mongodb://localhost:27017/health-record-system
 JWT_SECRET=your_jwt_secret_key_change_this_in_production
 NODE_ENV=development
+
+# AI provider switch: local (Ollama) or gemini
+AI_PROVIDER=local
+AI_FALLBACK_PROVIDER=local
+AI_FAILOVER_ON_PROVIDER_ERROR=true
+
+# Shared AI limits
+AI_MAX_INPUT_CHARS=7000
+AI_TIMEOUT_MS=300000
+AI_TRACE_ENABLED=true
+
+# Local Ollama configuration (used when AI_PROVIDER=local)
+OLLAMA_MODEL=qwen2.5vl:7b
+OLLAMA_GENERATE_URL=http://localhost:11434/api/generate
+
+# Gemini configuration (used when AI_PROVIDER=gemini)
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
 4. Start the backend server:

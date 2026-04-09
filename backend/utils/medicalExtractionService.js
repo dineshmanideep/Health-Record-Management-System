@@ -4,7 +4,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
-const { OLLAMA_CONFIG, callOllamaGenerate } = require('./aiSummarizer');
+const { AI_RUNTIME_CONFIG, callModelGenerate, aiTrace, createTraceId } = require('./aiSummarizer');
 const { extractDocumentText } = require('./aiDocumentTextExtractor');
 const { validateMedicalExtractionResponse } = require('./medicalExtractionValidator');
 const { normalizeFieldEntries } = require('./medicalFieldNormalization');
@@ -93,14 +93,17 @@ async function createPdfPreviewImage(filePath = '') {
   return fs.existsSync(fallbackPath) ? fallbackPath : '';
 }
 
-function buildOllamaImages(filePath = '') {
+function buildModelImages(filePath = '') {
   if (!filePath || !fs.existsSync(filePath)) return [];
   if (!IMAGE_EXTENSIONS.has(path.extname(filePath).toLowerCase())) return [];
-  return [fs.readFileSync(filePath).toString('base64')];
+  return [{
+    data: fs.readFileSync(filePath).toString('base64'),
+    mimeType: detectMimeType(filePath)
+  }];
 }
 
 async function requestMedicalExtraction({ filePath, fallbackText }) {
-  const sourceText = await extractDocumentText(filePath, { maxChars: OLLAMA_CONFIG.maxInputChars });
+  const sourceText = await extractDocumentText(filePath, { maxChars: AI_RUNTIME_CONFIG.maxInputChars });
   const visionInputPath = sourceText
     ? ''
     : (
@@ -110,21 +113,36 @@ async function requestMedicalExtraction({ filePath, fallbackText }) {
     );
 
   const prompt = buildExtractionPrompt({
-    text: sourceText || String(fallbackText || '').slice(0, OLLAMA_CONFIG.maxInputChars)
+    text: sourceText || String(fallbackText || '').slice(0, AI_RUNTIME_CONFIG.maxInputChars)
   });
 
-  return callOllamaGenerate({
+  return callModelGenerate({
     prompt,
-    images: buildOllamaImages(visionInputPath)
+    images: buildModelImages(visionInputPath)
   });
 }
 
 async function extractStructuredMedicalData(options = {}) {
+  const traceId = createTraceId('ext');
+  aiTrace('structured_extraction_start', {
+    traceId,
+    provider: AI_RUNTIME_CONFIG.provider,
+    sourceFile: path.basename(options?.filePath || '') || 'unknown',
+    hasFallbackText: Boolean(options?.fallbackText)
+  });
+
   const result = await requestMedicalExtraction(options);
+  const activeProvider = result?.providerUsed || AI_RUNTIME_CONFIG.provider;
   const rawResponse = result?.content || '';
   const providerError = result?.error || '';
 
   if (!rawResponse) {
+    aiTrace('structured_extraction_failed', {
+      traceId,
+      provider: activeProvider,
+      stage: 'provider_response',
+      reason: (providerError || 'empty_content').slice(0, 160)
+    });
     return {
       success: false,
       status: 'failed',
@@ -140,6 +158,12 @@ async function extractStructuredMedicalData(options = {}) {
 
   const validation = validateMedicalExtractionResponse(rawResponse);
   if (!validation.valid) {
+    aiTrace('structured_extraction_failed', {
+      traceId,
+      provider: activeProvider,
+      stage: 'validation',
+      errorCount: (validation.errors || []).length
+    });
     return {
       success: false,
       status: 'failed',
@@ -157,6 +181,14 @@ async function extractStructuredMedicalData(options = {}) {
   const diagnosis = canonicalizeDiagnosis(validation.data.diagnosis);
   const specialization = canonicalizeSpecialization(validation.data.specialization);
   const medications = canonicalizeMedicationList(validation.data.medications);
+
+  aiTrace('structured_extraction_complete', {
+    traceId,
+    provider: activeProvider,
+    normalizedFieldCount: Object.keys(normalized.normalizedFields || {}).length,
+    numericFieldCount: Object.keys(normalized.numericFields || {}).length,
+    metricCount: (normalized.parsedMetrics || []).length
+  });
 
   return {
     success: true,
