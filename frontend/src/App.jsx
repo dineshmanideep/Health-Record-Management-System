@@ -50,6 +50,7 @@ import AdminNurses from './pages/admin/AdminNurses';
 
 import { ThemeProvider } from './context/ThemeContext';
 import { AccessibilityProvider } from './context/AccessibilityContext';
+import ContextVoiceHelpButton from './components/ContextVoiceHelpButton';
 
 function App() {
   return (
@@ -326,6 +327,7 @@ function App() {
           {/* Final catch-all → role-aware redirect via /dashboard */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        <ContextVoiceHelpButton />
         </AccessibilityProvider>
       </AuthProvider>
     </Router>

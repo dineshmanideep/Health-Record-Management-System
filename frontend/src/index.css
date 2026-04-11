@@ -61,6 +61,11 @@ body {
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+@keyframes voice-help-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+  70% { box-shadow: 0 0 0 9px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
 
 /* ===== Animation Utility Classes ===== */
 .animate-fadeIn { animation: fadeIn 0.5s ease-out forwards; }
@@ -226,6 +231,17 @@ html[data-a11y-form-assist='on'] textarea:invalid,
 html[data-a11y-form-assist='on'] select:invalid {
   border-color: #dc2626 !important;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.voice-help-highlight {
+  outline: 3px solid #10b981 !important;
+  outline-offset: 2px;
+  border-radius: 0.75rem;
+  animation: voice-help-pulse 1s ease-in-out 2;
+}
+
+html[data-a11y-mode='on'] .voice-help-highlight {
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
