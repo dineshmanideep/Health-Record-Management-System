@@ -4,8 +4,8 @@ import { profileService } from '../../services/api';
 
 // ── Defined OUTSIDE to avoid remounting on every render ──
 const InfoRow = ({ label, value }) => (
-  <div className="flex items-center py-6 border-b border-slate-100 dark:border-slate-800/50 last:border-0 group">
-    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.22em] w-64 shrink-0 italic group-hover:text-teal-500 transition-colors">{label}</span>
+  <div className="flex flex-col sm:items-center sm:flex-row py-4 md:py-6 border-b border-slate-100 dark:border-slate-800/50 last:border-0 group">
+    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.22em] sm:w-64 shrink-0 italic group-hover:text-teal-500 transition-colors mb-2 sm:mb-0">{label}</span>
     <span className="text-sm font-black text-slate-800 dark:text-white flex-1 uppercase tracking-widest">{value ?? 'Registry Null'}</span>
   </div>
 );
@@ -106,7 +106,7 @@ const HospitalProfile = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             {/* Institution Header */}
-            <div className="lg:col-span-12 bg-white dark:bg-slate-900 rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800 p-10 relative overflow-hidden group">
+            <div className="lg:col-span-12 bg-white dark:bg-slate-900 rounded-3xl md:rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800 p-6 md:p-10 relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/5 dark:bg-teal-500/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl" />
               <div className="flex flex-col md:flex-row md:items-center gap-10 relative z-10">
                 <div className="w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white text-4xl font-black shadow-2xl shadow-teal-500/20 shrink-0 border-4 border-white dark:border-slate-800 group-hover:scale-105 transition-transform">
@@ -141,7 +141,7 @@ const HospitalProfile = () => {
 
             {/* Metric Matrix */}
             <div className="lg:col-span-8 space-y-10">
-              <div className="bg-white dark:bg-slate-900 rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800 overflow-hidden shadow-sm">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="px-10 py-8 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                   <div>
                     <h3 className="text-xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Institution Artifacts</h3>
@@ -158,7 +158,7 @@ const HospitalProfile = () => {
                 </div>
 
                 {editing ? (
-                  <div className="p-10 space-y-8">
+                  <div className="p-6 md:p-10 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div>
                         <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Subject Identifier</label>
@@ -222,7 +222,7 @@ const HospitalProfile = () => {
               </div>
 
               {/* Geographic Coordinates */}
-              <div className="bg-white dark:bg-slate-900 rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800 overflow-hidden shadow-sm">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="px-10 py-8 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                   <div>
                     <h3 className="text-xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Geospatial Registry</h3>
@@ -239,7 +239,7 @@ const HospitalProfile = () => {
                 </div>
 
                 {editAddr ? (
-                  <div className="p-10 space-y-8">
+                  <div className="p-6 md:p-10 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {[
                         { label: 'Vector Street', key: 'street' },
@@ -310,7 +310,7 @@ const HospitalProfile = () => {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 p-10 rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800">
+              <div className="bg-white dark:bg-slate-900 p-6 md:p-10 rounded-3xl md:rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800">
                 <h3 className="text-[10px] font-black text-slate-950 dark:text-white mb-8 uppercase tracking-[0.3em] flex items-center gap-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
                   Capabilities

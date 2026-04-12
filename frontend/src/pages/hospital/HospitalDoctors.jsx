@@ -48,7 +48,7 @@ const HospitalDoctors = () => {
           </div>
         )}
 
-        <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 transition-all">
+        <div className="bg-white dark:bg-slate-900 p-6 md:p-10 rounded-3xl md:rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 transition-all">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div>
               <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase flex items-center gap-4">
@@ -74,7 +74,7 @@ const HospitalDoctors = () => {
              <p className="mt-8 text-slate-400 font-black tracking-[0.3em] uppercase text-[10px]">Scanning Physician Registry...</p>
           </div>
         ) : doctors.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 p-32 rounded-[3.5rem] shadow-sm text-center border border-slate-200/50 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 p-12 md:p-32 rounded-3xl md:rounded-[3.5rem] shadow-sm text-center border border-slate-200/50 dark:border-slate-800">
             <p className="text-8xl mb-10 grayscale opacity-10">⚕️</p>
             <p className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.4em] text-[11px] mb-4">Registry Null</p>
             <p className="text-slate-400 dark:text-slate-600 text-sm font-bold max-w-xs mx-auto leading-relaxed">No medical practitioners affiliated yet. Share a secure OTP to initiate registration.</p>
@@ -84,7 +84,7 @@ const HospitalDoctors = () => {
             {doctors.map((d) => (
               <div 
                 key={d.affiliationId} 
-                className="bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200/50 dark:border-slate-800 p-10 hover:shadow-2xl transition-all duration-500 group relative overflow-hidden"
+                className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[3rem] border border-slate-200/50 dark:border-slate-800 p-6 md:p-10 hover:shadow-2xl transition-all duration-500 group relative overflow-hidden"
               >
                 {/* Decorative accent */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-emerald-500/10 transition-colors" />

@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
+import LoadingScreen from '../../components/LoadingScreen';
+import toast from 'react-hot-toast';
 import { profileService } from '../../services/api';
 
 const KPICard = ({ label, value, icon, color }) => (
-  <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800 group hover:shadow-xl transition-all overflow-hidden relative">
-    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
-      <span className="text-8xl">{icon}</span>
+  <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800 group hover:shadow-xl transition-all overflow-hidden relative">
+    <div className="absolute top-0 right-0 p-6 md:p-8 opacity-5 group-hover:scale-110 transition-transform pointer-events-none">
+      <span className="text-6xl md:text-8xl">{icon}</span>
     </div>
     <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 relative z-10">{label}</p>
-    <p className={`text-4xl font-black ${color} relative z-10`}>{value}</p>
+    <p className={`text-3xl md:text-4xl font-black ${color} relative z-10`}>{value}</p>
   </div>
 );
 
@@ -23,7 +25,7 @@ const HospitalDashboard = () => {
   useEffect(() => {
     profileService.hospital.getDashboard()
       .then((res) => { if (res.success) setData(res.data); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -35,7 +37,7 @@ const HospitalDashboard = () => {
       const res = await profileService.hospital.generateOTP(targetRole);
       setOtp({ value: res.otp, expiresAt: new Date(res.expiresAt), targetRole });
     } catch (err) {
-      setOtpError(err?.response?.data?.message || 'Failed to generate OTP');
+      toast.error(err?.response?.data?.message || 'Failed to generate OTP');
     } finally {
       setGenerating(false);
     }
@@ -65,10 +67,7 @@ const HospitalDashboard = () => {
     <DashboardLayout title="Hospital Dashboard">
       <div className="max-w-7xl mx-auto space-y-8 pb-20 px-4 sm:px-0">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-32 animate-pulse">
-            <div className="w-12 h-12 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Loading hospital dashboard...</p>
-          </div>
+          <LoadingScreen message="Establishing Hospital Operations Node" />
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -78,7 +77,7 @@ const HospitalDashboard = () => {
               <KPICard label="Total Beds" value={data?.totalBeds ?? 0} icon="🏢" color="text-slate-400" />
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+            <div className="bg-white dark:bg-slate-900 p-6 md:p-10 rounded-3xl md:rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
               <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-8 tracking-tight">Quick Actions</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Link to="/hospital/tests" className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-[2rem] hover:bg-slate-900 dark:hover:bg-white group transition-all">
@@ -106,7 +105,7 @@ const HospitalDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+              <div className="bg-white dark:bg-slate-900 p-6 md:p-10 rounded-3xl md:rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Staff Onboarding</h2>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10 leading-relaxed">Generate temporary codes to connect doctors and nurses to your hospital.</p>
 
@@ -119,8 +118,6 @@ const HospitalDashboard = () => {
                   </button>
                 </div>
 
-                {otpError && <p className="text-red-600 text-[10px] font-black uppercase tracking-widest text-center mb-6">{otpError}</p>}
-
                 {otp.value && (
                   <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-900/30 rounded-[2.5rem] p-8 animate-fade-in text-center">
                     <p className="text-[10px] font-black text-teal-700 dark:text-teal-400 uppercase tracking-widest mb-4">
@@ -132,7 +129,7 @@ const HospitalDashboard = () => {
                 )}
               </div>
 
-              <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 overflow-hidden flex flex-col">
+              <div className="bg-white dark:bg-slate-900 p-6 md:p-10 rounded-3xl md:rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 overflow-hidden flex flex-col">
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-8">Recent Activity</h2>
                 {!data?.recentLogs?.length ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center py-12">

@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+import LoadingScreen from '../../components/LoadingScreen';
+import toast from 'react-hot-toast';
 import QRScanner from '../../components/QRScanner';
 import { profileService, doctorService } from '../../services/api';
 
@@ -21,7 +23,7 @@ const DoctorDashboard = () => {
   const [otpInput, setOtpInput] = useState('');
   const [deptInput, setDeptInput] = useState('');
   const [affiliating, setAffiliating] = useState(false);
-  const [affiliateMsg, setAffiliateMsg] = useState({ type: '', text: '' });
+  const [loading, setLoading] = useState(true);
 
   const [patientEmail, setPatientEmail] = useState('');
   const [patientOtp, setPatientOtp] = useState('');
@@ -38,6 +40,7 @@ const DoctorDashboard = () => {
   const nurseReqPollRef = useRef(null);
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       const [dashRes, nursesRes] = await Promise.all([
         doctorService.getDashboard(),
@@ -45,7 +48,11 @@ const DoctorDashboard = () => {
       ]);
       setDashboard(dashRes.data);
       setAssignedNurses(nursesRes.data || []);
-    } catch { /* silent */ }
+    } catch { 
+      toast.error('Failed to synchronize clinical data');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const fetchNurseRequests = useCallback(async () => {
@@ -90,10 +97,13 @@ const DoctorDashboard = () => {
     setAffiliateMsg({ type: '', text: '' });
     try {
       const data = await profileService.doctor.affiliate(otpInput.trim(), deptInput.trim());
-      setAffiliateMsg({ type: 'success', text: `Successfully affiliated with ${data.hospital?.name}!` });
+      toast.success(`Affiliated with ${data.hospital?.name}`);
       setOtpInput(''); setDeptInput(''); fetchData();
-    } catch (err) { setAffiliateMsg({ type: 'error', text: err?.response?.data?.message || 'Affiliation failed.' }); }
-    finally { setAffiliating(false); }
+    } catch (err) { 
+      toast.error(err?.response?.data?.message || 'Affiliation failed.');
+    } finally { 
+      setAffiliating(false); 
+    }
   };
 
   const handlePatientAccess = async (e) => {
@@ -103,10 +113,13 @@ const DoctorDashboard = () => {
     setAccessMsg({ type: '', text: '' });
     try {
       const res = await doctorService.verifyPatientOtp(patientEmail.trim(), patientOtp.trim());
-      setAccessMsg({ type: 'success', text: `Access granted: ${res.data?.patientName}` });
+      toast.success(`Access granted: ${res.data?.patientName}`);
       setPatientEmail(''); setPatientOtp(''); fetchData();
-    } catch (err) { setAccessMsg({ type: 'error', text: err?.response?.data?.message || 'OTP verification failed.' }); }
-    finally { setAccessingPatient(false); }
+    } catch (err) { 
+      toast.error(err?.response?.data?.message || 'OTP verification failed.');
+    } finally { 
+      setAccessingPatient(false); 
+    }
   };
 
   const handleQRScan = async (scannedText) => {
@@ -115,15 +128,19 @@ const DoctorDashboard = () => {
     setQrAccessMsg({ type: '', text: '' });
     try {
       const res = await doctorService.verifyQrToken(token.trim());
-      setQrAccessMsg({ type: 'success', text: `✅ Access granted: ${res.data?.patientName}` });
+      toast.success(`Access granted: ${res.data?.patientName}`);
       fetchData();
-    } catch (err) { setQrAccessMsg({ type: 'error', text: err?.response?.data?.message || 'Invalid QR code.' }); }
-    finally { /* silent */ }
+    } catch (err) { 
+      toast.error(err?.response?.data?.message || 'Invalid QR code.');
+    } finally { /* silent */ }
   };
 
   return (
     <DashboardLayout title="Clinical Oversight">
-      <div className="max-w-7xl mx-auto space-y-8 pb-20 px-4 sm:px-0">
+      {loading ? (
+        <LoadingScreen message="Establishing Clinical Environment" />
+      ) : (
+        <div className="max-w-7xl mx-auto space-y-8 pb-20 px-4 sm:px-0">
         
         {/* KPI Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -174,11 +191,6 @@ const DoctorDashboard = () => {
                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Scan a patient QR code to verify access</p>
               </div>
             )}
-            {(accessMsg.text || qrAccessMsg.text) && (
-              <div className={`mt-6 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest text-center ${ (accessMsg.type === 'success' || qrAccessMsg.type === 'success') ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                {accessMsg.text || qrAccessMsg.text}
-              </div>
-            )}
           </div>
 
           {/* Hospital Affiliation Cluster */}
@@ -201,11 +213,6 @@ const DoctorDashboard = () => {
                   {affiliating ? 'Connecting...' : 'Join Hospital'}
                </button>
             </form>
-            {affiliateMsg.text && (
-              <div className={`mt-6 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest text-center ${ affiliateMsg.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                {affiliateMsg.text}
-              </div>
-            )}
           </div>
         </div>
 
@@ -309,7 +316,8 @@ const DoctorDashboard = () => {
            </div>
         )}
 
-      </div>
+        </div>
+      )}
       {showQRScanner && <QRScanner onScan={handleQRScan} onError={() => {}} onClose={() => setShowQRScanner(false)} />}
     </DashboardLayout>
   );

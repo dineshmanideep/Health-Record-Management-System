@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -12,7 +13,6 @@ const Login = () => {
     password: '',
     role: 'user'
   });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   if (authLoading) return null;
@@ -23,20 +23,19 @@ const Login = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
-    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
     const result = await login(formData);
     
     if (result.success) {
+      toast.success(`Welcome back, ${formData.email.split('@')[0]}!`);
       navigate('/dashboard');
     } else {
-      setError(result.message || 'Login failed. Please try again.');
+      toast.error(result.message || 'Login failed. Please try again.');
     }
     
     setLoading(false);
@@ -74,18 +73,7 @@ const Login = () => {
           </p>
         </div>
         
-        <div className="relative z-10 flex gap-6">
-          {[
-            { val: '256-bit', label: 'Encrypted' },
-            { val: 'HIPAA', label: 'Compliant' },
-            { val: '99.9%', label: 'Uptime' }
-          ].map((s, i) => (
-            <div key={i}>
-              <p className="text-xl font-extrabold text-white">{s.val}</p>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{s.label}</p>
-            </div>
-          ))}
-        </div>
+        {/* Stats removed for cleaner UI */}
       </div>
 
       {/* Right Panel - Form */}
@@ -109,17 +97,11 @@ const Login = () => {
             <p className="text-sm text-slate-500 dark:text-slate-400">Enter your credentials to access the dashboard</p>
           </div>
 
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3.5 rounded-xl border border-red-100 dark:border-red-900/30 mb-6 text-sm font-medium animate-fadeIn flex items-center gap-2">
-              <span>⚠️</span> {error}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Role Selection */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2.5 uppercase tracking-wider">Select Role</label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 {roleOptions.map((role) => (
                   <button
                     key={role.value}

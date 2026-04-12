@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
+import LoadingScreen from '../../components/LoadingScreen';
+import toast from 'react-hot-toast';
 import { doctorService } from '../../services/api';
 
 const DoctorAssignRecords = () => {
@@ -37,6 +39,7 @@ const DoctorAssignRecords = () => {
       setNurses(nursesRes.data || []);
       setAssignments(assignmentsRes.data || []);
     } catch (error) {
+      toast.error('Failed to synchronize deployment data');
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
@@ -110,10 +113,10 @@ const DoctorAssignRecords = () => {
     
     try {
       await doctorService.cancelAssignment(id);
+      toast.success('Assignment aborted successfully');
       fetchData();
     } catch (error) {
-      console.error('Error cancelling assignment:', error);
-      alert('Failed to cancel assignment');
+      toast.error('Abort sequence failed. Please retry.');
     }
   };
 
@@ -130,7 +133,7 @@ const DoctorAssignRecords = () => {
   return (
     <DashboardLayout title="Assign Medical Records">
       {loading ? (
-        <p className="text-gray-500">Loading...</p>
+        <LoadingScreen message="Initializing Clinical Protocol" />
       ) : (
         <>
           {/* Header */}

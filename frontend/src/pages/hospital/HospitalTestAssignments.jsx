@@ -221,12 +221,12 @@ const HospitalTestAssignments = () => {
             { label: 'In Progress', value: stats.in_progress, icon: '⚙️', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
             { label: 'Completed', value: stats.completed, icon: '✅', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' }
           ].map((s) => (
-            <div key={s.label} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800 relative overflow-hidden group hover:shadow-md transition-all">
-              <div className={`absolute top-0 right-0 w-16 h-16 ${s.bg} blur-xl rounded-full -translate-y-1/2 translate-x-1/2 opacity-60`} />
-              <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{s.label}</p>
+            <div key={s.label} className="bg-white dark:bg-slate-900 p-4 md:p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800 relative overflow-hidden group hover:shadow-md transition-all">
+              <div className={`absolute top-0 right-0 w-12 h-12 md:w-16 md:h-16 ${s.bg} blur-xl rounded-full -translate-y-1/2 translate-x-1/2 opacity-60`} />
+              <p className="text-[9px] md:text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{s.label}</p>
               <div className="flex items-end justify-between">
-                <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-                <span className="text-xl opacity-40">{s.icon}</span>
+                <p className={`text-xl md:text-2xl font-extrabold ${s.color}`}>{s.value}</p>
+                <span className="text-lg md:text-xl opacity-40">{s.icon}</span>
               </div>
             </div>
           ))}
@@ -260,7 +260,7 @@ const HospitalTestAssignments = () => {
 
         {/* Create Assignment Form */}
         {showCreateForm && (
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border-4 border-emerald-500/10 mb-8 animate-in zoom-in-95 duration-300">
+          <div className="bg-white dark:bg-slate-900 p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] shadow-xl border-4 border-emerald-500/10 mb-8 animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-10">
                <div>
                   <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">New Assignment Protocol</h3>
@@ -270,14 +270,14 @@ const HospitalTestAssignments = () => {
             </div>
 
             {/* Step 1: Verify Patient */}
-            <div className="mb-10 p-8 bg-slate-50 dark:bg-slate-800/80 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-700">
+            <div className="mb-10 p-6 md:p-8 bg-slate-50 dark:bg-slate-800/80 rounded-3xl md:rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-700">
               <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Phase I: Subject Verification
               </h4>
               
               {!verifiedPatient ? (
                 <div className="space-y-8">
-                  <div className="flex gap-4 p-1.5 bg-white dark:bg-slate-900 rounded-2xl w-fit border border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-wrap gap-2 md:gap-4 p-1.5 bg-white dark:bg-slate-900 rounded-2xl w-full sm:w-fit border border-slate-100 dark:border-slate-800">
                     {[
                       { id: 'email', label: 'EMAIL & OTP', icon: '📧' },
                       { id: 'qr', label: 'QR SCANNER', icon: '📷' }
@@ -476,7 +476,7 @@ const HospitalTestAssignments = () => {
         </div>
 
         {/* Assignments Table */}
-        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200/60 dark:border-slate-800 overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[2.5rem] border border-slate-200/60 dark:border-slate-800 overflow-hidden shadow-sm">
           {loading ? (
              <div className="flex items-center justify-center py-24">
                 <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />

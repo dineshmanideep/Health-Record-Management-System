@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+import LoadingScreen from '../../components/LoadingScreen';
+import toast from 'react-hot-toast';
 import { profileService } from '../../services/api';
 
 const InfoRow = ({ label, value, icon }) => (
@@ -18,8 +20,7 @@ const inputCls = "w-full px-6 py-4 rounded-[1.5rem] bg-slate-50 dark:bg-slate-95
 
 const PatientProfile = () => {
   const [profile, setProfile] = useState(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(true);
   const [editProfile, setEditProfile] = useState(false);
   const [editEmergency, setEditEmergency] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -49,14 +50,13 @@ const PatientProfile = () => {
           syncForms(res.data);
         }
       })
-      .catch(() => setError('Failed to load profile.'));
+      .catch(() => toast.error('Failed to retrieve medical identity record'))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleProfileSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setError('');
-    setSuccess('');
 
     try {
       const res = await profileService.patient.update(form);
@@ -64,11 +64,10 @@ const PatientProfile = () => {
         setProfile(res.data);
         syncForms(res.data);
         setEditProfile(false);
-        setSuccess('Profile updated successfully.');
-        setTimeout(() => setSuccess(''), 3000);
+        toast.success('Medical identity updated successfully');
       }
     } catch {
-      setError('Failed to update profile.');
+      toast.error('Identity update synchronization failed');
     }
 
     setSaving(false);
@@ -77,8 +76,6 @@ const PatientProfile = () => {
   const handleEmergencySave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setError('');
-    setSuccess('');
 
     try {
       const res = await profileService.patient.update({ emergencyContact: ecForm });
@@ -86,11 +83,10 @@ const PatientProfile = () => {
         setProfile(res.data);
         syncForms(res.data);
         setEditEmergency(false);
-        setSuccess('Emergency contact updated successfully.');
-        setTimeout(() => setSuccess(''), 3000);
+        toast.success('Emergency protocol updated');
       }
     } catch {
-      setError('Failed to update emergency contact.');
+      toast.error('Emergency contact synchronization failed');
     }
 
     setSaving(false);
@@ -102,22 +98,8 @@ const PatientProfile = () => {
   return (
     <DashboardLayout title="My Profile">
       <div className="max-w-6xl mx-auto space-y-10 pb-24">
-        {error && (
-          <div className="bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 p-6 rounded-[2.5rem] border-l-4 border-rose-500 shadow-xl shadow-rose-500/10 text-[10px] font-black uppercase tracking-widest animate-in slide-in-from-top-4 duration-500">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 p-6 rounded-[2.5rem] border-l-4 border-emerald-500 shadow-xl shadow-emerald-500/10 text-[10px] font-black uppercase tracking-widest animate-in slide-in-from-top-4 duration-500">
-            {success}
-          </div>
-        )}
-
-        {!profile ? (
-          <div className="flex flex-col items-center justify-center py-40 animate-pulse">
-            <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-8" />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Loading profile...</p>
-          </div>
+        {loading ? (
+          <LoadingScreen message="Accessing Medical Identity Profile" />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-fadeIn">
             <div className="lg:col-span-4 space-y-8">

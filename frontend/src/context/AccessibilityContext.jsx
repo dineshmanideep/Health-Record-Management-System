@@ -12,13 +12,37 @@ const DEFAULT_PROFILE = {
   dyslexiaMode: false,
   targetBoost: false,
   formAssistMode: false,
-  accessibleChartsMode: false
+  accessibleChartsMode: false,
+  contrast: 'normal',
+  highlightLinks: false,
+  invert: false,
+  saturation: 'normal',
+  textSpacing: 'normal',
+  lineHeight: 'normal',
+  hideImages: false,
+  bigCursor: false
 };
 
 const normalizeProfile = (value = {}) => {
-  const safeTextSize = ['normal', 'large', 'extra-large'].includes(value.textSize)
+  const safeTextSize = ['small', 'normal', 'large', 'extra-large'].includes(value.textSize)
     ? value.textSize
     : DEFAULT_PROFILE.textSize;
+
+  const safeContrast = ['normal', 'high'].includes(value.contrast)
+    ? value.contrast
+    : DEFAULT_PROFILE.contrast;
+
+  const safeSaturation = ['normal', 'low', 'high'].includes(value.saturation)
+    ? value.saturation
+    : DEFAULT_PROFILE.saturation;
+
+  const safeTextSpacing = ['normal', 'high'].includes(value.textSpacing)
+    ? value.textSpacing
+    : DEFAULT_PROFILE.textSpacing;
+
+  const safeLineHeight = ['normal', 'high'].includes(value.lineHeight)
+    ? value.lineHeight
+    : DEFAULT_PROFILE.lineHeight;
 
   return {
     modeEnabled: Boolean(value.modeEnabled),
@@ -27,7 +51,15 @@ const normalizeProfile = (value = {}) => {
     dyslexiaMode: Boolean(value.dyslexiaMode),
     targetBoost: Boolean(value.targetBoost),
     formAssistMode: Boolean(value.formAssistMode),
-    accessibleChartsMode: Boolean(value.accessibleChartsMode)
+    accessibleChartsMode: Boolean(value.accessibleChartsMode),
+    contrast: safeContrast,
+    highlightLinks: Boolean(value.highlightLinks),
+    invert: Boolean(value.invert),
+    saturation: safeSaturation,
+    textSpacing: safeTextSpacing,
+    lineHeight: safeLineHeight,
+    hideImages: Boolean(value.hideImages),
+    bigCursor: Boolean(value.bigCursor)
   };
 };
 
@@ -55,11 +87,23 @@ export const AccessibilityProvider = ({ children }) => {
     root.dataset.a11yTargetBoost = profile.targetBoost ? 'on' : 'off';
     root.dataset.a11yFormAssist = profile.formAssistMode ? 'on' : 'off';
     root.dataset.a11yCharts = profile.accessibleChartsMode ? 'on' : 'off';
+    
+    // New attributes
+    root.dataset.a11yContrast = profile.contrast;
+    root.dataset.a11yHighlightLinks = profile.highlightLinks ? 'on' : 'off';
+    root.dataset.a11yInvert = profile.invert ? 'on' : 'off';
+    root.dataset.a11ySaturation = profile.saturation;
+    root.dataset.a11yTextSpacing = profile.textSpacing;
+    root.dataset.a11yLineHeight = profile.lineHeight;
+    root.dataset.a11yHideImages = profile.hideImages ? 'on' : 'off';
+    root.dataset.a11yBigCursor = profile.bigCursor ? 'on' : 'off';
 
     root.classList.toggle('a11y-mode', profile.modeEnabled);
     root.classList.toggle('a11y-keyboard', profile.keyboardMode || profile.modeEnabled);
     root.classList.toggle('a11y-dyslexia', profile.dyslexiaMode);
     root.classList.toggle('a11y-target-boost', profile.targetBoost);
+    root.classList.toggle('a11y-invert', profile.invert);
+    root.classList.toggle('a11y-big-cursor', profile.bigCursor);
   }, [profile]);
 
   useEffect(() => {
@@ -127,6 +171,10 @@ export const AccessibilityProvider = ({ children }) => {
     await saveProfile(merged);
   }, [profile, saveProfile]);
 
+  const resetProfile = useCallback(async () => {
+    await saveProfile(DEFAULT_PROFILE);
+  }, [saveProfile]);
+
   const toggleAccessibilityMode = useCallback(async () => {
     if (profile.modeEnabled) {
       await updateProfile({ modeEnabled: false });
@@ -151,9 +199,10 @@ export const AccessibilityProvider = ({ children }) => {
     loading,
     formErrors,
     updateProfile,
+    resetProfile,
     toggleAccessibilityMode,
     clearFormErrors
-  }), [profile, loading, formErrors, updateProfile, toggleAccessibilityMode]);
+  }), [profile, loading, formErrors, updateProfile, resetProfile, toggleAccessibilityMode]);
 
   return (
     <AccessibilityContext.Provider value={value}>

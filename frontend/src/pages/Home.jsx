@@ -1,12 +1,13 @@
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import LoadingScreen from '../components/LoadingScreen';
 
 const Home = () => {
   const { isAuthenticated, loading } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  if (loading) return null;
+  if (loading) return <LoadingScreen />;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
   const features = [

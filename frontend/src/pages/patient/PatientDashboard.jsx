@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import DashboardLayout from '../../components/DashboardLayout';
+import LoadingScreen from '../../components/LoadingScreen';
 import { useAuth } from '../../context/AuthContext';
 import { patientService } from '../../services/api';
 
@@ -46,9 +48,12 @@ const PatientDashboard = () => {
     setOtpLoading(true);
     try {
       const res = await patientService.generateAccessOTP();
-      if (res.success) setOtpInfo(res.data);
+      if (res.success) {
+        setOtpInfo(res.data);
+        toast.success('Access code generated successfully');
+      }
     } catch {
-      alert('Failed to generate OTP');
+      toast.error('Failed to generate access code');
     }
     setOtpLoading(false);
   };
@@ -103,10 +108,7 @@ const PatientDashboard = () => {
   return (
     <DashboardLayout title="Dashboard">
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24">
-           <div className="w-10 h-10 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4" />
-           <p className="text-sm text-slate-400 font-medium">Loading dashboard...</p>
-        </div>
+        <LoadingScreen message="Fetching medical profile" />
       ) : (
         <div className="space-y-6 pb-12 stagger-children">
           {/* Welcome Banner */}

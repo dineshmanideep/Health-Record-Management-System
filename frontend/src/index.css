@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ===== Global Reset & Defaults ===== */
 * {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: -0.01em;
 }
 
 html {
@@ -135,50 +135,71 @@ body {
   color: #e0e7ff;
 }
 
-/* ===== Accessibility Mode ===== */
-html[data-a11y-text-size='normal'] {
-  font-size: 100%;
+/* ===== Accessibility & UI Personalization ===== */
+
+:root {
+  --a11y-contrast: contrast(1);
+  --a11y-brightness: brightness(1);
+  --a11y-invert: invert(0) hue-rotate(0deg);
+  --a11y-saturation: saturate(1);
 }
 
-html[data-a11y-text-size='large'] {
-  font-size: 112.5%;
+html {
+  filter: var(--a11y-contrast) var(--a11y-brightness) var(--a11y-invert) var(--a11y-saturation);
 }
 
-html[data-a11y-text-size='extra-large'] {
-  font-size: 125%;
+/* Text Size & Spacing */
+html[data-a11y-text-size='small'] { font-size: 85%; }
+html[data-a11y-text-size='normal'] { font-size: 100%; }
+html[data-a11y-text-size='large'] { font-size: 112.5%; }
+html[data-a11y-text-size='extra-large'] { font-size: 125%; }
+
+html[data-a11y-text-spacing='high'] body {
+  letter-spacing: 0.12em !important;
+  word-spacing: 0.2em !important;
 }
 
-html[data-a11y-mode='on'] body {
-  filter: contrast(1.08);
+/* Line Height */
+html[data-a11y-line-height='high'] body,
+html[data-a11y-line-height='high'] p,
+html[data-a11y-line-height='high'] li,
+html[data-a11y-line-height='high'] h1,
+html[data-a11y-line-height='high'] h2,
+html[data-a11y-line-height='high'] h3,
+html[data-a11y-line-height='high'] h4 {
+  line-height: 2 !important;
 }
 
-html[data-a11y-mode='on'] {
-  scroll-behavior: auto;
+/* Contrast & Filters */
+html[data-a11y-contrast='high'] { 
+  --a11y-contrast: contrast(1.25); 
+  --a11y-brightness: brightness(1.05); 
+}
+html[data-a11y-contrast='high'].dark { 
+  --a11y-contrast: contrast(1.3); 
+  --a11y-brightness: brightness(1.1); 
 }
 
-html[data-a11y-mode='on'] .animate-fadeIn,
-html[data-a11y-mode='on'] .animate-fadeInScale,
-html[data-a11y-mode='on'] .animate-slideUp,
-html[data-a11y-mode='on'] .animate-float,
-html[data-a11y-mode='on'] .animate-pulse,
-html[data-a11y-mode='on'] .animate-pulse-glow,
-html[data-a11y-mode='on'] .animate-spin,
-html[data-a11y-mode='on'] .transition-all,
-html[data-a11y-mode='on'] .duration-200,
-html[data-a11y-mode='on'] .duration-300,
-html[data-a11y-mode='on'] .duration-500 {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
+html.a11y-invert { 
+  --a11y-invert: invert(1) hue-rotate(180deg); 
+}
+html.a11y-invert img, html.a11y-invert video, html.a11y-invert [style*='background-image'] {
+  filter: invert(1) hue-rotate(180deg);
 }
 
-html.a11y-keyboard :focus-visible {
-  outline: 3px solid #0f766e !important;
-  outline-offset: 2px;
-  border-radius: 0.5rem;
-  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.18);
+html[data-a11y-saturation='low'] { --a11y-saturation: saturate(0); }
+html[data-a11y-saturation='high'] { --a11y-saturation: saturate(1.8); }
+
+/* Highlight Links */
+html[data-a11y-highlight-links='on'] a {
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+  text-decoration-color: #0d9488 !important;
+  background-color: rgba(13, 148, 136, 0.1) !important;
+  font-weight: 600 !important;
 }
 
+/* Dyslexia Mode */
 html.a11y-dyslexia body,
 html.a11y-dyslexia p,
 html.a11y-dyslexia li,
@@ -191,63 +212,57 @@ html.a11y-dyslexia h1,
 html.a11y-dyslexia h2,
 html.a11y-dyslexia h3,
 html.a11y-dyslexia h4 {
-  letter-spacing: 0.02em;
-  line-height: 1.75 !important;
-  text-align: left;
-  font-style: normal !important;
-  word-spacing: 0.08em;
+  letter-spacing: 0.05em !important;
+  line-height: 1.8 !important;
+  word-spacing: 0.1em !important;
 }
 
+/* Target Boost (Click Areas) */
 html.a11y-target-boost button,
 html.a11y-target-boost a,
 html.a11y-target-boost input,
-html.a11y-target-boost select,
-html.a11y-target-boost textarea,
 html.a11y-target-boost [role='button'] {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 48px !important;
+  min-width: 48px !important;
 }
 
-html[data-a11y-mode='on'] body,
-html[data-a11y-mode='on'] p,
-html[data-a11y-mode='on'] li,
-html[data-a11y-mode='on'] label,
-html[data-a11y-mode='on'] input,
-html[data-a11y-mode='on'] textarea,
-html[data-a11y-mode='on'] select,
-html[data-a11y-mode='on'] button {
-  line-height: 1.65;
+/* Focus Indicators */
+html.a11y-keyboard :focus-visible {
+  outline: 3px solid #0d9488 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px rgba(13, 148, 136, 0.25) !important;
 }
 
-html[data-a11y-mode='on'] input,
-html[data-a11y-mode='on'] textarea,
-html[data-a11y-mode='on'] select,
-html[data-a11y-mode='on'] button {
-  border-radius: 0.9rem;
+/* Hide Images */
+html[data-a11y-hide-images='on'] img,
+html[data-a11y-hide-images='on'] video,
+html[data-a11y-hide-images='on'] [style*='background-image'] {
+  visibility: hidden !important;
+  opacity: 0 !important;
 }
 
+/* Big Cursor */
+html.a11y-big-cursor,
+html.a11y-big-cursor * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 32 32'%3E%3Cpath d='M8 4l16 16-6 2 6 6-2 2-6-6-2 6L8 4z' fill='black' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E"), auto !important;
+}
+
+/* Form Assistance */
 html[data-a11y-form-assist='on'] input:invalid,
-html[data-a11y-form-assist='on'] textarea:invalid,
-html[data-a11y-form-assist='on'] select:invalid {
-  border-color: #dc2626 !important;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+html[data-a11y-form-assist='on'] textarea:invalid {
+  border: 2px solid #ef4444 !important;
+  background-color: #fef2f2 !important;
 }
 
+/* Voice Help Highlights */
 .voice-help-highlight {
   outline: 3px solid #10b981 !important;
   outline-offset: 2px;
-  border-radius: 0.75rem;
-  animation: voice-help-pulse 1s ease-in-out 2;
-}
-
-html[data-a11y-mode='on'] .voice-help-highlight {
-  animation: none;
+  animation: voice-help-pulse 1s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, ::before, ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

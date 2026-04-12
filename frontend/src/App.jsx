@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -51,6 +52,8 @@ import AdminNurses from './pages/admin/AdminNurses';
 import { ThemeProvider } from './context/ThemeContext';
 import { AccessibilityProvider } from './context/AccessibilityContext';
 import ContextVoiceHelpButton from './components/ContextVoiceHelpButton';
+import FloatingNav from './components/FloatingNav';
+import AccessibilityTools from './components/AccessibilityTools';
 
 function App() {
   return (
@@ -328,6 +331,35 @@ function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
         <ContextVoiceHelpButton />
+        <AccessibilityTools />
+        <FloatingNav />
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#0F172A',
+              color: '#fff',
+              borderRadius: '16px',
+              fontSize: '14px',
+              padding: '12px 20px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(10px)',
+            },
+            success: {
+              iconTheme: {
+                primary: '#10B981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#EF4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
         </AccessibilityProvider>
       </AuthProvider>
     </Router>

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+import LoadingScreen from '../../components/LoadingScreen';
+import toast from 'react-hot-toast';
 import { adminService } from '../../services/api';
 
 const STATUS_BADGE = {
@@ -26,7 +28,7 @@ const AdminNurses = () => {
       const res = await adminService.getAllNurses();
       setAllNurses(res.data || []);
     } catch {
-      // silently fail
+      toast.error('Failed to retrieve clinical support personnel records');
     } finally {
       setLoading(false);
     }
@@ -47,9 +49,10 @@ const AdminNurses = () => {
     setLoadingId(id);
     try {
       await actionFn(id);
+      toast.success('Action successfully executed');
       await fetchAll();
     } catch {
-      // ignore
+      toast.error('Operation failed. Please try again.');
     } finally {
       setLoadingId(null);
     }
@@ -115,10 +118,7 @@ const AdminNurses = () => {
 
           {/* List */}
           {loading ? (
-            <div className="p-12 text-center">
-              <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-slate-400 dark:text-slate-500">Loading nurses...</p>
-            </div>
+            <LoadingScreen message="Accessing Clinical Support Personnel Registry" />
           ) : nurses.length === 0 ? (
             <div className="p-12 text-center">
               <span className="text-4xl opacity-20 block mb-3">👩‍⚕️</span>

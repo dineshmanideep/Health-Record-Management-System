@@ -1,5 +1,6 @@
 import { useState, useCallback, memo } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getPasswordError } from '../utils/passwordValidation';
@@ -38,14 +39,12 @@ const Signup = () => {
     licenseNumber: '',
     registrationNumber: ''
   });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingState, setPendingState] = useState({ isPending: false, message: '', role: '' });
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setError('');
   }, []);
 
   if (authLoading) return null;
@@ -54,7 +53,7 @@ const Signup = () => {
   const validatePassword = () => {
     const errorMessage = getPasswordError(formData.password);
     if (errorMessage) {
-      setError(errorMessage);
+      toast.error(errorMessage);
       return false;
     }
     return true;
@@ -62,13 +61,14 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
-    if (!validatePassword()) return;
-    setLoading(true);
+    if (!validatePassword()) {
+      toast.error('Invalid password format');
+      return;
+    }
 
     const { confirmPassword: _, ...baseFields } = formData;
     const signupData = { ...baseFields };
@@ -78,12 +78,14 @@ const Signup = () => {
     const result = await signup(signupData);
     if (result.success) {
       if (result.pending) {
+        toast.success('Registration submitted for approval');
         setPendingState({ isPending: true, message: result.message, role: formData.role });
       } else {
+        toast.success('Account created successfully!');
         navigate('/dashboard');
       }
     } else {
-      setError(result.message || 'Signup failed. Please try again.');
+      toast.error(result.message || 'Signup failed. Please try again.');
     }
     setLoading(false);
   };
@@ -158,18 +160,7 @@ const Signup = () => {
           </p>
         </div>
         
-        <div className="relative z-10 flex gap-6">
-          {[
-            { val: 'Free', label: 'For Patients' },
-            { val: 'Instant', label: 'Setup' },
-            { val: 'Secure', label: 'Always' }
-          ].map((s, i) => (
-            <div key={i}>
-              <p className="text-xl font-extrabold text-white">{s.val}</p>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{s.label}</p>
-            </div>
-          ))}
-        </div>
+        {/* Stats removed for cleaner UI */}
       </div>
 
       {/* Right Panel - Form */}
@@ -192,12 +183,6 @@ const Signup = () => {
             <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">Create your account</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">Fill in your details to get started</p>
           </div>
-
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3.5 rounded-xl border border-red-100 dark:border-red-900/30 mb-6 text-sm font-medium animate-fadeIn flex items-center gap-2">
-              <span>⚠️</span> {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Role Selection */}
