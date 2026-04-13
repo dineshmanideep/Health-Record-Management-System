@@ -398,7 +398,7 @@ const DoctorAssignRecords = () => {
                     <div className="flex gap-3">
                       {assignment.status === 'completed' && assignment.medicalRecord && (
                         <button
-                          onClick={() => navigate(`/doctor/patients/${assignment.patient._id}/records`)}
+                          onClick={() => navigate(`/doctor/patient-records/${assignment.patient._id}`)}
                           className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                         >
                           Access Record

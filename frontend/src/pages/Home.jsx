@@ -17,12 +17,7 @@ const Home = () => {
     { icon: '💉', title: 'For Nurses', desc: 'Real-time updates and seamless test result uploads for perfectly coordinated patient care.', color: 'from-pink-500 to-rose-500' }
   ];
 
-  const stats = [
-    { value: '99.9%', label: 'Uptime' },
-    { value: '256-bit', label: 'Encryption' },
-    { value: 'HIPAA', label: 'Compliant' },
-    { value: '24/7', label: 'Support' }
-  ];
+
 
   return (
     <div className={`min-h-screen bg-white dark:bg-[#0a0f1e] transition-colors duration-500 ${theme === 'dark' ? 'dark' : ''}`}>
@@ -88,17 +83,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="py-8 px-4 border-y border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/30">
-        <div className="max-w-5xl mx-auto flex flex-wrap justify-center gap-8 sm:gap-16">
-          {stats.map((s, i) => (
-            <div key={i} className="text-center">
-              <p className="text-2xl font-extrabold text-slate-900 dark:text-white">{s.value}</p>
-              <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-1">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+
 
       {/* Features Grid */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">

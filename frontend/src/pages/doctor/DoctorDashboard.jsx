@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import LoadingScreen from '../../components/LoadingScreen';
 import toast from 'react-hot-toast';
@@ -23,6 +23,7 @@ const DoctorDashboard = () => {
   const [otpInput, setOtpInput] = useState('');
   const [deptInput, setDeptInput] = useState('');
   const [affiliating, setAffiliating] = useState(false);
+  const [affiliateMsg, setAffiliateMsg] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(true);
 
   const [patientEmail, setPatientEmail] = useState('');

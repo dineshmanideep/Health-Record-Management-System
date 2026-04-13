@@ -57,7 +57,7 @@ const AccessibilityTools = () => {
   );
 
   return (
-    <div className="fixed bottom-24 right-4 md:right-8 z-[9999]" ref={menuRef}>
+    <div className="fixed bottom-32 right-4 md:right-8 z-[9999]" ref={menuRef}>
       {/* Floating Toggle Button */}
       <button
         onClick={toggleOpen}
