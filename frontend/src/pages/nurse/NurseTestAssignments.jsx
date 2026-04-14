@@ -12,6 +12,7 @@ const NurseTestAssignments = () => {
   const [files, setFiles] = useState([{ file: null, category: 'test_report' }]);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [resolutionState, setResolutionState] = useState({ visible: false, sessionId: '', ambiguities: [], clarifications: {} });
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -81,6 +82,14 @@ const NurseTestAssignments = () => {
   };
 
   const handleFileChange = (index, file) => {
+    if (!file) return;
+    const fileName = file.name?.toLowerCase() || '';
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const isAllowed = allowedExtensions.some((ext) => fileName.endsWith(ext));
+    if (!isAllowed) {
+      setMessage({ type: 'error', text: 'Unsupported file. Use PDF, JPG, JPEG, or PNG.' });
+      return;
+    }
     const newFiles = [...files];
     newFiles[index].file = file;
     setFiles(newFiles);
@@ -130,9 +139,57 @@ const NurseTestAssignments = () => {
         fetchAssignments();
       }, 1500);
     } catch (error) {
+      if (error?.response?.data?.resolutionRequired) {
+        const payload = error.response.data;
+        const defaultClarifications = Object.fromEntries(
+          (payload.ambiguities || []).map((item) => [item.rawFieldName, item.options?.[0] || 'fasting'])
+        );
+        setResolutionState({
+          visible: true,
+          sessionId: payload.sessionId,
+          ambiguities: payload.ambiguities || [],
+          clarifications: defaultClarifications
+        });
+        setMessage({ type: 'error', text: payload.message || 'Clarification is required to complete this test assignment.' });
+        return;
+      }
       setMessage({ 
         type: 'error', 
         text: error?.response?.data?.message || 'Failed to complete test assignment' 
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleClarificationChange = (rawFieldName, value) => {
+    setResolutionState((prev) => ({
+      ...prev,
+      clarifications: {
+        ...prev.clarifications,
+        [rawFieldName]: value
+      }
+    }));
+  };
+
+  const handleResolveClarification = async () => {
+    if (!resolutionState.sessionId) return;
+    setSubmitting(true);
+    try {
+      await nurseService.resolveUploadSession(resolutionState.sessionId, resolutionState.clarifications);
+      setMessage({ type: 'success', text: 'Test completed successfully! Redirecting...' });
+      setTimeout(() => {
+        setShowCompletionForm(false);
+        setSelectedAssignment(null);
+        setFilter('all');
+        setFiles([{ file: null, category: 'test_report' }]);
+        setResolutionState({ visible: false, sessionId: '', ambiguities: [], clarifications: {} });
+        fetchAssignments();
+      }, 1500);
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error?.response?.data?.message || 'Failed to resolve clarification'
       });
     } finally {
       setSubmitting(false);
@@ -181,6 +238,40 @@ const NurseTestAssignments = () => {
           </div>
         ) : (
           <>
+            {resolutionState.visible && (
+              <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-2xl p-5">
+                <h3 className="text-sm font-bold text-amber-700 dark:text-amber-300 mb-2">Clarification Required</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mb-4">Processing found an ambiguous blood sugar field. Confirm the correct test type to finish the assignment.</p>
+                <div className="space-y-4">
+                  {resolutionState.ambiguities.map((item) => (
+                    <div key={item.rawFieldName} className="bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-900/40 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">{item.rawFieldName}</p>
+                      <select
+                        value={resolutionState.clarifications[item.rawFieldName] || item.options?.[0] || 'fasting'}
+                        onChange={(e) => handleClarificationChange(item.rawFieldName, e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        {(item.options || []).map((option) => (
+                          <option key={option} value={option}>
+                            {option === 'post_meal' ? 'Post-Meal Blood Sugar' : `${option.charAt(0).toUpperCase()}${option.slice(1).replace('_', ' ')} Blood Sugar`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={handleResolveClarification}
+                    disabled={submitting}
+                    className="px-5 py-2 rounded-xl bg-amber-600 text-white text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                  >
+                    {submitting ? 'Resolving...' : 'Confirm And Complete'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Header with Filters & Stats */}
             {!selectedAssignment && !showCompletionForm && (
               <div className="space-y-6">

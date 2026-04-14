@@ -19,7 +19,8 @@ const {
   queueMedicalRecordPostUploadProcessing,
   queueTestAssignmentPostUploadProcessing
 } = require('../utils/postUploadMedicalPipeline');
-const { getFieldDisplayLabel } = require('../utils/medicalCanonicalization');
+const { getFieldDisplayLabel, normalizeLookup } = require('../utils/medicalCanonicalization');
+const { loadCatalogEntries } = require('../utils/medicalFieldCatalogService');
 const { protect, authorize } = require('../middleware/auth');
 
 // All routes below require a valid JWT AND the 'user' (patient) role.
@@ -40,6 +41,29 @@ function markDocumentsPending(documents = []) {
       validationErrors: [],
       processedAt: null
     };
+  }
+}
+
+async function ensureUpcomingVisitReminderNotifications(patientId, reminders = []) {
+  for (const reminder of reminders || []) {
+    if (!reminder?._id || !reminder?.nextVisitDate) continue;
+
+    const existing = await Notification.findOne({
+      user: patientId,
+      type: 'visit_reminder',
+      relatedId: reminder._id
+    }).lean();
+
+    if (existing) continue;
+
+    await Notification.create({
+      user: patientId,
+      type: 'visit_reminder',
+      title: 'Upcoming Visit Reminder',
+      message: `You have a follow-up visit on ${new Date(reminder.nextVisitDate).toLocaleDateString('en-US')} at ${reminder.hospital?.name || 'your hospital'}${reminder.doctor?.name ? ` with Dr. ${reminder.doctor.name}` : ''}.`,
+      relatedModel: 'MedicalRecord',
+      relatedId: reminder._id
+    });
   }
 }
 
@@ -122,6 +146,94 @@ function getMetricGroupTag(name = '', fallbackTag = '') {
   return fallbackTag || 'General Metrics';
 }
 
+function compactMetricLookup(value = '') {
+  return normalizeLookup(value).replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeMetricUnit(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[µμ]/g, 'u')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+function createMetricNameResolver(catalogEntries = []) {
+  const exactMap = new Map();
+  const compactMap = new Map();
+
+  const registerAlias = (alias = '', canonicalKey = '') => {
+    const canonical = String(canonicalKey || '').trim();
+    const exact = normalizeLookup(alias);
+    if (!canonical || !exact) return;
+
+    if (!exactMap.has(exact)) {
+      exactMap.set(exact, canonical);
+    }
+
+    const compact = compactMetricLookup(alias);
+    if (compact && !compactMap.has(compact)) {
+      compactMap.set(compact, canonical);
+    }
+  };
+
+  for (const entry of catalogEntries || []) {
+    if (!entry?.canonicalKey) continue;
+    registerAlias(entry.canonicalKey, entry.canonicalKey);
+    registerAlias(entry.displayName, entry.canonicalKey);
+    for (const alias of entry.aliases || []) {
+      registerAlias(alias, entry.canonicalKey);
+    }
+  }
+
+  return (rawName = '') => {
+    const exact = normalizeLookup(rawName);
+    if (!exact) return String(rawName || '').trim();
+
+    if (exactMap.has(exact)) {
+      return exactMap.get(exact);
+    }
+
+    const compact = compactMetricLookup(rawName);
+    if (compact && compactMap.has(compact)) {
+      return compactMap.get(compact);
+    }
+
+    return String(rawName || '').trim();
+  };
+}
+
+function metricPointQuality(point = {}) {
+  const reference = String(point.reference || '').trim().toLowerCase();
+  const hasAgeContext = /(year|years|yr|week|weeks|day|days|month|months|trimester|pregnan|pediatric|paediatric|adult|age|cord blood)/i.test(reference);
+
+  let score = 0;
+  if (point.status && point.status !== 'unknown') score += 2;
+  if (reference) score += 1;
+  if (reference && !hasAgeContext) score += 2;
+  if (reference && reference.length <= 120) score += 1;
+  if (Number.isFinite(point.referenceMin) || Number.isFinite(point.referenceMax)) score += 1;
+  if (point.sourceLabel) score += 1;
+  return score;
+}
+
+function dedupeMetricPoints(points = []) {
+  const byKey = new Map();
+
+  for (const point of points || []) {
+    const dateKey = point?.date ? new Date(point.date).toISOString().slice(0, 10) : '';
+    const valueKey = Number.isFinite(point?.value) ? String(point.value) : String(point?.value ?? '');
+    const key = [dateKey, valueKey].join('|');
+
+    const existing = byKey.get(key);
+    if (!existing || metricPointQuality(point) > metricPointQuality(existing)) {
+      byKey.set(key, point);
+    }
+  }
+
+  return Array.from(byKey.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
+}
+
 async function fetchMetricsFromProvider(connection) {
   const baseUrl = connection.apiBaseUrl?.trim();
   if (!baseUrl) {
@@ -201,6 +313,8 @@ router.put('/profile', async (req, res) => {
 router.get('/dashboard', async (req, res) => {
   try {
     const patientId = req.user._id;
+    const now = new Date();
+    const reminderWindowEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const [recordCount, selfRecordCount, trustedDoctorCount, upcomingReminders] = await Promise.all([
       MedicalRecord.countDocuments({ patient: patientId }),
@@ -208,7 +322,10 @@ router.get('/dashboard', async (req, res) => {
       DoctorAccess.countDocuments({ patient: patientId, isActive: true }),
       MedicalRecord.find({
         patient: patientId,
-        nextVisitDate: { $gte: new Date() }
+        nextVisitDate: {
+          $gte: now,
+          $lte: reminderWindowEnd
+        }
       })
         .sort({ nextVisitDate: 1 })
         .limit(5)
@@ -217,6 +334,8 @@ router.get('/dashboard', async (req, res) => {
         .select('nextVisitDate doctor hospital diagnosis')
         .lean()
     ]);
+
+    await ensureUpcomingVisitReminderNotifications(patientId, upcomingReminders);
 
     const [recentRecords, recentActivity, recentNotifications, unreadNotificationCount] = await Promise.all([
       MedicalRecord.find({ patient: patientId })
@@ -613,24 +732,26 @@ router.patch('/revoke-access/:doctorId', async (req, res) => {
 // @desc    Aggregate health metrics from all medical records for trend graphs
 router.get('/health-analytics', async (req, res) => {
   try {
-    const records = await MedicalRecord.find({
-      patient: req.user._id,
-      $or: [
-        { 'healthMetrics.bloodSugar': { $exists: true } },
-        { 'healthMetrics.bloodPressureSystolic': { $exists: true } },
-        { 'healthMetrics.thyroidTSH': { $exists: true } },
-        { 'healthMetrics.heartRate': { $exists: true } },
-        { 'healthMetrics.weight': { $exists: true } }
-      ]
-    })
-      .sort({ visitDate: 1 })
-      .select('visitDate healthMetrics')
-      .lean();
-
     const [
+      catalogEntries,
+      records,
       medicalRecordsWithStructuredData,
       completedTestsWithStructuredData
     ] = await Promise.all([
+      loadCatalogEntries().catch(() => []),
+      MedicalRecord.find({
+        patient: req.user._id,
+        $or: [
+          { 'healthMetrics.bloodSugar': { $exists: true } },
+          { 'healthMetrics.bloodPressureSystolic': { $exists: true } },
+          { 'healthMetrics.thyroidTSH': { $exists: true } },
+          { 'healthMetrics.heartRate': { $exists: true } },
+          { 'healthMetrics.weight': { $exists: true } }
+        ]
+      })
+        .sort({ visitDate: 1 })
+        .select('visitDate healthMetrics')
+        .lean(),
       MedicalRecord.find({
         patient: req.user._id,
         $or: [
@@ -655,6 +776,8 @@ router.get('/health-analytics', async (req, res) => {
         .lean()
     ]);
 
+    const resolveMetricName = createMetricNameResolver(catalogEntries);
+
     const parsedReports = [];
 
     medicalRecordsWithStructuredData.forEach((record) => {
@@ -672,18 +795,23 @@ router.get('/health-analytics', async (req, res) => {
         return;
       }
 
+      const structuredMetrics = Array.isArray(record?.structuredData?.parsedMetrics)
+        ? record.structuredData.parsedMetrics.filter((metric) => typeof metric?.value === 'number' && Number.isFinite(metric.value))
+        : [];
       const numericFields = record?.structuredData?.numericFields || {};
-      const metrics = Object.entries(numericFields)
-        .filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
-        .map(([name, value]) => ({
-          name,
-          value,
-          unit: '',
-          reference: '',
-          referenceMin: null,
-          referenceMax: null,
-          status: 'unknown'
-        }));
+      const metrics = structuredMetrics.length > 0
+        ? structuredMetrics
+        : Object.entries(numericFields)
+          .filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
+          .map(([name, value]) => ({
+            name,
+            value,
+            unit: '',
+            reference: '',
+            referenceMin: null,
+            referenceMax: null,
+            status: 'unknown'
+          }));
 
       if (!metrics.length) return;
 
@@ -710,18 +838,23 @@ router.get('/health-analytics', async (req, res) => {
         return;
       }
 
+      const structuredMetrics = Array.isArray(test?.structuredData?.parsedMetrics)
+        ? test.structuredData.parsedMetrics.filter((metric) => typeof metric?.value === 'number' && Number.isFinite(metric.value))
+        : [];
       const numericFields = test?.structuredData?.numericFields || {};
-      const metrics = Object.entries(numericFields)
-        .filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
-        .map(([name, value]) => ({
-          name,
-          value,
-          unit: '',
-          reference: '',
-          referenceMin: null,
-          referenceMax: null,
-          status: 'unknown'
-        }));
+      const metrics = structuredMetrics.length > 0
+        ? structuredMetrics
+        : Object.entries(numericFields)
+          .filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
+          .map(([name, value]) => ({
+            name,
+            value,
+            unit: '',
+            reference: '',
+            referenceMin: null,
+            referenceMax: null,
+            status: 'unknown'
+          }));
 
       if (!metrics.length) return;
 
@@ -738,8 +871,10 @@ router.get('/health-analytics', async (req, res) => {
     parsedReports.forEach((report) => {
       report.metrics.forEach((metric) => {
         const rawName = metric.name || 'Unknown Metric';
-        const displayName = getMetricDisplayName(rawName);
-        const tag = getMetricGroupTag(rawName, report.reportTag || 'general test report');
+        const canonicalName = resolveMetricName(rawName);
+        const displayName = getMetricDisplayName(canonicalName);
+        const tag = getMetricGroupTag(canonicalName, report.reportTag || 'general test report');
+        const normalizedUnit = normalizeMetricUnit(metric.unit || '');
 
         if (!reportGroupMap.has(tag)) {
           reportGroupMap.set(tag, {
@@ -749,17 +884,23 @@ router.get('/health-analytics', async (req, res) => {
         }
 
         const group = reportGroupMap.get(tag);
-        const metricKey = `${rawName.toLowerCase()}|${metric.unit || ''}`;
+        const metricKey = `${String(canonicalName || '').toLowerCase()}|${normalizedUnit}`;
 
         if (!group.metricSeries.has(metricKey)) {
           group.metricSeries.set(metricKey, {
             attribute: displayName,
+            canonicalName,
             unit: metric.unit || '',
             points: []
           });
         }
 
-        group.metricSeries.get(metricKey).points.push({
+        const series = group.metricSeries.get(metricKey);
+        if (!series.unit && metric.unit) {
+          series.unit = metric.unit;
+        }
+
+        series.points.push({
           date: report.reportDate,
           value: metric.value,
           reference: metric.reference || '',
@@ -775,7 +916,7 @@ router.get('/health-analytics', async (req, res) => {
     for (const group of Array.from(reportGroupMap.values())) {
       const metricSeries = Array.from(group.metricSeries.values()).map((series) => ({
         ...series,
-        points: series.points.sort((a, b) => new Date(a.date) - new Date(b.date))
+        points: dedupeMetricPoints(series.points)
       }));
 
       reportAnalytics.push({

@@ -1,7 +1,7 @@
 const path = require('path');
 const MedicalRecord = require('../models/MedicalRecord');
 const TestAssignment = require('../models/TestAssignment');
-const { extractStructuredMedicalData } = require('./medicalExtractionService');
+const { extractStructuredMedicalData, normalizeValidatedMedicalData } = require('./medicalExtractionService');
 const { buildCustomFields, buildHealthMetrics } = require('./medicalFieldNormalization');
 const { getFieldDisplayLabel } = require('./medicalCanonicalization');
 
@@ -9,100 +9,80 @@ function toAbsoluteUploadPath(filePath = '') {
   return path.join(__dirname, '..', String(filePath || '').replace(/^\/+/, ''));
 }
 
-function mergeLatest(base = {}, next = {}) {
-  return { ...(base || {}), ...(next || {}) };
+function toProcessingDocuments(documents = []) {
+  return (documents || [])
+    .filter((document) => document?.filePath)
+    .map((document) => ({
+      ...document,
+      filePath: /^https?:\/\//i.test(document.filePath)
+        ? document.filePath
+        : toAbsoluteUploadPath(document.filePath)
+    }));
 }
 
-function mergeLists(base = [], next = []) {
-  return Array.from(new Set([...(base || []), ...(next || [])].filter(Boolean)));
-}
-
-function buildMedicationObjects(list = []) {
-  return (list || []).filter(Boolean).map((name) => ({
-    name,
-    dosage: '',
-    frequency: '',
-    duration: ''
-  }));
-}
-
-function buildSummaryFromExtraction(result = {}, document = {}) {
+function buildSummaryFromExtraction(result = {}) {
   const lines = [];
-  const reportLabel = document.reportTag || document.category || 'medical report';
-  const displayLabel = String(reportLabel)
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-
-  lines.push(`${displayLabel} summary:`);
 
   if (result.specialization) {
-    lines.push(`- Specialty: ${result.specialization}`);
+    lines.push(`Specialty: ${result.specialization}`);
   }
 
   if (result.diagnosis) {
-    lines.push(`- Main finding: ${result.diagnosis}`);
+    lines.push(`Main finding: ${result.diagnosis}`);
   }
 
-  const topFindings = (result.importantFindings || []).slice(0, 4);
+  if (result.medicationDetails?.length) {
+    lines.push(`Medicines: ${result.medicationDetails.slice(0, 4).map((item) => {
+      const timing = item.timing ? `, ${item.timing}` : '';
+      const duration = item.durationDays ? `, ${item.durationDays} day(s)` : (item.duration ? `, ${item.duration}` : '');
+      return `${item.name}${item.dosage ? ` ${item.dosage}` : ''}${timing}${duration}`;
+    }).join('; ')}`);
+  } else if (result.medications?.length) {
+    lines.push(`Medicines: ${result.medications.slice(0, 4).join(', ')}`);
+  }
+
+  const topFindings = (result.parsedMetrics || []).slice(0, 4);
   if (topFindings.length) {
-    lines.push(`- Important values: ${topFindings.map((finding) => {
+    lines.push(`Important values: ${topFindings.map((finding) => {
       const unit = finding.unit ? ` ${finding.unit}` : '';
       const reference = finding.reference ? ` (Ref: ${finding.reference})` : '';
       const flag = finding.status && finding.status !== 'unknown' ? `, ${finding.status}` : '';
       return `${getFieldDisplayLabel(finding.name)}: ${finding.value}${unit}${reference}${flag}`;
-    }).join(', ')}`);
-  }
-
-  if (result.medications?.length) {
-    lines.push(`- Mentioned medicines: ${result.medications.slice(0, 4).join(', ')}`);
+    }).join('; ')}`);
   }
 
   if (result.nextVisitDate) {
-    lines.push(`- Suggested next visit: ${new Date(result.nextVisitDate).toLocaleDateString('en-US')}`);
+    lines.push(`Next visit: ${new Date(result.nextVisitDate).toLocaleDateString('en-US')}`);
   }
 
   return lines.join('\n');
 }
 
-async function processDocuments({ documents, fallbackText }) {
-  const aggregate = {
-    normalizedFields: {},
-    numericFields: {},
-    medications: [],
-    validationErrors: [],
-    unknownFields: [],
-    conflicts: [],
-    rawResponses: [],
-    diagnosis: '',
-    specialization: '',
-    reportDate: null,
-    nextVisitDate: null,
-    anySuccess: false,
-    anyAttempted: false
+async function processDocuments({ documents, fallbackText, visitDate, clarificationSelections }) {
+  const extraction = await extractStructuredMedicalData({
+    documents: toProcessingDocuments(documents),
+    fallbackText,
+    visitDate,
+    clarificationSelections
+  });
+
+  return {
+    ...extraction,
+    summary: extraction.success ? buildSummaryFromExtraction(extraction) : ''
   };
+}
 
+function applyResultToDocuments(documents = [], result = {}) {
+  const summary = result.summary || '';
+  const hasMultipleDocuments = (documents || []).length > 1;
   for (const document of documents || []) {
-    if (!document?.filePath) {
-      document.llmExtraction = {
-        ...(document.llmExtraction || {}),
-        status: 'skipped',
-        processedAt: new Date(),
-        validationErrors: ['Document is missing a file path']
-      };
-      continue;
-    }
-
-    aggregate.anyAttempted = true;
-    const isRemoteSource = /^https?:\/\//i.test(document.filePath);
-    const result = await extractStructuredMedicalData({
-      filePath: isRemoteSource ? '' : toAbsoluteUploadPath(document.filePath),
-      sourceUrl: isRemoteSource ? document.filePath : '',
-      category: document.category,
-      fallbackText
-    });
-
+    if (!document?.filePath) continue;
+    document.aiSummary = hasMultipleDocuments ? '' : summary;
+    document.aiSummaryGeneratedAt = !hasMultipleDocuments && summary ? new Date() : document.aiSummaryGeneratedAt;
+    document.reportDate = result.reportDate || document.reportDate || null;
     document.llmExtraction = {
-      status: result.status,
+      ...(document.llmExtraction || {}),
+      status: result.status || 'failed',
       diagnosis: result.diagnosis || '',
       specialization: result.specialization || '',
       reportDate: result.reportDate || null,
@@ -114,137 +94,195 @@ async function processDocuments({ documents, fallbackText }) {
       unknownFields: result.unknownFields || [],
       conflicts: result.conflicts || [],
       rawResponse: result.rawResponse || '',
-      processedAt: new Date(),
-      sourceType: document.category
+      processedAt: new Date()
     };
-    document.parsedMetrics = result.parsedMetrics || [];
-    document.reportDate = result.reportDate || null;
-
-    if (result.success) {
-      document.aiSummary = buildSummaryFromExtraction(result, document);
-      document.aiSummaryGeneratedAt = new Date();
-    }
-
-    aggregate.rawResponses.push({
-      documentPath: document.filePath,
-      response: result.rawResponse || '',
-      status: result.status
-    });
-
-    aggregate.validationErrors.push(...(result.validationErrors || []));
-    aggregate.unknownFields.push(...(result.unknownFields || []));
-    aggregate.conflicts.push(...(result.conflicts || []));
-
-    if (!result.success) {
-      continue;
-    }
-
-    aggregate.anySuccess = true;
-    aggregate.normalizedFields = mergeLatest(aggregate.normalizedFields, result.normalizedFields);
-    aggregate.numericFields = mergeLatest(aggregate.numericFields, result.numericFields);
-    aggregate.medications = mergeLists(aggregate.medications, result.medications);
-    if (result.diagnosis) aggregate.diagnosis = result.diagnosis;
-    if (result.specialization) aggregate.specialization = result.specialization;
-    if (result.reportDate) aggregate.reportDate = result.reportDate;
-    if (result.nextVisitDate) aggregate.nextVisitDate = result.nextVisitDate;
+    document.parsedMetrics = hasMultipleDocuments ? [] : (result.parsedMetrics || []);
   }
-
-  aggregate.validationErrors = Array.from(new Set(aggregate.validationErrors));
-  aggregate.unknownFields = Array.from(new Set(aggregate.unknownFields));
-  return aggregate;
 }
 
-function applyAggregateToMedicalRecord(record, aggregate) {
-  const healthMetrics = buildHealthMetrics(aggregate.normalizedFields);
+function applyResultToMedicalRecord(record, result) {
+  const healthMetrics = buildHealthMetrics(result.normalizedFields);
 
   record.structuredData = {
-    extractionStatus: aggregate.anyAttempted
-      ? (aggregate.anySuccess ? 'completed' : 'failed')
-      : 'skipped',
-    diagnosis: aggregate.diagnosis || record.structuredData?.diagnosis || '',
-    specialization: aggregate.specialization || record.structuredData?.specialization || '',
-    reportDate: aggregate.reportDate || record.structuredData?.reportDate || null,
-    normalizedFields: aggregate.normalizedFields || {},
-    numericFields: aggregate.numericFields || {},
-    medications: aggregate.medications || [],
-    nextVisitDate: aggregate.nextVisitDate || null,
-    validationErrors: aggregate.validationErrors || [],
-    unknownFields: aggregate.unknownFields || [],
-    conflicts: aggregate.conflicts || [],
-    rawResponses: aggregate.rawResponses || [],
+    extractionStatus: result.status || 'skipped',
+    diagnosis: result.diagnosis || '',
+    specialization: result.specialization || '',
+    summary: result.summary || '',
+    reportDate: result.reportDate || null,
+    normalizedFields: result.normalizedFields || {},
+    numericFields: result.numericFields || {},
+    parsedMetrics: result.parsedMetrics || [],
+    medications: result.medications || [],
+    nextVisitDate: result.nextVisitDate || null,
+    validationErrors: result.validationErrors || [],
+    unknownFields: result.unknownFields || [],
+    ambiguities: result.ambiguities || [],
+    conflicts: result.conflicts || [],
+    rawResponses: result.rawResponse ? [{
+      documentPath: 'combined',
+      response: result.rawResponse,
+      status: result.status
+    }] : [],
     processedAt: new Date()
   };
 
-  if ((record.diagnosis === 'See Prescription' || !record.diagnosis) && aggregate.diagnosis) {
-    record.diagnosis = aggregate.diagnosis;
+  if ((record.diagnosis === 'See Prescription' || !record.diagnosis) && result.diagnosis) {
+    record.diagnosis = result.diagnosis;
   }
 
-  if (aggregate.medications?.length) {
-    record.medications = buildMedicationObjects(aggregate.medications);
+  if (result.medicationDetails?.length) {
+    record.medications = result.medicationDetails;
+  } else if (result.medications?.length) {
+    record.medications = result.medications.map((name) => ({
+      name,
+      dosage: '',
+      frequency: '',
+      duration: '',
+      timing: '',
+      instructions: ''
+    }));
+  } else {
+    record.medications = [];
   }
 
-  if (aggregate.nextVisitDate) {
-    record.nextVisitDate = aggregate.nextVisitDate;
+  if (result.nextVisitDate) {
+    record.nextVisitDate = result.nextVisitDate;
+  } else {
+    record.nextVisitDate = null;
   }
 
   record.healthMetrics = {
     ...(record.healthMetrics?.toObject ? record.healthMetrics.toObject() : (record.healthMetrics || {})),
     ...healthMetrics
   };
-
-  record.customFields = buildCustomFields(aggregate.normalizedFields);
+  record.customFields = buildCustomFields(result.normalizedFields);
 }
 
-function applyAggregateToTestAssignment(assignment, aggregate) {
+function applyResultToTestAssignment(assignment, result) {
   assignment.structuredData = {
-    extractionStatus: aggregate.anyAttempted
-      ? (aggregate.anySuccess ? 'completed' : 'failed')
-      : 'skipped',
-    diagnosis: aggregate.diagnosis || assignment.structuredData?.diagnosis || '',
-    specialization: aggregate.specialization || assignment.structuredData?.specialization || '',
-    reportDate: aggregate.reportDate || assignment.structuredData?.reportDate || null,
-    normalizedFields: aggregate.normalizedFields || {},
-    numericFields: aggregate.numericFields || {},
-    medications: aggregate.medications || [],
-    nextVisitDate: aggregate.nextVisitDate || null,
-    validationErrors: aggregate.validationErrors || [],
-    unknownFields: aggregate.unknownFields || [],
-    conflicts: aggregate.conflicts || [],
-    rawResponses: aggregate.rawResponses || [],
+    extractionStatus: result.status || 'skipped',
+    diagnosis: result.diagnosis || '',
+    specialization: result.specialization || '',
+    summary: result.summary || '',
+    reportDate: result.reportDate || null,
+    normalizedFields: result.normalizedFields || {},
+    numericFields: result.numericFields || {},
+    parsedMetrics: result.parsedMetrics || [],
+    medications: result.medications || [],
+    nextVisitDate: result.nextVisitDate || null,
+    validationErrors: result.validationErrors || [],
+    unknownFields: result.unknownFields || [],
+    ambiguities: result.ambiguities || [],
+    conflicts: result.conflicts || [],
+    rawResponses: result.rawResponse ? [{
+      documentPath: 'combined',
+      response: result.rawResponse,
+      status: result.status
+    }] : [],
     processedAt: new Date()
   };
 }
 
-async function processMedicalRecord(recordId) {
+async function processMedicalRecord(recordId, clarificationSelections = {}) {
   const record = await MedicalRecord.findById(recordId);
-  if (!record) return;
+  if (!record) return null;
 
-  const aggregate = await processDocuments({
+  const result = await processDocuments({
     documents: record.categorizedDocuments || [],
-    fallbackText: record.prescriptionNotes || record.diagnosis || ''
+    fallbackText: record.prescriptionNotes || record.diagnosis || '',
+    visitDate: record.visitDate || record.createdAt || new Date(),
+    clarificationSelections
   });
 
-  applyAggregateToMedicalRecord(record, aggregate);
+  applyResultToDocuments(record.categorizedDocuments, result);
+  applyResultToMedicalRecord(record, result);
   record.markModified('categorizedDocuments');
   record.markModified('structuredData');
   record.markModified('healthMetrics');
   record.markModified('customFields');
   await record.save();
+  return result;
 }
 
-async function processTestAssignment(assignmentId) {
+async function processTestAssignment(assignmentId, clarificationSelections = {}) {
   const assignment = await TestAssignment.findById(assignmentId);
-  if (!assignment) return;
+  if (!assignment) return null;
 
-  const aggregate = await processDocuments({
+  const result = await processDocuments({
     documents: assignment.resultDocuments || [],
-    fallbackText: assignment.results || ''
+    fallbackText: assignment.results || '',
+    visitDate: assignment.completedAt || assignment.createdAt || new Date(),
+    clarificationSelections
   });
 
-  applyAggregateToTestAssignment(assignment, aggregate);
+  applyResultToDocuments(assignment.resultDocuments, result);
+  applyResultToTestAssignment(assignment, result);
   assignment.markModified('resultDocuments');
   assignment.markModified('structuredData');
   await assignment.save();
+  return result;
+}
+
+async function finalizeValidatedMedicalRecord(record, validatedData, rawResponse, clarificationSelections = {}) {
+  const hasPrescriptionDocumentHint = (record.categorizedDocuments || []).some((document) => {
+    const label = `${document?.reportTag || ''} ${document?.filePath || ''} ${document?.category || ''}`;
+    return /(prescription|\brx\b|medication|medicine)/i.test(label);
+  });
+
+  const normalized = await normalizeValidatedMedicalData(validatedData, {
+    clarificationSelections,
+    visitDate: record.visitDate || record.createdAt || new Date(),
+    fallbackText: record.prescriptionNotes || record.diagnosis || '',
+    hasPrescriptionDocumentHint
+  });
+
+  const result = {
+    success: !normalized.ambiguities?.length,
+    status: normalized.ambiguities?.length ? 'clarification_required' : 'completed',
+    rawResponse,
+    validationErrors: [],
+    ...normalized,
+    summary: buildSummaryFromExtraction(normalized)
+  };
+
+  applyResultToDocuments(record.categorizedDocuments, result);
+  applyResultToMedicalRecord(record, result);
+  record.markModified('categorizedDocuments');
+  record.markModified('structuredData');
+  record.markModified('healthMetrics');
+  record.markModified('customFields');
+  await record.save();
+  return result;
+}
+
+async function finalizeValidatedTestAssignment(assignment, validatedData, rawResponse, clarificationSelections = {}) {
+  const hasPrescriptionDocumentHint = (assignment.resultDocuments || []).some((document) => {
+    const label = `${document?.reportTag || ''} ${document?.filePath || ''} ${document?.category || ''}`;
+    return /(prescription|\brx\b|medication|medicine)/i.test(label);
+  });
+
+  const normalized = await normalizeValidatedMedicalData(validatedData, {
+    clarificationSelections,
+    visitDate: assignment.completedAt || assignment.createdAt || new Date(),
+    fallbackText: assignment.results || '',
+    hasPrescriptionDocumentHint
+  });
+
+  const result = {
+    success: !normalized.ambiguities?.length,
+    status: normalized.ambiguities?.length ? 'clarification_required' : 'completed',
+    rawResponse,
+    validationErrors: [],
+    ...normalized,
+    summary: buildSummaryFromExtraction(normalized)
+  };
+
+  applyResultToDocuments(assignment.resultDocuments, result);
+  applyResultToTestAssignment(assignment, result);
+  assignment.markModified('resultDocuments');
+  assignment.markModified('structuredData');
+  await assignment.save();
+  return result;
 }
 
 function queueMedicalRecordPostUploadProcessing(recordId) {
@@ -264,8 +302,11 @@ function queueTestAssignmentPostUploadProcessing(assignmentId) {
 }
 
 module.exports = {
+  processDocuments,
   processMedicalRecord,
   processTestAssignment,
+  finalizeValidatedMedicalRecord,
+  finalizeValidatedTestAssignment,
   queueMedicalRecordPostUploadProcessing,
   queueTestAssignmentPostUploadProcessing
 };

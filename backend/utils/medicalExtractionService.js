@@ -7,54 +7,268 @@ const { promisify } = require('util');
 const { AI_RUNTIME_CONFIG, callModelGenerate, aiTrace, createTraceId } = require('./aiSummarizer');
 const { extractDocumentText } = require('./aiDocumentTextExtractor');
 const { validateMedicalExtractionResponse } = require('./medicalExtractionValidator');
-const { normalizeFieldEntries } = require('./medicalFieldNormalization');
+const { normalizeFieldEntriesWithCatalog } = require('./medicalFieldNormalization');
+const { buildCatalogPromptSection } = require('./medicalFieldCatalogService');
 const {
   canonicalizeDiagnosis,
   canonicalizeSpecialization,
-  canonicalizeMedicationList,
+  canonicalizeMedicationName,
   buildCanonicalPromptSection
 } = require('./medicalCanonicalization');
 
 const execFileAsync = promisify(execFile);
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const PRESCRIPTION_SIGNAL_PATTERN = /\b(tablet|tab\b|capsule|cap\b|syrup|drops|ointment|inject(?:ion)?|take|before food|after food|once daily|twice daily|thrice|morning|night|bedtime|od\b|bd\b|tid\b|hs\b|for\s+\d+\s*(?:day|week|month)s?)\b/i;
+const FOLLOW_UP_SIGNAL_PATTERN = /\b(next visit|follow[\s-]?up|review (?:after|in)|revisit|consult (?:again|after)|after\s+\d+\s*(?:day|week|month)s?|in\s+\d+\s*(?:day|week|month)s?)\b/i;
+const LAB_DOSAGE_UNIT_PATTERN = /(?:\/\s*(?:dl|ml|l)|\b(?:mg\/dl|g\/dl|ng\/dl|pg\/ml|mmol\/l|miu\/l|uiu\/ml|iu\/ml)\b)/i;
+const LIKELY_LAB_TERM_PATTERN = /\b(tsh|t3|t4|ft3|ft4|hemoglobin|hgb|rbc|wbc|platelet|pcv|glucose|sugar|cholesterol|triglyceride|creatinine|urea|bilirubin|sgot|sgpt|ast|alt)\b/i;
 
-function buildExtractionPrompt({ text }) {
+function normalizeEvidenceText(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasEvidenceForMedicationName(name = '', evidenceText = '') {
+  const normalizedName = normalizeEvidenceText(name);
+  if (!normalizedName || !evidenceText) return false;
+
+  if (evidenceText.includes(normalizedName)) return true;
+
+  const significantTokens = normalizedName
+    .split(' ')
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 4);
+
+  if (!significantTokens.length) return false;
+  return significantTokens.every((token) => evidenceText.includes(token));
+}
+
+function hasPartialEvidenceForMedicationName(name = '', evidenceText = '') {
+  const normalizedName = normalizeEvidenceText(name);
+  if (!normalizedName || !evidenceText) return false;
+
+  const significantTokens = normalizedName
+    .split(' ')
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 4);
+
+  if (!significantTokens.length) return false;
+  return significantTokens.some((token) => evidenceText.includes(token));
+}
+
+function isLabLikeDosageText(value = '') {
+  const normalized = String(value || '').toLowerCase().replace(/\s+/g, '');
+  if (!normalized) return false;
+  return LAB_DOSAGE_UNIT_PATTERN.test(normalized);
+}
+
+function isLikelyLabTerm(value = '') {
+  const normalized = normalizeEvidenceText(value);
+  if (!normalized) return false;
+  return LIKELY_LAB_TERM_PATTERN.test(normalized);
+}
+
+function sanitizeClinicalPlan({
+  medications = [],
+  medicationDetails = [],
+  nextVisitDate = null,
+  fallbackText = '',
+  sourceText = '',
+  visitDate = null,
+  hasPrescriptionDocumentHint = false
+}) {
+  const evidenceText = normalizeEvidenceText(`${fallbackText || ''}\n${sourceText || ''}`);
+  const hasPrescriptionSignal = PRESCRIPTION_SIGNAL_PATTERN.test(evidenceText);
+  const hasPrescriptionContext = hasPrescriptionSignal || Boolean(hasPrescriptionDocumentHint);
+  const hasFollowUpSignal = FOLLOW_UP_SIGNAL_PATTERN.test(evidenceText);
+
+  const filteredMedicationDetails = (medicationDetails || []).filter((item) => {
+    const name = String(item?.name || '').trim();
+    if (!name) return false;
+
+    const hasNameEvidence = hasEvidenceForMedicationName(name, evidenceText);
+    const hasPartialNameEvidence = hasPartialEvidenceForMedicationName(name, evidenceText);
+    const hasInstructionSignal = Boolean(
+      String(item?.frequency || '').trim() ||
+      String(item?.timing || '').trim() ||
+      String(item?.instructions || '').trim() ||
+      String(item?.duration || '').trim() ||
+      Number.isFinite(item?.durationDays)
+    );
+
+    const dosageLooksLabLike = isLabLikeDosageText(item?.dosage || '');
+    const nameLooksLabLike = isLikelyLabTerm(name);
+
+    if (nameLooksLabLike) {
+      return false;
+    }
+
+    if (dosageLooksLabLike && !hasPrescriptionContext) {
+      return false;
+    }
+
+    if (!hasNameEvidence) {
+      if (!(hasPrescriptionContext && hasInstructionSignal && !dosageLooksLabLike)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  const detailNames = new Set(
+    filteredMedicationDetails
+      .map((item) => String(item?.name || '').trim())
+      .filter(Boolean)
+      .map((name) => name.toLowerCase())
+  );
+
+  const filteredMedications = uniqueNonEmpty([
+    ...(medications || []),
+    ...filteredMedicationDetails.map((item) => item.name)
+  ]).filter((name) => {
+    const hasNameEvidence = hasEvidenceForMedicationName(name, evidenceText);
+    const hasPartialNameEvidence = hasPartialEvidenceForMedicationName(name, evidenceText);
+    const nameLooksLabLike = isLikelyLabTerm(name);
+    const includedInDetails = detailNames.has(String(name || '').trim().toLowerCase());
+
+    if (nameLooksLabLike) {
+      return false;
+    }
+
+    if (!hasNameEvidence && !includedInDetails && !(hasPrescriptionContext && hasPartialNameEvidence)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  let sanitizedNextVisitDate = nextVisitDate || null;
+  if (sanitizedNextVisitDate && visitDate) {
+    const anchor = new Date(visitDate);
+    if (!Number.isNaN(anchor.getTime()) && sanitizedNextVisitDate.getTime() <= anchor.getTime()) {
+      sanitizedNextVisitDate = null;
+    }
+  }
+
+  if (sanitizedNextVisitDate && !hasFollowUpSignal && !hasPrescriptionSignal) {
+    sanitizedNextVisitDate = null;
+  }
+
+  return {
+    medications: filteredMedications,
+    medicationDetails: filteredMedicationDetails,
+    nextVisitDate: sanitizedNextVisitDate
+  };
+}
+
+function sanitizeEvidenceBackedFields(normalized = {}, options = {}) {
+  const evidenceText = ` ${normalizeEvidenceText(`${options.fallbackText || ''}\n${options.sourceText || ''}`)} `;
+  const evidenceRequiredFields = {
+    weight: ['weight', 'wt'],
+    height: ['height', 'ht'],
+    bmi: ['bmi', 'body mass index']
+  };
+
+  const shouldKeepField = (fieldKey) => {
+    const aliases = evidenceRequiredFields[fieldKey];
+    if (!aliases) return true;
+    return aliases.some((alias) => evidenceText.includes(` ${alias} `));
+  };
+
+  const dropSet = new Set(
+    Object.keys(evidenceRequiredFields).filter((fieldKey) => (
+      Object.prototype.hasOwnProperty.call(normalized.normalizedFields || {}, fieldKey)
+      && !shouldKeepField(fieldKey)
+    ))
+  );
+
+  if (!dropSet.size) {
+    return normalized;
+  }
+
+  const normalizedFields = { ...(normalized.normalizedFields || {}) };
+  const numericFields = { ...(normalized.numericFields || {}) };
+
+  for (const fieldKey of dropSet) {
+    delete normalizedFields[fieldKey];
+    delete numericFields[fieldKey];
+  }
+
+  const parsedMetrics = (normalized.parsedMetrics || []).filter((metric) => !dropSet.has(metric?.name));
+
+  return {
+    ...normalized,
+    normalizedFields,
+    numericFields,
+    parsedMetrics,
+    importantFindings: parsedMetrics.slice(0, 8)
+  };
+}
+
+function buildExtractionPrompt({ combinedText = '', fallbackText = '', documentLabels = [], catalogPromptSection = '' }) {
   return [
     'You are a medical data extraction system.',
     '',
-    'Extract structured medical information from the given text.',
+    'Extract structured medical information from the full combined medical context.',
+    'The input may contain multiple uploaded files and prescription notes.',
+    'Use the exact field wording from the source when possible. Do not silently merge blood sugar context if it is ambiguous.',
+    'When multiple reports are provided, include the UNION of distinct tests from every report. Do not drop tests that appear in only one document.',
     '',
     'Return ONLY valid JSON.',
     '',
-    'Do not include explanation or extra text.',
-    '',
     'Format:',
-    '',
     '{',
     '"diagnosis": "...",',
     '"specialization": "...",',
     '"reportDate": "YYYY-MM-DD",',
     '"fields": {',
-    '"field_name": {',
-    '"value": 0,',
-    '"unit": "",',
-    '"reference": "",',
-    '"status": "high|low|normal|unknown"',
-    '}',
+    '  "field_name_from_source": {',
+    '    "value": 0,',
+    '    "unit": "",',
+    '    "reference": "",',
+    '    "status": "high|low|normal|unknown"',
+    '  }',
     '},',
-    '"medications": [],',
-    '"nextVisit": "YYYY-MM-DD"',
+    '"medications": ["Medicine Name"],',
+    '"medicationDetails": [{',
+    '  "name": "",',
+    '  "dosage": "",',
+    '  "frequency": "",',
+    '  "timing": "",',
+    '  "duration": "",',
+    '  "durationDays": 0,',
+    '  "totalTablets": 0,',
+    '  "tabletsPerDose": 0,',
+    '  "timesPerDay": 0,',
+    '  "instructions": ""',
+    '}],',
+    '"nextVisit": "YYYY-MM-DD",',
+    '"nextVisitInDays": 0',
     '}',
     '',
-    'Only include relevant medical fields.',
-    'Use numeric values where applicable.',
-    'If a report or sample date is visible, include it in reportDate.',
-    'For important lab values, preserve unit, reference range, and status when visible.',
+    'Rules:',
+    '- Use numeric values where applicable.',
+    '- If report or sample date is visible, include it in reportDate.',
+    '- If prescription notes mention medicines, dosage, after food/before food, morning/night, or duration, capture them in medicationDetails.',
+    '- If next visit is relative such as "after 1 week", fill nextVisitInDays.',
+    '- Do not invent missing information.',
+    '- Never infer medications from lab values unless explicitly present in prescription context.',
     '',
     buildCanonicalPromptSection(),
     '',
-    'INPUT:',
-    text || ''
+    catalogPromptSection,
+    '',
+    `Uploaded documents: ${documentLabels.join(', ') || 'none'}`,
+    '',
+    'DOCUMENT CONTENT:',
+    combinedText || '',
+    '',
+    'PRESCRIPTION OR FALLBACK NOTES:',
+    fallbackText || ''
   ].join('\n');
 }
 
@@ -93,33 +307,500 @@ async function createPdfPreviewImage(filePath = '') {
   return fs.existsSync(fallbackPath) ? fallbackPath : '';
 }
 
-function buildModelImages(filePath = '') {
-  if (!filePath || !fs.existsSync(filePath)) return [];
-  if (!IMAGE_EXTENSIONS.has(path.extname(filePath).toLowerCase())) return [];
-  return [{
+function buildModelImage(filePath = '') {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  if (!IMAGE_EXTENSIONS.has(path.extname(filePath).toLowerCase())) return null;
+  return {
     data: fs.readFileSync(filePath).toString('base64'),
     mimeType: detectMimeType(filePath)
-  }];
+  };
 }
 
-async function requestMedicalExtraction({ filePath, fallbackText }) {
-  const sourceText = await extractDocumentText(filePath, { maxChars: AI_RUNTIME_CONFIG.maxInputChars });
-  const visionInputPath = sourceText
-    ? ''
-    : (
-      detectMimeType(filePath) === 'application/pdf'
-        ? await createPdfPreviewImage(filePath)
-        : filePath
-    );
+async function collectDocumentSources(documents = []) {
+  const textSections = [];
+  const images = [];
+  const labels = [];
 
+  for (const document of documents || []) {
+    if (!document?.filePath) continue;
+    const label = document.reportTag || document.category || path.basename(document.filePath);
+    labels.push(label);
+
+    const extractedText = await extractDocumentText(document.filePath, { maxChars: Math.floor(AI_RUNTIME_CONFIG.maxInputChars / Math.max(documents.length || 1, 1)) });
+    if (extractedText) {
+      textSections.push(`### ${label}\n${extractedText}`);
+      continue;
+    }
+
+    const mimeType = detectMimeType(document.filePath);
+    const previewPath = mimeType === 'application/pdf'
+      ? await createPdfPreviewImage(document.filePath)
+      : document.filePath;
+    const image = buildModelImage(previewPath);
+    if (image) {
+      images.push(image);
+      textSections.push(`### ${label}\n[visual document attached]`);
+    }
+  }
+
+  return {
+    combinedText: textSections.join('\n\n').slice(0, AI_RUNTIME_CONFIG.maxInputChars),
+    textSections,
+    images,
+    labels
+  };
+}
+
+function computeMedicationDurations(medicationDetails = [], visitDate = null) {
+  const startDate = visitDate ? new Date(visitDate) : new Date();
+  return (medicationDetails || []).map((item) => {
+    const normalized = {
+      name: canonicalizeMedicationName(item.name),
+      dosage: item.dosage || '',
+      frequency: item.frequency || '',
+      duration: item.duration || '',
+      timing: item.timing || '',
+      instructions: item.instructions || '',
+      durationDays: Number.isFinite(item.durationDays) ? item.durationDays : null,
+      totalTablets: Number.isFinite(item.totalTablets) ? item.totalTablets : null,
+      tabletsPerDose: Number.isFinite(item.tabletsPerDose) ? item.tabletsPerDose : null,
+      timesPerDay: Number.isFinite(item.timesPerDay) ? item.timesPerDay : null
+    };
+
+    if (
+      normalized.durationDays == null &&
+      normalized.totalTablets != null &&
+      normalized.tabletsPerDose != null &&
+      normalized.timesPerDay != null &&
+      normalized.tabletsPerDose > 0 &&
+      normalized.timesPerDay > 0
+    ) {
+      normalized.durationDays = Math.max(
+        1,
+        Math.floor(normalized.totalTablets / (normalized.tabletsPerDose * normalized.timesPerDay))
+      );
+    }
+
+    normalized.startDate = startDate;
+    normalized.endDate = normalized.durationDays
+      ? new Date(startDate.getTime() + normalized.durationDays * 24 * 60 * 60 * 1000)
+      : null;
+
+    return normalized;
+  });
+}
+
+function resolveNextVisitDate(validatedData = {}, visitDate = null) {
+  if (validatedData.nextVisit) return validatedData.nextVisit;
+  if (validatedData.nextVisitInDays == null) return null;
+
+  const anchor = visitDate ? new Date(visitDate) : new Date();
+  return new Date(anchor.getTime() + validatedData.nextVisitInDays * 24 * 60 * 60 * 1000);
+}
+
+function uniqueNonEmpty(values = []) {
+  return Array.from(new Set((values || []).map((value) => String(value || '').trim()).filter(Boolean)));
+}
+
+function fieldValueScore(value) {
+  if (value == null) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? 4 : 0;
+  if (typeof value === 'boolean') return 1;
+  if (typeof value === 'string') return value.trim().length ? 2 : 0;
+  if (typeof value !== 'object' || Array.isArray(value)) return 0;
+
+  let score = 0;
+  if (value.value != null && String(value.value).trim() !== '') score += 4;
+  if (value.unit && String(value.unit).trim()) score += 1;
+  if (value.reference && String(value.reference).trim()) score += 1;
+  if (value.status && String(value.status).trim()) score += 1;
+  return score;
+}
+
+function mergeFieldMaps(current = {}, incoming = {}) {
+  const merged = { ...(current || {}) };
+
+  for (const [fieldKey, candidate] of Object.entries(incoming || {})) {
+    if (!(fieldKey in merged)) {
+      merged[fieldKey] = candidate;
+      continue;
+    }
+
+    const existing = merged[fieldKey];
+    if (fieldValueScore(candidate) > fieldValueScore(existing)) {
+      merged[fieldKey] = candidate;
+    }
+  }
+
+  return merged;
+}
+
+function normalizeMedicationToken(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function medicationDetailCompleteness(item = {}) {
+  let score = 0;
+  if (normalizeMedicationToken(item.name)) score += 5;
+  if (normalizeMedicationToken(item.dosage)) score += 4;
+  if (normalizeMedicationToken(item.frequency)) score += 3;
+  if (normalizeMedicationToken(item.timing)) score += 2;
+  if (normalizeMedicationToken(item.instructions)) score += 2;
+  if (normalizeMedicationToken(item.duration)) score += 2;
+  if (Number.isFinite(item.durationDays)) score += 3;
+  if (Number.isFinite(item.totalTablets)) score += 1;
+  if (Number.isFinite(item.tabletsPerDose)) score += 1;
+  if (Number.isFinite(item.timesPerDay)) score += 1;
+  if (item.endDate) score += 1;
+  return score;
+}
+
+function mergeMedicationDetails(items = []) {
+  const byKey = new Map();
+
+  for (const item of items || []) {
+    if (!item || typeof item !== 'object') continue;
+    const key = [
+      normalizeMedicationToken(item.name),
+      normalizeMedicationToken(item.dosage),
+      normalizeMedicationToken(item.frequency),
+      normalizeMedicationToken(item.timing),
+      normalizeMedicationToken(item.instructions)
+    ].join('|');
+
+    const fallbackKey = [
+      normalizeMedicationToken(item.name),
+      normalizeMedicationToken(item.dosage)
+    ].join('|');
+
+    const finalKey = key.replace(/\|/g, '') ? key : fallbackKey;
+    if (!finalKey || !finalKey.replace(/\|/g, '')) continue;
+
+    const existing = byKey.get(finalKey);
+    if (!existing || medicationDetailCompleteness(item) > medicationDetailCompleteness(existing)) {
+      byKey.set(finalKey, item);
+    }
+  }
+
+  return Array.from(byKey.values());
+}
+
+function mergeValidatedPayloads(payloads = []) {
+  const merged = {
+    diagnosis: '',
+    specialization: '',
+    reportDate: null,
+    fields: {},
+    medications: [],
+    medicationDetails: [],
+    nextVisit: null,
+    nextVisitInDays: null
+  };
+
+  for (const payload of payloads || []) {
+    if (!payload || typeof payload !== 'object') continue;
+
+    if (!merged.diagnosis && payload.diagnosis) {
+      merged.diagnosis = payload.diagnosis;
+    }
+
+    if (!merged.specialization && payload.specialization) {
+      merged.specialization = payload.specialization;
+    }
+
+    if (!merged.reportDate && payload.reportDate) {
+      merged.reportDate = payload.reportDate;
+    }
+
+    if (!merged.nextVisit && payload.nextVisit) {
+      merged.nextVisit = payload.nextVisit;
+    }
+
+    if (merged.nextVisitInDays == null && Number.isFinite(payload.nextVisitInDays)) {
+      merged.nextVisitInDays = payload.nextVisitInDays;
+    }
+
+    merged.fields = mergeFieldMaps(merged.fields, payload.fields || {});
+    merged.medications.push(...(payload.medications || []));
+    merged.medicationDetails.push(...(payload.medicationDetails || []));
+  }
+
+  merged.medications = uniqueNonEmpty(merged.medications);
+  merged.medicationDetails = mergeMedicationDetails(merged.medicationDetails);
+  return merged;
+}
+
+function buildCompactCombinedText(sourceBundle = {}, maxChars = 3600) {
+  const textSections = Array.isArray(sourceBundle.textSections)
+    ? sourceBundle.textSections
+    : [];
+
+  if (!textSections.length) {
+    return String(sourceBundle.combinedText || '').slice(0, maxChars);
+  }
+
+  const docCount = Math.max(textSections.length, 1);
+  const perDocBudget = Math.max(500, Math.floor(maxChars / docCount));
+  return textSections
+    .map((section) => String(section || '').slice(0, perDocBudget))
+    .join('\n\n')
+    .slice(0, maxChars);
+}
+
+async function validateOrRepairExtraction(rawResponse = '') {
+  const initialValidation = validateMedicalExtractionResponse(rawResponse);
+  if (initialValidation.valid) {
+    return {
+      valid: true,
+      data: initialValidation.data,
+      rawResponse,
+      repaired: false,
+      errors: []
+    };
+  }
+
+  const repaired = await repairMedicalExtractionJson(rawResponse);
+  const repairedValidation = repaired?.content
+    ? validateMedicalExtractionResponse(repaired.content)
+    : { valid: false, errors: ['LLM repair returned no content'] };
+
+  if (repairedValidation.valid) {
+    return {
+      valid: true,
+      data: repairedValidation.data,
+      rawResponse: repaired.content,
+      repaired: true,
+      errors: []
+    };
+  }
+
+  return {
+    valid: false,
+    data: null,
+    rawResponse,
+    repaired: false,
+    errors: uniqueNonEmpty([
+      ...(initialValidation.errors || []),
+      ...((repairedValidation.errors || []).map((error) => `repair: ${error}`))
+    ])
+  };
+}
+
+function buildExtractionSuccessResponse({ normalized, rawResponse, validatedData }) {
+  const requiresClarification = Array.isArray(normalized.ambiguities) && normalized.ambiguities.length > 0;
+
+  return {
+    success: !requiresClarification,
+    status: requiresClarification ? 'clarification_required' : 'completed',
+    rawResponse,
+    diagnosis: normalized.diagnosis,
+    specialization: normalized.specialization,
+    reportDate: normalized.reportDate,
+    medications: normalized.medications,
+    medicationDetails: normalized.medicationDetails,
+    nextVisitDate: normalized.nextVisitDate,
+    normalizedFields: normalized.normalizedFields,
+    numericFields: normalized.numericFields,
+    parsedMetrics: normalized.parsedMetrics,
+    importantFindings: normalized.importantFindings,
+    unknownFields: normalized.unknownFields,
+    conflicts: normalized.conflicts,
+    ambiguities: normalized.ambiguities,
+    validationErrors: [],
+    validatedData
+  };
+}
+
+async function requestMedicalExtractionFromSources({ documents = [], fallbackText = '' }) {
+  const sourceBundle = await collectDocumentSources(documents);
+  const catalogPromptSection = await buildCatalogPromptSection();
+  const localFallbackEnabled = AI_RUNTIME_CONFIG.provider === 'local' || AI_RUNTIME_CONFIG.fallbackProvider === 'local';
+  const shouldCompactPrompt = localFallbackEnabled && (documents.length > 1 || sourceBundle.images.length > 1);
+  const compactCatalogSection = shouldCompactPrompt
+    ? String(catalogPromptSection || '').split('\n').slice(0, 28).join('\n')
+    : catalogPromptSection;
+  const combinedText = shouldCompactPrompt
+    ? buildCompactCombinedText(sourceBundle, Math.min(AI_RUNTIME_CONFIG.maxInputChars, 3600))
+    : sourceBundle.combinedText;
+  const fallbackTextLimit = shouldCompactPrompt
+    ? 1200
+    : Math.floor(AI_RUNTIME_CONFIG.maxInputChars / 2);
   const prompt = buildExtractionPrompt({
-    text: sourceText || String(fallbackText || '').slice(0, AI_RUNTIME_CONFIG.maxInputChars)
+    combinedText,
+    fallbackText: String(fallbackText || '').slice(0, fallbackTextLimit),
+    documentLabels: sourceBundle.labels,
+    catalogPromptSection: compactCatalogSection
   });
 
-  return callModelGenerate({
+  const providerResult = await callModelGenerate({
     prompt,
-    images: buildModelImages(visionInputPath)
+    images: sourceBundle.images
   });
+
+  return {
+    ...providerResult,
+    sourceText: sourceBundle.combinedText
+  };
+}
+
+async function repairMedicalExtractionJson(rawResponse = '') {
+  const prompt = [
+    'You are a JSON repair system.',
+    'Convert the following model output into valid JSON only.',
+    'Do not add explanations.',
+    'Preserve the original medical meaning.',
+    'Return one JSON object only.',
+    '',
+    rawResponse
+  ].join('\n');
+
+  return callModelGenerate({ prompt });
+}
+
+async function extractBySplittingDocuments(options = {}, traceId = '') {
+  const documents = options.documents || [];
+  if (documents.length <= 1) {
+    return { success: false, errors: [] };
+  }
+
+  aiTrace('structured_extraction_split_retry_start', {
+    traceId,
+    documentCount: documents.length
+  });
+
+  const successfulPayloads = [];
+  const documentErrors = [];
+
+  for (let index = 0; index < documents.length; index += 1) {
+    const document = documents[index];
+    const label = document?.reportTag || document?.category || path.basename(document?.filePath || '') || `document_${index + 1}`;
+
+    const docResult = await requestMedicalExtractionFromSources({
+      documents: [document],
+      fallbackText: index === 0 ? options.fallbackText : '',
+      visitDate: options.visitDate
+    });
+
+    const docRawResponse = docResult?.content || '';
+    const docProvider = docResult?.providerUsed || AI_RUNTIME_CONFIG.provider;
+    if (!docRawResponse) {
+      documentErrors.push(`${label}: ${docResult?.error || 'LLM returned no content'}`);
+      continue;
+    }
+
+    const docValidation = await validateOrRepairExtraction(docRawResponse);
+    if (!docValidation.valid) {
+      documentErrors.push(...(docValidation.errors || []).map((error) => `${label}: ${error}`));
+      continue;
+    }
+
+    successfulPayloads.push({
+      label,
+      provider: docProvider,
+      repaired: docValidation.repaired,
+      data: docValidation.data
+    });
+  }
+
+  if (!successfulPayloads.length) {
+    aiTrace('structured_extraction_split_retry_failed', {
+      traceId,
+      errorCount: documentErrors.length
+    });
+    return {
+      success: false,
+      errors: documentErrors
+    };
+  }
+
+  const mergedPayload = mergeValidatedPayloads(successfulPayloads.map((item) => item.data));
+  const mergedValidation = validateMedicalExtractionResponse(mergedPayload);
+  if (!mergedValidation.valid) {
+    const mergedErrors = uniqueNonEmpty([
+      ...documentErrors,
+      ...(mergedValidation.errors || [])
+    ]);
+    aiTrace('structured_extraction_split_retry_failed', {
+      traceId,
+      errorCount: mergedErrors.length
+    });
+    return {
+      success: false,
+      errors: mergedErrors
+    };
+  }
+
+  const mergedRawResponse = JSON.stringify({
+    strategy: 'per_document_merge',
+    mergedDocumentCount: successfulPayloads.length,
+    documents: successfulPayloads.map((item) => ({
+      label: item.label,
+      provider: item.provider,
+      repaired: item.repaired,
+      fieldCount: Object.keys(item.data?.fields || {}).length
+    }))
+  });
+
+  aiTrace('structured_extraction_split_retry_success', {
+    traceId,
+    mergedDocumentCount: successfulPayloads.length,
+    mergedFieldCount: Object.keys(mergedValidation.data?.fields || {}).length
+  });
+
+  return {
+    success: true,
+    validatedData: mergedValidation.data,
+    rawResponse: mergedRawResponse,
+    repaired: successfulPayloads.some((item) => item.repaired),
+    errors: documentErrors
+  };
+}
+
+async function normalizeValidatedMedicalData(validatedData = {}, options = {}) {
+  const normalizedRaw = await normalizeFieldEntriesWithCatalog(
+    validatedData.fields,
+    options.clarificationSelections || {}
+  );
+  const normalized = sanitizeEvidenceBackedFields(normalizedRaw, options);
+  const diagnosis = canonicalizeDiagnosis(validatedData.diagnosis);
+  const specialization = canonicalizeSpecialization(validatedData.specialization);
+  const medicationDetails = mergeMedicationDetails(
+    computeMedicationDurations(validatedData.medicationDetails, options.visitDate)
+  );
+  const medications = Array.from(new Set([
+    ...(validatedData.medications || []).map((item) => canonicalizeMedicationName(item)),
+    ...medicationDetails.map((item) => item.name)
+  ].filter(Boolean)));
+  const nextVisitDate = resolveNextVisitDate(validatedData, options.visitDate);
+  const sanitizedPlan = sanitizeClinicalPlan({
+    medications,
+    medicationDetails,
+    nextVisitDate,
+    fallbackText: options.fallbackText || '',
+    sourceText: options.sourceText || '',
+    visitDate: options.visitDate || null,
+    hasPrescriptionDocumentHint: Boolean(options.hasPrescriptionDocumentHint)
+  });
+
+  return {
+    diagnosis,
+    specialization,
+    reportDate: normalized.reportDate || validatedData.reportDate || null,
+    normalizedFields: normalized.normalizedFields,
+    numericFields: normalized.numericFields,
+    parsedMetrics: normalized.parsedMetrics,
+    importantFindings: normalized.importantFindings,
+    unknownFields: normalized.unknownFields,
+    conflicts: normalized.conflicts,
+    ambiguities: normalized.ambiguities,
+    medications: sanitizedPlan.medications,
+    medicationDetails: sanitizedPlan.medicationDetails,
+    nextVisitDate: sanitizedPlan.nextVisitDate
+  };
 }
 
 async function extractStructuredMedicalData(options = {}) {
@@ -127,13 +808,18 @@ async function extractStructuredMedicalData(options = {}) {
   aiTrace('structured_extraction_start', {
     traceId,
     provider: AI_RUNTIME_CONFIG.provider,
-    sourceFile: path.basename(options?.filePath || '') || 'unknown',
-    hasFallbackText: Boolean(options?.fallbackText)
+    documentCount: (options.documents || []).length,
+    hasFallbackText: Boolean(options.fallbackText)
   });
 
-  const result = await requestMedicalExtraction(options);
+  const result = await requestMedicalExtractionFromSources(options);
   const activeProvider = result?.providerUsed || AI_RUNTIME_CONFIG.provider;
   const rawResponse = result?.content || '';
+  const sourceText = result?.sourceText || '';
+  const hasPrescriptionDocumentHint = (options.documents || []).some((document) => {
+    const label = `${document?.reportTag || ''} ${document?.filePath || ''} ${document?.category || ''}`;
+    return /(prescription|\brx\b|medication|medicine)/i.test(label);
+  });
   const providerError = result?.error || '';
 
   if (!rawResponse) {
@@ -151,64 +837,118 @@ async function extractStructuredMedicalData(options = {}) {
       normalizedFields: {},
       numericFields: {},
       medications: [],
+      medicationDetails: [],
       unknownFields: [],
-      conflicts: []
+      conflicts: [],
+      ambiguities: []
     };
   }
 
-  const validation = validateMedicalExtractionResponse(rawResponse);
-  if (!validation.valid) {
-    aiTrace('structured_extraction_failed', {
-      traceId,
-      provider: activeProvider,
-      stage: 'validation',
-      errorCount: (validation.errors || []).length
-    });
-    return {
-      success: false,
-      status: 'failed',
-      rawResponse,
-      validationErrors: validation.errors,
-      normalizedFields: {},
-      numericFields: {},
-      medications: [],
-      unknownFields: [],
-      conflicts: []
-    };
+  let parsed = await validateOrRepairExtraction(rawResponse);
+  let parsedFromSplitRetry = false;
+
+  if (!parsed.valid) {
+    const splitRetry = await extractBySplittingDocuments(options, traceId);
+    if (splitRetry.success) {
+      parsed = {
+        valid: true,
+        data: splitRetry.validatedData,
+        rawResponse: splitRetry.rawResponse,
+        repaired: splitRetry.repaired,
+        errors: []
+      };
+      parsedFromSplitRetry = true;
+    } else {
+      const combinedErrors = uniqueNonEmpty([
+        ...(parsed.errors || []),
+        ...(splitRetry.errors || [])
+      ]);
+
+      aiTrace('structured_extraction_failed', {
+        traceId,
+        provider: activeProvider,
+        stage: 'validation',
+        errorCount: combinedErrors.length
+      });
+      return {
+        success: false,
+        status: 'failed',
+        rawResponse,
+        validationErrors: combinedErrors.length ? combinedErrors : ['Medical extraction validation failed'],
+        normalizedFields: {},
+        numericFields: {},
+        medications: [],
+        medicationDetails: [],
+        unknownFields: [],
+        conflicts: [],
+        ambiguities: []
+      };
+    }
   }
 
-  const normalized = normalizeFieldEntries(validation.data.fields);
-  const diagnosis = canonicalizeDiagnosis(validation.data.diagnosis);
-  const specialization = canonicalizeSpecialization(validation.data.specialization);
-  const medications = canonicalizeMedicationList(validation.data.medications);
+  const shouldRefineWithSplitMerge =
+    !parsedFromSplitRetry
+    && (options.documents || []).length > 1
+    && (activeProvider === 'local' || AI_RUNTIME_CONFIG.provider === 'local' || AI_RUNTIME_CONFIG.fallbackProvider === 'local');
 
-  aiTrace('structured_extraction_complete', {
+  if (shouldRefineWithSplitMerge) {
+    const splitRetry = await extractBySplittingDocuments(options, traceId);
+    if (splitRetry.success) {
+      const mergedPayload = mergeValidatedPayloads([parsed.data, splitRetry.validatedData]);
+      const mergedValidation = validateMedicalExtractionResponse(mergedPayload);
+
+      if (mergedValidation.valid) {
+        aiTrace('structured_extraction_multidoc_merge', {
+          traceId,
+          combinedFieldCount: Object.keys(parsed.data?.fields || {}).length,
+          splitFieldCount: Object.keys(splitRetry.validatedData?.fields || {}).length,
+          mergedFieldCount: Object.keys(mergedValidation.data?.fields || {}).length
+        });
+
+        parsed = {
+          ...parsed,
+          data: mergedValidation.data,
+          repaired: parsed.repaired || splitRetry.repaired,
+          rawResponse: parsed.rawResponse || splitRetry.rawResponse
+        };
+      } else {
+        aiTrace('structured_extraction_multidoc_merge_failed', {
+          traceId,
+          errorCount: (mergedValidation.errors || []).length
+        });
+      }
+    } else {
+      aiTrace('structured_extraction_multidoc_merge_skipped', {
+        traceId,
+        reason: (splitRetry.errors || []).slice(0, 2).join(' | ').slice(0, 200)
+      });
+    }
+  }
+
+  const normalized = await normalizeValidatedMedicalData(parsed.data, {
+    ...options,
+    sourceText,
+    hasPrescriptionDocumentHint
+  });
+  const requiresClarification = Array.isArray(normalized.ambiguities) && normalized.ambiguities.length > 0;
+
+  aiTrace(requiresClarification ? 'structured_extraction_clarification_required' : 'structured_extraction_complete', {
     traceId,
     provider: activeProvider,
     normalizedFieldCount: Object.keys(normalized.normalizedFields || {}).length,
     numericFieldCount: Object.keys(normalized.numericFields || {}).length,
-    metricCount: (normalized.parsedMetrics || []).length
+    ambiguityCount: (normalized.ambiguities || []).length,
+    repairedJson: parsed.repaired
   });
 
-  return {
-    success: true,
-    status: 'completed',
-    rawResponse,
-    diagnosis,
-    specialization,
-    reportDate: normalized.reportDate || validation.data.reportDate || null,
-    medications,
-    nextVisitDate: validation.data.nextVisit,
-    normalizedFields: normalized.normalizedFields,
-    numericFields: normalized.numericFields,
-    parsedMetrics: normalized.parsedMetrics,
-    importantFindings: normalized.importantFindings,
-    unknownFields: normalized.unknownFields,
-    conflicts: normalized.conflicts,
-    validationErrors: []
-  };
+  return buildExtractionSuccessResponse({
+    normalized,
+    rawResponse: parsed.rawResponse,
+    validatedData: parsed.data
+  });
 }
 
 module.exports = {
-  extractStructuredMedicalData
+  extractStructuredMedicalData,
+  normalizeValidatedMedicalData
 };

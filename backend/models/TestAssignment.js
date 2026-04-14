@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const llmExtractionSchema = new mongoose.Schema({
   status: {
     type: String,
-    enum: ['pending', 'completed', 'failed', 'skipped'],
+    enum: ['pending', 'completed', 'failed', 'skipped', 'clarification_required'],
     default: 'pending'
   },
   diagnosis: { type: String, trim: true },
@@ -28,18 +28,35 @@ const llmExtractionSchema = new mongoose.Schema({
 const structuredMedicalDataSchema = new mongoose.Schema({
   extractionStatus: {
     type: String,
-    enum: ['pending', 'completed', 'failed', 'skipped'],
+    enum: ['pending', 'completed', 'failed', 'skipped', 'clarification_required'],
     default: 'skipped'
   },
   diagnosis: { type: String, trim: true },
   specialization: { type: String, trim: true },
+  summary: { type: String, trim: true },
   normalizedFields: { type: mongoose.Schema.Types.Mixed, default: {} },
   numericFields: { type: mongoose.Schema.Types.Mixed, default: {} },
+  parsedMetrics: [{
+    name: { type: String, trim: true },
+    value: { type: Number },
+    unit: { type: String, trim: true },
+    reference: { type: String, trim: true },
+    referenceMin: { type: Number },
+    referenceMax: { type: Number },
+    status: { type: String, enum: ['low', 'normal', 'high', 'unknown'], default: 'unknown' }
+  }],
   medications: [{ type: String, trim: true }],
   reportDate: { type: Date },
   nextVisitDate: { type: Date },
   validationErrors: [{ type: String, trim: true }],
   unknownFields: [{ type: String, trim: true }],
+  ambiguities: [{
+    code: { type: String, trim: true },
+    fieldKey: { type: String, trim: true },
+    rawFieldName: { type: String, trim: true },
+    message: { type: String, trim: true },
+    options: [{ type: String, trim: true }]
+  }],
   conflicts: [{
     field: { type: String, trim: true },
     previousValue: { type: mongoose.Schema.Types.Mixed },

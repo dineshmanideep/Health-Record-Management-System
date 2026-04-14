@@ -16,6 +16,7 @@ const NurseAssignments = () => {
   const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ show: false, type: 'error', text: '' });
+  const [resolutionState, setResolutionState] = useState({ visible: false, sessionId: '', ambiguities: [], clarifications: {} });
 
   const showToast = (type, text) => {
     setToast({ show: true, type, text });
@@ -103,6 +104,7 @@ const NurseAssignments = () => {
   const resetForm = () => {
     setPrescription('');
     setFiles([]);
+    setResolutionState({ visible: false, sessionId: '', ambiguities: [], clarifications: {} });
   };
 
   const handleFileAdd = () => {
@@ -113,7 +115,7 @@ const NurseAssignments = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.doc', '.docx'];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
     const fileName = file.name?.toLowerCase() || '';
     const isAllowed = allowedExtensions.some((ext) => fileName.endsWith(ext));
 
@@ -124,7 +126,7 @@ const NurseAssignments = () => {
       }
       setFiles(clearedFiles);
       event.target.value = '';
-      showToast('error', 'Unsupported file. Use PDF, JPG, PNG, WEBP, HEIC, DOC, or DOCX.');
+      showToast('error', 'Unsupported file. Use PDF, JPG, JPEG, or PNG.');
       return;
     }
 
@@ -178,10 +180,61 @@ const NurseAssignments = () => {
         fetchAssignments(); // Refresh the list
       }, 1500);
     } catch (error) {
+      if (error?.response?.data?.resolutionRequired) {
+        const payload = error.response.data;
+        const defaultClarifications = Object.fromEntries(
+          (payload.ambiguities || []).map((item) => [item.rawFieldName, item.options?.[0] || 'fasting'])
+        );
+        setResolutionState({
+          visible: true,
+          sessionId: payload.sessionId,
+          ambiguities: payload.ambiguities || [],
+          clarifications: defaultClarifications
+        });
+        setMessage({
+          type: 'error',
+          text: payload.message || 'Clarification is required to complete this record.'
+        });
+        return;
+      }
       showToast('error', error?.response?.data?.message || 'Failed to complete assignment');
       setMessage({ 
         type: 'error', 
         text: error?.response?.data?.message || 'Failed to complete assignment' 
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleClarificationChange = (rawFieldName, value) => {
+    setResolutionState((prev) => ({
+      ...prev,
+      clarifications: {
+        ...prev.clarifications,
+        [rawFieldName]: value
+      }
+    }));
+  };
+
+  const handleResolveClarification = async () => {
+    if (!resolutionState.sessionId) return;
+    setSubmitting(true);
+    try {
+      await nurseService.resolveUploadSession(resolutionState.sessionId, resolutionState.clarifications);
+      setMessage({ type: 'success', text: 'Medical record created successfully! Redirecting...' });
+      setTimeout(() => {
+        setShowCompletionForm(false);
+        setSelectedAssignment(null);
+        setFilter('all');
+        resetForm();
+        fetchAssignments();
+      }, 1500);
+    } catch (error) {
+      showToast('error', error?.response?.data?.message || 'Failed to resolve clarification');
+      setMessage({
+        type: 'error',
+        text: error?.response?.data?.message || 'Failed to resolve clarification'
       });
     } finally {
       setSubmitting(false);
@@ -251,6 +304,40 @@ const NurseAssignments = () => {
         </div>
       ) : (
         <>
+          {resolutionState.visible && (
+            <div className="mb-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-[2rem] p-6">
+              <h3 className="text-sm font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider mb-2">Clarification Required</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mb-4">Processing found an ambiguous blood sugar field. Confirm the correct test type to finish the record.</p>
+              <div className="space-y-4">
+                {resolutionState.ambiguities.map((item) => (
+                  <div key={item.rawFieldName} className="bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-900/40 rounded-2xl p-4">
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">{item.rawFieldName}</p>
+                    <select
+                      value={resolutionState.clarifications[item.rawFieldName] || item.options?.[0] || 'fasting'}
+                      onChange={(e) => handleClarificationChange(item.rawFieldName, e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                    >
+                      {(item.options || []).map((option) => (
+                        <option key={option} value={option}>
+                          {option === 'post_meal' ? 'Post-Meal Blood Sugar' : `${option.charAt(0).toUpperCase()}${option.slice(1).replace('_', ' ')} Blood Sugar`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleResolveClarification}
+                  disabled={submitting}
+                  className="px-5 py-3 rounded-xl bg-amber-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-50"
+                >
+                  {submitting ? 'Resolving...' : 'Confirm And Complete'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Header & Filters */}
           <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 mb-8 transition-all">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10">
@@ -285,10 +372,14 @@ const NurseAssignments = () => {
           {!selectedAssignment && (
             <div className="pb-20">
               {filteredAssignments.length === 0 ? (
-                <div className="bg-white dark:bg-slate-900 p-32 rounded-[3.5rem] shadow-sm text-center border border-slate-200/50 dark:border-slate-800">
-                  <p className="text-8xl mb-10 grayscale opacity-10">📂</p>
-                  <p className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.4em] text-[11px] mb-4">Registry Null</p>
-                  <p className="text-slate-400 dark:text-slate-600 text-sm font-bold max-w-xs mx-auto leading-relaxed">No protocols discovered matching the current filter parameters.</p>
+                <div className="bg-white dark:bg-slate-900 p-20 rounded-[3.5rem] shadow-sm text-center border border-slate-200/50 dark:border-slate-800">
+                  <div className="w-20 h-20 rounded-[2rem] bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-4xl mx-auto mb-8">🩺</div>
+                  <p className="text-slate-800 dark:text-slate-100 font-black uppercase tracking-[0.2em] text-sm mb-3">
+                    {filter === 'all' ? 'No Doctor Tasks Yet' : `No ${getStatusText(filter)} Tasks`}
+                  </p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm font-medium max-w-md mx-auto leading-relaxed">
+                    When a doctor assigns a patient record workflow, it will appear here with instructions, attachments, and completion actions.
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">

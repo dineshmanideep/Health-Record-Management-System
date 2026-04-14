@@ -25,6 +25,15 @@ const DoctorPatientRecords = () => {
     return acc;
   }, {});
 
+  const formatMedicationDuration = (medication) => {
+    if (medication?.durationDays) return `${medication.durationDays} day(s)`;
+    if (medication?.duration) return medication.duration;
+    return '-';
+  };
+
+  const formatMedicationTiming = (medication) =>
+    [medication?.frequency, medication?.timing, medication?.instructions].filter(Boolean).join(' • ') || '-';
+
   return (
     <DashboardLayout title="Subject Archives">
       <div className="mb-8 flex items-center justify-between">
@@ -103,6 +112,15 @@ const DoctorPatientRecords = () => {
                     </div>
                   )}
 
+                  {selectedRecord.structuredData?.summary && (
+                    <div>
+                      <span className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] block mb-4 ml-1">Structured AI Summary</span>
+                      <div className="text-slate-800 dark:text-slate-200 bg-indigo-50 dark:bg-indigo-900/15 p-6 rounded-[2rem] font-medium leading-relaxed border border-indigo-100 dark:border-indigo-900/30 whitespace-pre-line">
+                        {selectedRecord.structuredData.summary}
+                      </div>
+                    </div>
+                  )}
+
                   {selectedRecord.medications?.length > 0 && (
                     <div>
                       <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] block mb-4 ml-1">Pharmacological Regimen</span>
@@ -113,6 +131,7 @@ const DoctorPatientRecords = () => {
                               <th className="p-5 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Agent</th>
                               <th className="p-5 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Node</th>
                               <th className="p-5 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Frequency</th>
+                              <th className="p-5 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Timing</th>
                               <th className="p-5 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Duration</th>
                             </tr>
                           </thead>
@@ -122,7 +141,8 @@ const DoctorPatientRecords = () => {
                                 <td className="p-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight">{m.name || '-'}</td>
                                 <td className="p-5 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">{m.dosage || '-'}</td>
                                 <td className="p-5 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">{m.frequency || '-'}</td>
-                                <td className="p-5 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">{m.duration || '-'}</td>
+                                <td className="p-5 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">{formatMedicationTiming(m)}</td>
+                                <td className="p-5 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">{formatMedicationDuration(m)}</td>
                               </tr>
                             ))}
                           </tbody>

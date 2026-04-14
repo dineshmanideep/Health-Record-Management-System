@@ -41,6 +41,72 @@ const AutoSizedChart = ({ height = 320, children }) => {
   );
 };
 
+const normalizeUnitKey = (unit = '') => String(unit || '')
+  .toLowerCase()
+  .replace(/[µμ]/g, 'u')
+  .replace(/\s+/g, '')
+  .trim();
+
+const pointDedupeKey = (point = {}) => {
+  const dateKey = point?.date ? new Date(point.date).toISOString().slice(0, 10) : '';
+  const valueKey = Number.isFinite(point?.value) ? String(point.value) : String(point?.value ?? '');
+  const statusKey = String(point?.status || '').toLowerCase();
+  const referenceKey = String(point?.reference || '').toLowerCase().trim();
+  return [dateKey, valueKey, statusKey, referenceKey].join('|');
+};
+
+const mergeMetricSeriesOptions = (metricSeries = []) => {
+  const bySeries = new Map();
+  const unitsPerAttribute = new Map();
+
+  for (const series of metricSeries || []) {
+    const attribute = String(series?.attribute || '').trim();
+    if (!attribute) continue;
+
+    const attrKey = attribute.toLowerCase();
+    const unit = String(series?.unit || '').trim();
+    const unitKey = normalizeUnitKey(unit);
+    const key = `${attrKey}|${unitKey}`;
+
+    if (!bySeries.has(key)) {
+      bySeries.set(key, {
+        key,
+        attribute,
+        unit,
+        points: []
+      });
+    }
+
+    if (!unitsPerAttribute.has(attrKey)) {
+      unitsPerAttribute.set(attrKey, new Set());
+    }
+    unitsPerAttribute.get(attrKey).add(unitKey || '-');
+
+    bySeries.get(key).points.push(...(series?.points || []));
+  }
+
+  return Array.from(bySeries.values()).map((series) => {
+    const pointMap = new Map();
+    for (const point of series.points || []) {
+      pointMap.set(pointDedupeKey(point), point);
+    }
+
+    const points = Array.from(pointMap.values())
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const attrKey = series.attribute.toLowerCase();
+    const hasMultipleUnits = (unitsPerAttribute.get(attrKey)?.size || 0) > 1;
+
+    return {
+      ...series,
+      points,
+      displayLabel: hasMultipleUnits && series.unit
+        ? `${series.attribute} (${series.unit})`
+        : series.attribute
+    };
+  });
+};
+
 const PatientHealthAnalytics = () => {
   const { theme } = useTheme();
   const { profile } = useAccessibility();
@@ -139,8 +205,13 @@ const PatientHealthAnalytics = () => {
                   {group.metricSeries?.length ? (
                     (() => {
                       const reportKey = `${group.reportTag}-${groupIndex}`;
-                      const selectedAttr = selectedMetricByReport[reportKey] || group.metricSeries[0].attribute;
-                      const selectedSeries = group.metricSeries.find((series) => series.attribute === selectedAttr) || group.metricSeries[0];
+                      const mergedSeriesOptions = mergeMetricSeriesOptions(group.metricSeries || []);
+                      const selectedSeriesKey = selectedMetricByReport[reportKey] || mergedSeriesOptions[0]?.key;
+                      const selectedSeries = mergedSeriesOptions.find((series) => series.key === selectedSeriesKey) || mergedSeriesOptions[0];
+
+                      if (!selectedSeries) {
+                        return <p className="text-sm text-slate-500 dark:text-slate-400">No measurable attributes found for this report type.</p>;
+                      }
 
                       const graphData = (selectedSeries.points || []).map((point) => ({
                         date: new Date(point.date).toLocaleDateString([], {
@@ -187,12 +258,12 @@ const PatientHealthAnalytics = () => {
                             <div className="min-w-55">
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Select Attribute</label>
                               <select
-                                value={selectedSeries.attribute}
+                                value={selectedSeries.key}
                                 onChange={(e) => setSelectedMetricByReport((prev) => ({ ...prev, [reportKey]: e.target.value }))}
                                 className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200"
                               >
-                                {group.metricSeries.map((series) => (
-                                  <option key={series.attribute} value={series.attribute}>{series.attribute}</option>
+                                {mergedSeriesOptions.map((series) => (
+                                  <option key={series.key} value={series.key}>{series.displayLabel}</option>
                                 ))}
                               </select>
                             </div>

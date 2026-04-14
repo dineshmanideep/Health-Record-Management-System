@@ -4,6 +4,7 @@ const {
   toStableCamelCase,
   getCanonicalFieldDefinition
 } = require('./medicalCanonicalization');
+const { resolveFieldsWithLLM } = require('./medicalFieldResolverService');
 
 const STANDARD_FIELD_ALIASES = FIELD_DEFINITIONS.reduce((acc, definition) => {
   (definition.aliases || []).forEach((alias) => {
@@ -26,6 +27,7 @@ const HEALTH_METRIC_KEY_MAP = {
 
 const FIELD_PRIORITY = {
   thyroidTSH: 100,
+  thyroidTPOAntibodies: 96,
   thyroidFreeT4: 95,
   thyroidT4: 94,
   thyroidFreeT3: 93,
@@ -108,12 +110,69 @@ function parseReferenceRange(reference = '') {
   const raw = String(reference || '').trim();
   if (!raw) return { reference: '', min: null, max: null };
 
-  const matches = raw.match(/-?\d+(?:\.\d+)?/g) || [];
-  if (matches.length >= 2) {
+  const lessThanMatch = raw.match(/<\s*(-?\d+(?:\.\d+)?)/);
+  if (lessThanMatch) {
     return {
       reference: raw,
-      min: Number(matches[0]),
-      max: Number(matches[1])
+      min: null,
+      max: Number(lessThanMatch[1])
+    };
+  }
+
+  const greaterThanMatch = raw.match(/>\s*(-?\d+(?:\.\d+)?)/);
+  if (greaterThanMatch) {
+    return {
+      reference: raw,
+      min: Number(greaterThanMatch[1]),
+      max: null
+    };
+  }
+
+  const rangeCandidates = [];
+  const rangeRegex = /(-?\d+(?:\.\d+)?)\s*(?:to|–|-)\s*(-?\d+(?:\.\d+)?)/gi;
+  let rangeMatch;
+
+  while ((rangeMatch = rangeRegex.exec(raw)) !== null) {
+    const left = Number(rangeMatch[1]);
+    const right = Number(rangeMatch[2]);
+    if (!Number.isFinite(left) || !Number.isFinite(right)) continue;
+
+    const min = Math.min(left, right);
+    const max = Math.max(left, right);
+    const contextStart = Math.max(0, rangeMatch.index - 30);
+    const contextEnd = Math.min(raw.length, rangeMatch.index + rangeMatch[0].length + 30);
+    const context = raw.slice(contextStart, contextEnd).toLowerCase();
+    const ageContext = /(year|years|yr|week|weeks|day|days|month|months|trimester|pregnan|pediatric|paediatric|adult|age|cord blood)/i.test(context);
+
+    rangeCandidates.push({ min, max, ageContext, index: rangeMatch.index });
+  }
+
+  if (rangeCandidates.length) {
+    const preferred = rangeCandidates.find((candidate) => !candidate.ageContext) || rangeCandidates[0];
+    return {
+      reference: raw,
+      min: preferred.min,
+      max: preferred.max
+    };
+  }
+
+  const matches = raw.match(/-?\d+(?:\.\d+)?/g) || [];
+  if (matches.length >= 2) {
+    const hasAgeContext = /(year|years|yr|week|weeks|day|days|month|months|trimester|pregnan|pediatric|paediatric|adult|age|cord blood)/i.test(raw);
+    if (hasAgeContext && matches.length > 4) {
+      return {
+        reference: raw,
+        min: null,
+        max: null
+      };
+    }
+
+    const min = Number(matches[0]);
+    const max = Number(matches[1]);
+    return {
+      reference: raw,
+      min: Number.isFinite(min) ? min : null,
+      max: Number.isFinite(max) ? max : null
     };
   }
 
@@ -125,6 +184,7 @@ function deriveStatus({ rawStatus, numericValue, referenceMin, referenceMax }) {
     if (referenceMin != null && numericValue < referenceMin) return 'low';
     if (referenceMax != null && numericValue > referenceMax) return 'high';
     if (referenceMin != null || referenceMax != null) return 'normal';
+    return 'unknown';
   }
 
   const normalizedStatus = String(rawStatus || '').trim().toLowerCase();
@@ -216,6 +276,52 @@ function rankMetric(metric = {}) {
   return abnormalWeight + (FIELD_PRIORITY[metric.name] || 0);
 }
 
+function metricQualityScore(metric = {}) {
+  const reference = String(metric.reference || '').trim().toLowerCase();
+  const hasAgeContext = /(year|years|yr|week|weeks|day|days|month|months|trimester|pregnan|pediatric|paediatric|adult|age|cord blood)/i.test(reference);
+
+  let score = 0;
+  if (metric.status && metric.status !== 'unknown') score += 3;
+  if (reference) score += 1;
+  if (reference && !hasAgeContext) score += 2;
+  if (reference && reference.length <= 120) score += 1;
+  if (Number.isFinite(metric.referenceMin) || Number.isFinite(metric.referenceMax)) score += 1;
+
+  return score;
+}
+
+function normalizeMetricUnit(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[µμ]/g, 'u')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+function dedupeParsedMetrics(metrics = []) {
+  const byKey = new Map();
+
+  for (const metric of metrics || []) {
+    const key = [
+      String(metric?.name || '').toLowerCase(),
+      String(metric?.value ?? ''),
+      normalizeMetricUnit(metric?.unit || '')
+    ].join('|');
+
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, metric);
+      continue;
+    }
+
+    if (metricQualityScore(metric) > metricQualityScore(existing)) {
+      byKey.set(key, metric);
+    }
+  }
+
+  return Array.from(byKey.values());
+}
+
 function normalizeFieldEntries(fields = {}) {
   const normalizedFields = {};
   const numericFields = {};
@@ -278,16 +384,115 @@ function normalizeFieldEntries(fields = {}) {
     }
   }
 
-  parsedMetrics.sort((a, b) => rankMetric(b) - rankMetric(a));
+  const uniqueParsedMetrics = dedupeParsedMetrics(parsedMetrics);
+  uniqueParsedMetrics.sort((a, b) => rankMetric(b) - rankMetric(a));
 
   return {
     normalizedFields,
     numericFields,
-    parsedMetrics,
+    parsedMetrics: uniqueParsedMetrics,
     reportDate,
-    importantFindings: parsedMetrics.slice(0, 8),
+    importantFindings: uniqueParsedMetrics.slice(0, 8),
     unknownFields: Array.from(new Set(unknownFields)),
     conflicts
+  };
+}
+
+async function normalizeFieldEntriesWithCatalog(fields = {}, clarificationSelections = {}) {
+  const normalizedFields = {};
+  const numericFields = {};
+  const unknownFields = [];
+  const conflicts = [];
+  const parsedMetrics = [];
+  const ambiguities = [];
+  let reportDate = null;
+
+  const stage2Resolution = await resolveFieldsWithLLM({
+    extractedFields: fields,
+    clarificationSelections
+  });
+
+  const resolutionMap = new Map(
+    (stage2Resolution.internalResolutions || []).map((item) => [
+      normalizeLookup(item.inputName),
+      item
+    ])
+  );
+
+  for (const [rawKey, rawValue] of Object.entries(fields || {})) {
+    const resolution = resolutionMap.get(normalizeLookup(rawKey));
+
+    if (resolution?.status === 'clarification_required') {
+      if (resolution.ambiguity) {
+        ambiguities.push(resolution.ambiguity);
+      }
+      continue;
+    }
+
+    const standardizedKey = resolution?.canonicalKey || toStableCamelCase(rawKey);
+    if (!getCanonicalFieldDefinition(rawKey) && resolution?.source === 'learned') {
+      unknownFields.push(String(rawKey));
+    }
+
+    const descriptor = extractFieldDescriptor(rawValue);
+    if (descriptor.usableValue === null && descriptor.numericValue === null) continue;
+
+    if (standardizedKey === 'reportDate') {
+      const parsedDate = parseDateValue(descriptor.usableValue || rawValue);
+      if (parsedDate) {
+        reportDate = parsedDate;
+        normalizedFields.reportDate = parsedDate.toISOString();
+      }
+      continue;
+    }
+
+    const normalizedValue = descriptor.numericValue ?? descriptor.usableValue;
+
+    if (Object.prototype.hasOwnProperty.call(normalizedFields, standardizedKey)) {
+      conflicts.push({
+        field: standardizedKey,
+        previousValue: normalizedFields[standardizedKey],
+        nextValue: normalizedValue
+      });
+    }
+
+    normalizedFields[standardizedKey] = normalizedValue;
+
+    if (typeof descriptor.numericValue === 'number' && Number.isFinite(descriptor.numericValue)) {
+      numericFields[standardizedKey] = descriptor.numericValue;
+    }
+
+    if (standardizedKey === 'bloodPressure') {
+      const bloodPressure = parseBloodPressureValue(normalizedValue);
+      if (bloodPressure?.systolic != null) {
+        numericFields.bloodPressureSystolic = bloodPressure.systolic;
+        normalizedFields.bloodPressureSystolic = bloodPressure.systolic;
+      }
+      if (bloodPressure?.diastolic != null) {
+        numericFields.bloodPressureDiastolic = bloodPressure.diastolic;
+        normalizedFields.bloodPressureDiastolic = bloodPressure.diastolic;
+      }
+    }
+
+    const metric = buildMetricEntry(standardizedKey, descriptor);
+    if (metric) {
+      parsedMetrics.push(metric);
+    }
+  }
+
+  const uniqueParsedMetrics = dedupeParsedMetrics(parsedMetrics);
+  uniqueParsedMetrics.sort((a, b) => rankMetric(b) - rankMetric(a));
+
+  return {
+    normalizedFields,
+    numericFields,
+    parsedMetrics: uniqueParsedMetrics,
+    reportDate,
+    importantFindings: uniqueParsedMetrics.slice(0, 8),
+    unknownFields: Array.from(new Set(unknownFields)),
+    conflicts,
+    ambiguities,
+    fieldResolutions: stage2Resolution.resolvedFields || []
   };
 }
 
@@ -329,6 +534,7 @@ module.exports = {
   STANDARD_FIELD_ALIASES,
   normalizeLookupKey,
   normalizeFieldEntries,
+  normalizeFieldEntriesWithCatalog,
   buildHealthMetrics,
   buildCustomFields
 };

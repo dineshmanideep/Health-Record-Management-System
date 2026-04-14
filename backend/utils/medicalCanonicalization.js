@@ -44,7 +44,10 @@ function createCatalog(definitions = []) {
 }
 
 const FIELD_DEFINITIONS = [
-  { canonical: 'bloodSugar', display: 'Blood Sugar', aliases: ['blood sugar', 'blood glucose', 'glucose', 'fasting sugar', 'fasting blood sugar', 'random sugar', 'random blood sugar', 'rbs', 'fbs'] },
+  { canonical: 'bloodSugar', display: 'Blood Sugar', aliases: [] },
+  { canonical: 'fastingBloodSugar', display: 'Fasting Blood Sugar', aliases: ['fasting blood sugar', 'fasting sugar', 'fasting glucose', 'fbs'] },
+  { canonical: 'postMealBloodSugar', display: 'Post-Meal Blood Sugar', aliases: ['post meal blood sugar', 'post-meal blood sugar', 'post prandial blood sugar', 'postprandial blood sugar', 'after food sugar', 'ppbs', 'pp sugar'] },
+  { canonical: 'randomBloodSugar', display: 'Random Blood Sugar', aliases: ['random blood sugar', 'random sugar', 'random glucose', 'rbs'] },
   { canonical: 'hbA1c', display: 'HbA1c', aliases: ['hba1c', 'a1c', 'hb1ac'] },
   { canonical: 'weight', display: 'Weight', aliases: ['weight', 'wt'] },
   { canonical: 'height', display: 'Height', aliases: ['height'] },
@@ -55,6 +58,7 @@ const FIELD_DEFINITIONS = [
   { canonical: 'heartRate', display: 'Heart Rate', aliases: ['pulse', 'pulse rate', 'heart rate'] },
   { canonical: 'temperature', display: 'Temperature', aliases: ['temperature', 'temp'] },
   { canonical: 'thyroidTSH', display: 'TSH', aliases: ['tsh', 'serum tsh', 'thyroid tsh', 'tsh 3rd generation', 'tsh 3rd gen'] },
+  { canonical: 'thyroidTPOAntibodies', display: 'Anti-TPO Antibodies', aliases: ['thyroid peroxidase autoantibodies', 'anti tpo', 'anti tpo ama', 'anti-thyroid peroxidase', 'tpo antibodies', 'anti thyroid peroxidase antibodies'] },
   { canonical: 'thyroidFreeT3', display: 'Free T3', aliases: ['free t3', 'ft3'] },
   { canonical: 'thyroidT3', display: 'T3', aliases: ['t3', 'serum t3', 'total t3'] },
   { canonical: 'thyroidFreeT4', display: 'Free T4', aliases: ['free t4', 'ft4'] },
@@ -193,6 +197,7 @@ function buildCanonicalPromptSection() {
 module.exports = {
   FIELD_DEFINITIONS,
   normalizeLookup,
+  titleCase,
   toStableCamelCase,
   canonicalizeDiagnosis,
   canonicalizeSpecialization,

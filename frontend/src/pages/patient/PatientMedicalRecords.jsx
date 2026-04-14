@@ -118,6 +118,54 @@ const PatientMedicalRecords = () => {
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (char) => char.toUpperCase());
   const formatMetricValue = (metric) => `${metric?.value ?? '--'}${metric?.unit ? ` ${metric.unit}` : ''}`;
+  const formatMedicationDuration = (medication) => {
+    if (medication?.durationDays) return `${medication.durationDays} day(s)`;
+    if (medication?.duration) return medication.duration;
+    return 'Duration not specified';
+  };
+  const formatMedicationSchedule = (medication) => {
+    return [medication?.frequency, medication?.timing, medication?.instructions]
+      .filter(Boolean)
+      .join(' • ');
+  };
+  const dedupeMetrics = (metrics = []) => {
+    const byKey = new Map();
+
+    const normalizeUnit = (value) => String(value || '')
+      .toLowerCase()
+      .replace(/[µμ]/g, 'u')
+      .replace(/\s+/g, '')
+      .trim();
+
+    const qualityScore = (metric) => {
+      let score = 0;
+      if (metric?.status && metric.status !== 'unknown') score += 2;
+      const reference = String(metric?.reference || '').toLowerCase();
+      if (reference) score += 1;
+      if (reference && !/(year|years|week|weeks|day|days|month|months|trimester|pregnan|pediatric|paediatric|adult|cord blood|age)/i.test(reference)) score += 2;
+      if (reference && reference.length <= 120) score += 1;
+      return score;
+    };
+
+    for (const metric of metrics || []) {
+      const reportDateKey = metric?.reportDate
+        ? new Date(metric.reportDate).toISOString().slice(0, 10)
+        : '';
+      const key = [
+        String(metric?.name || '').toLowerCase(),
+        String(metric?.value ?? ''),
+        normalizeUnit(metric?.unit || ''),
+        reportDateKey
+      ].join('|');
+
+      const existing = byKey.get(key);
+      if (!existing || qualityScore(metric) > qualityScore(existing)) {
+        byKey.set(key, metric);
+      }
+    }
+
+    return Array.from(byKey.values());
+  };
   const findingTone = (status) => {
     if (status === 'high' || status === 'low') {
       return {
@@ -166,19 +214,28 @@ const PatientMedicalRecords = () => {
   const testReports = allDocuments.filter(d => d.category === 'test_report');
   const diagnosisReports = allDocuments.filter(d => d.category === 'diagnosis_report');
 
-  const getImportantFields = (record) =>
-    ((record?.recordType === 'medical_record' ? record?.categorizedDocuments : record?.resultDocuments) || [])
+  const getImportantFields = (record) => {
+    const documentMetrics = ((record?.recordType === 'medical_record' ? record?.categorizedDocuments : record?.resultDocuments) || [])
       .flatMap((doc) => (doc?.parsedMetrics || []).map((metric) => ({
         ...metric,
         documentName: doc?.filePath?.split('/').pop() || '',
         reportDate: doc?.reportDate || doc?.uploadedAt || null
-      })))
+      })));
+
+    const structuredMetrics = Array.isArray(record?.structuredData?.parsedMetrics)
+      ? record.structuredData.parsedMetrics
+      : [];
+
+    const metricPool = documentMetrics.length > 0 ? documentMetrics : structuredMetrics;
+
+    return dedupeMetrics(metricPool)
       .sort((a, b) => {
         const aRank = a.status === 'high' || a.status === 'low' ? 2 : (a.status === 'unknown' ? 1 : 0);
         const bRank = b.status === 'high' || b.status === 'low' ? 2 : (b.status === 'unknown' ? 1 : 0);
         return bRank - aRank;
       })
       .slice(0, 8);
+  };
 
   const tabs = [
     { key: 'hospital', label: 'Hospital Records', icon: '🏥' },
@@ -230,6 +287,13 @@ const PatientMedicalRecords = () => {
                   
                   {selectedRecord.recordType === 'medical_record' ? (
                     <>
+                      {selectedRecord.structuredData?.summary && (
+                        <div className="mb-6 p-5 rounded-xl border border-indigo-200/70 dark:border-indigo-900/40 bg-indigo-50 dark:bg-indigo-950/20">
+                          <h3 className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">AI Summary</h3>
+                          <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed">{selectedRecord.structuredData.summary}</p>
+                        </div>
+                      )}
+
                       {getImportantFields(selectedRecord).length > 0 && (
                         <div className="mb-6 p-5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
                           <h3 className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">Important Findings</h3>
@@ -295,6 +359,37 @@ const PatientMedicalRecords = () => {
                               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">{selectedRecord.prescriptionNotes}</p>
                             </div>
                           )}
+                          {selectedRecord.medications?.length > 0 && (
+                            <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
+                              <h4 className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-3">Tablet Schedule</h4>
+                              <div className="space-y-3">
+                                {selectedRecord.medications.map((medication, index) => (
+                                  <div key={`${medication.name}-${index}`} className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-100 dark:border-emerald-900/30 p-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <p className="text-sm font-bold text-slate-800 dark:text-white">{medication.name}</p>
+                                      <span className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">{formatMedicationDuration(medication)}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                                      {[medication.dosage, formatMedicationSchedule(medication)].filter(Boolean).join(' • ') || 'Dosage instructions not specified'}
+                                    </p>
+                                    {(medication.startDate || medication.endDate) && (
+                                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                                        {medication.startDate ? `Start: ${formatDate(medication.startDate)}` : ''}
+                                        {medication.startDate && medication.endDate ? ' • ' : ''}
+                                        {medication.endDate ? `End: ${formatDate(medication.endDate)}` : ''}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {selectedRecord.nextVisitDate && (
+                            <div className="bg-amber-50 dark:bg-amber-950/20 p-5 rounded-xl border border-amber-100 dark:border-amber-900/30">
+                              <h4 className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">Next Visit</h4>
+                              <p className="text-sm font-bold text-slate-800 dark:text-white">{new Date(selectedRecord.nextVisitDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            </div>
+                          )}
                         </div>
                         <div>
                           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Documents</h3>
@@ -314,11 +409,7 @@ const PatientMedicalRecords = () => {
                                   {doc.reportDate && (
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">Report Date: {formatDate(doc.reportDate)}</p>
                                   )}
-                                  {doc.aiSummary && (
-                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-3">
-                                      AI-generated summary: {doc.aiSummary}
-                                    </p>
-                                  )}
+                                  {doc.aiSummary && <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-3">{doc.aiSummary}</p>}
                                 </div>
                               </a>
                             ))}
@@ -360,6 +451,12 @@ const PatientMedicalRecords = () => {
                     </>
                   ) : (
                     <>
+                      {selectedRecord.structuredData?.summary && (
+                        <div className="mb-6 p-5 rounded-xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/20">
+                          <h3 className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">AI Summary</h3>
+                          <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed">{selectedRecord.structuredData.summary}</p>
+                        </div>
+                      )}
                       <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Test Result Details</h2>
                       {getImportantFields(selectedRecord).length > 0 && (
                         <div className="mb-6 p-5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40">
@@ -425,11 +522,7 @@ const PatientMedicalRecords = () => {
                                   {doc.reportDate && (
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">Report Date: {formatDate(doc.reportDate)}</p>
                                   )}
-                                  {doc.aiSummary && (
-                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-3">
-                                      AI-generated summary: {doc.aiSummary}
-                                    </p>
-                                  )}
+                                  {doc.aiSummary && <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-3">{doc.aiSummary}</p>}
                                 </div>
                               </a>
                             ))}
@@ -570,11 +663,7 @@ const PatientMedicalRecords = () => {
                         {doc.reportTag && (
                           <p className="text-[10px] font-semibold text-indigo-500 dark:text-indigo-400 mb-3 truncate">Tag: {doc.reportTag}</p>
                         )}
-                        {doc.aiSummary && (
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-4">
-                            AI-generated summary: {doc.aiSummary}
-                          </p>
-                        )}
+                        {doc.aiSummary && <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-4">{doc.aiSummary}</p>}
                         <div className="flex gap-2">
                           <a href={solveFileUrl(doc.filePath)} target="_blank" rel="noopener noreferrer" className="flex-1 text-center py-2 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-400 transition-all">Preview</a>
                           <button onClick={() => { const record = groupedRecords.flatMap(g => g.records).find(r => r._id === doc.record._id); setSelectedRecord(record); setTab('hospital'); }}

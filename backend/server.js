@@ -26,6 +26,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Dedicated route for assignments
 app.use('/uploads/assignments', express.static(path.join(__dirname, 'uploads', 'assignments')));
 app.use('/uploads/prescriptions', express.static(path.join(__dirname, 'uploads', 'prescriptions')));
+app.use('/uploads/test-results', express.static(path.join(__dirname, 'uploads', 'test-results')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
