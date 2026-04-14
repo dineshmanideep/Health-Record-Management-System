@@ -18,7 +18,8 @@ const AI_RUNTIME_CONFIG = {
 const OLLAMA_CONFIG = {
   model: process.env.OLLAMA_MODEL || 'qwen2.5vl:7b',
   generateUrl: process.env.OLLAMA_GENERATE_URL || 'http://localhost:11434/api/generate',
-  timeoutMs: AI_RUNTIME_CONFIG.timeoutMs
+  timeoutMs: AI_RUNTIME_CONFIG.timeoutMs,
+  numCtx: Number(process.env.OLLAMA_NUM_CTX || process.env.AI_OLLAMA_NUM_CTX || 8192)
 };
 
 const GEMINI_CONFIG = {
@@ -107,7 +108,10 @@ async function callOllamaGenerate({ prompt, images = [] }) {
       model: OLLAMA_CONFIG.model,
       prompt,
       stream: false,
-      images: ollamaImages.length ? ollamaImages : undefined
+      images: ollamaImages.length ? ollamaImages : undefined,
+      options: Number.isFinite(OLLAMA_CONFIG.numCtx) && OLLAMA_CONFIG.numCtx > 0
+        ? { num_ctx: OLLAMA_CONFIG.numCtx }
+        : undefined
     })
   });
 

@@ -62,8 +62,8 @@ const AdminDashboard = () => {
         <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 overflow-hidden">
           <div className="p-10 border-b dark:border-slate-800 flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Authority Terminal</h2>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Sovereign verification queue</p>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Verify users</h2>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Authorize new users</p>
             </div>
             <button onClick={fetchPending} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl hover:scale-105 transition-transform">🔄</button>
           </div>

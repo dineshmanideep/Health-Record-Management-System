@@ -198,6 +198,13 @@ const HospitalTestAssignments = () => {
     completed: assignments.filter(a => a.status === 'completed').length
   };
 
+  const filterTone = {
+    all: 'bg-slate-900 text-white shadow-lg shadow-slate-900/10',
+    pending: 'bg-amber-600 text-white shadow-lg shadow-amber-500/20',
+    in_progress: 'bg-blue-600 text-white shadow-lg shadow-blue-500/20',
+    completed: 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+  };
+
   return (
     <DashboardLayout title="Clinical Deployments">
       <div className="space-y-6 pb-12">
@@ -455,18 +462,18 @@ const HospitalTestAssignments = () => {
         <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-800 overflow-x-auto">
           <div className="flex items-center gap-2">
             {[
-              { id: 'all', label: 'All Assignments', count: stats.total, color: 'emerald' },
-              { id: 'pending', label: 'Queued', count: stats.pending, color: 'amber' },
-              { id: 'in_progress', label: 'Active Lab', count: stats.in_progress, color: 'blue' },
-              { id: 'completed', label: 'Archived', count: stats.completed, color: 'indigo' }
+              { id: 'all', label: 'All Assignments', count: stats.total },
+              { id: 'pending', label: 'Queued', count: stats.pending },
+              { id: 'in_progress', label: 'Active Lab', count: stats.in_progress },
+              { id: 'completed', label: 'Archived', count: stats.completed }
             ].map((f) => (
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
                 className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${
                   filter === f.id
-                    ? `bg-${f.color}-600 text-white shadow-lg shadow-${f.color}-500/20`
-                    : 'text-slate-400 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? filterTone[f.id]
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 {f.label} ({f.count})
@@ -482,9 +489,14 @@ const HospitalTestAssignments = () => {
                 <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
              </div>
           ) : filteredAssignments.length === 0 ? (
-            <div className="py-24 text-center grayscale opacity-30">
-              <span className="text-6xl mb-6 block">📂</span>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Deployment Database Empty</p>
+            <div className="py-24 text-center">
+              <div className="w-20 h-20 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-4xl mx-auto mb-6">🧪</div>
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">
+                {filter === 'all' ? 'No deployments created yet.' : `No ${filter.replace('_', ' ')} deployments found.`}
+              </p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md mx-auto">
+                Verify a patient, choose a protocol, and assign a nurse to start the diagnostic workflow.
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">

@@ -17,11 +17,11 @@ const HospitalAuditLog = require('../models/HospitalAuditLog');
 const RecordAssignment = require('../models/RecordAssignment');
 const TestAssignment = require('../models/TestAssignment');
 const TestType = require('../models/TestType');
-const { extractDocumentText } = require('../utils/aiDocumentTextExtractor');
-const { summarizeTask } = require('../utils/aiSummarizer');
+const UploadProcessingSession = require('../models/UploadProcessingSession');
 const {
-  queueMedicalRecordPostUploadProcessing,
-  queueTestAssignmentPostUploadProcessing
+  processDocuments,
+  finalizeValidatedMedicalRecord,
+  finalizeValidatedTestAssignment
 } = require('../utils/postUploadMedicalPipeline');
 const { protect, authorize } = require('../middleware/auth');
 const { hashOtp, createAsyncSideEffect, buildActor } = require('../utils/routeHelpers');
@@ -46,10 +46,10 @@ const upload = multer({
   storage: prescriptionStorage, 
   limits: { fileSize: 10 * 1024 * 1024 }, 
   fileFilter: (req, file, cb) => {
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.doc', '.docx'];
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (!allowed.includes(ext)) {
-      return cb(new Error('Unsupported file type. Use PDF, JPG, JPEG, PNG, WEBP, HEIC, HEIF, DOC, or DOCX.'));
+      return cb(new Error('Unsupported file type. Use PDF, JPG, JPEG, or PNG.'));
     }
     cb(null, true);
   }
@@ -80,11 +80,62 @@ const uploadTestResults = multer({
   storage: testResultStorage, 
   limits: { fileSize: 10 * 1024 * 1024 }, 
   fileFilter: (req, file, cb) => {
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'];
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, allowed.includes(ext));
+    if (!allowed.includes(ext)) {
+      return cb(new Error('Unsupported file type. Use PDF, JPG, JPEG, or PNG.'));
+    }
+    cb(null, true);
   }
 });
+
+function buildCategorizedDocuments(files = [], categories = {}, basePath = '') {
+  return (files || []).map((file, index) => {
+    const categoryFromIndexedKey = categories[`indexed:${index}`];
+    const categoryFromArray = Array.isArray(categories.array)
+      ? categories.array[index]
+      : undefined;
+    const rawCategory = categoryFromIndexedKey || categoryFromArray || 'test_report';
+    const category = ['test_report', 'diagnosis_report'].includes(rawCategory)
+      ? rawCategory
+      : 'test_report';
+
+    return {
+      filePath: `${basePath}/${file.filename}`,
+      category,
+      reportTag: file.originalname || '',
+      parsedMetrics: [],
+      aiSummary: '',
+      uploadedAt: new Date(),
+      llmExtraction: {
+        status: 'pending',
+        sourceType: category
+      }
+    };
+  });
+}
+
+async function createClarificationSession({
+  nurseId,
+  flowType,
+  assignmentId,
+  metadata,
+  documents,
+  fallbackText,
+  result
+}) {
+  return UploadProcessingSession.create({
+    nurse: nurseId,
+    flowType,
+    assignmentId,
+    metadata,
+    documents,
+    fallbackText,
+    rawResponse: result.rawResponse || '',
+    validatedData: result.validatedData || {},
+    ambiguities: result.ambiguities || []
+  });
+}
 
 // All routes below require a valid JWT AND the 'nurse' role.
 router.use(protect);
@@ -470,45 +521,52 @@ router.post('/assignments/:id/complete', uploadMedicalFiles, async (req, res) =>
       return res.status(400).json({ success: false, message: 'Prescription is required' });
     }
 
-    // Build categorized documents array
-    const categorizedDocuments = [];
-    if (req.files && req.files.length > 0) {
-      for (let index = 0; index < req.files.length; index += 1) {
-        const file = req.files[index];
-        const categoryFromIndexedKey = req.body[`fileCategories[${index}]`];
-        const categoryFromArray = Array.isArray(req.body.fileCategories)
-          ? req.body.fileCategories[index]
-          : undefined;
-        const rawCategory = categoryFromIndexedKey || categoryFromArray || 'test_report';
-        const category = ['test_report', 'diagnosis_report'].includes(rawCategory)
-          ? rawCategory
-          : 'test_report';
+    const categorizedDocuments = buildCategorizedDocuments(
+      req.files,
+      {
+        array: req.body.fileCategories,
+        ...Object.fromEntries(
+          Object.keys(req.body)
+            .filter((key) => key.startsWith('fileCategories['))
+            .map((key) => [`indexed:${key.match(/\[(\d+)\]/)?.[1] || ''}`, req.body[key]])
+        )
+      },
+      '/uploads/prescriptions'
+    );
 
-        const absolutePath = path.join(__dirname, '..', 'uploads', 'prescriptions', file.filename);
-        const extractedText = await extractDocumentText(absolutePath);
-        const summaryTask = category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
-        const aiSummary = await summarizeTask(summaryTask, {
-          reportTag: file.originalname || category,
-          text: extractedText || `File: ${file.originalname || 'document'}\nCategory: ${category}`
-        });
+    const result = await processDocuments({
+      documents: categorizedDocuments,
+      fallbackText: prescription,
+      visitDate: new Date()
+    });
 
-        categorizedDocuments.push({
-          filePath: `/uploads/prescriptions/${file.filename}`,
-          category: category,
-          reportTag: '',
-          parsedMetrics: [],
-          aiSummary,
-          aiSummaryGeneratedAt: new Date(),
-          uploadedAt: new Date(),
-          llmExtraction: {
-            status: 'pending',
-            sourceType: category
-          }
-        });
-      }
+    if (result.status === 'clarification_required') {
+      const session = await createClarificationSession({
+        nurseId: req.user._id,
+        flowType: 'medical_record',
+        assignmentId: assignment._id,
+        metadata: {
+          patient: assignment.patient._id,
+          hospital: assignment.hospital,
+          doctor: assignment.doctor._id,
+          prescription
+        },
+        documents: categorizedDocuments,
+        fallbackText: prescription,
+        result
+      });
+
+      return res.status(409).json({
+        success: false,
+        resolutionRequired: true,
+        sessionId: session._id,
+        ambiguities: result.ambiguities,
+        message: 'Nurse clarification is required before the record can be completed.'
+      });
     }
 
-    // Create the medical record
+    const extractionFailed = result.status === 'failed';
+
     const record = await MedicalRecord.create({
       patient: assignment.patient,
       hospital: assignment.hospital,
@@ -521,11 +579,48 @@ router.post('/assignments/:id/complete', uploadMedicalFiles, async (req, res) =>
       prescriptionDocuments: categorizedDocuments.map((doc) => doc.filePath),
       prescriptionDocument: categorizedDocuments[0]?.filePath,
       structuredData: {
-        extractionStatus: categorizedDocuments.length ? 'pending' : 'skipped',
+        extractionStatus: extractionFailed
+          ? 'failed'
+          : (categorizedDocuments.length ? 'pending' : 'skipped'),
+        validationErrors: extractionFailed ? (result.validationErrors || []) : [],
+        rawResponses: extractionFailed && result.rawResponse
+          ? [{ documentPath: 'combined', response: result.rawResponse, status: 'failed' }]
+          : [],
         normalizedFields: {},
-        numericFields: {}
+        numericFields: {},
+        processedAt: extractionFailed ? new Date() : undefined
       }
     });
+
+    if (extractionFailed) {
+      const extractionErrors = result.validationErrors || ['Medical extraction failed'];
+      const processedAt = new Date();
+
+      record.categorizedDocuments = (record.categorizedDocuments || []).map((doc) => ({
+        ...(doc.toObject ? doc.toObject() : doc),
+        llmExtraction: {
+          ...(doc.llmExtraction?.toObject ? doc.llmExtraction.toObject() : (doc.llmExtraction || {})),
+          status: 'failed',
+          diagnosis: '',
+          specialization: '',
+          reportDate: null,
+          nextVisitDate: null,
+          normalizedFields: {},
+          numericFields: {},
+          medications: [],
+          validationErrors: extractionErrors,
+          unknownFields: [],
+          conflicts: [],
+          rawResponse: result.rawResponse || '',
+          processedAt,
+          sourceType: doc.category
+        }
+      }));
+      record.markModified('categorizedDocuments');
+      await record.save();
+    } else {
+      await finalizeValidatedMedicalRecord(record, result.validatedData, result.rawResponse, {});
+    }
 
     // Add to patient's medicalRecords array
     await User.findByIdAndUpdate(assignment.patient, { 
@@ -563,14 +658,16 @@ router.post('/assignments/:id/complete', uploadMedicalFiles, async (req, res) =>
       message: `Nurse ${req.user.name} completed the record assignment for patient ${assignment.patient?.name || 'Unknown'}.`
     }).catch(() => {});
 
-    if (categorizedDocuments.length > 0) {
-      queueMedicalRecordPostUploadProcessing(record._id);
-    }
-
     res.status(201).json({ 
       success: true, 
-      message: 'Medical record created successfully',
-      data: { recordId: record._id }
+      message: extractionFailed
+        ? 'Medical record created successfully (AI extraction unavailable for this upload).'
+        : 'Medical record created successfully',
+      data: {
+        recordId: record._id,
+        extractionStatus: extractionFailed ? 'failed' : 'completed',
+        extractionErrors: extractionFailed ? (result.validationErrors || []) : []
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Server error' });
@@ -708,54 +805,96 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
       });
     }
 
-    // Process uploaded documents (using categories from frontend if available)
-    const resultDocuments = [];
-    if (req.files && req.files.length > 0) {
-      for (let index = 0; index < req.files.length; index += 1) {
-        const file = req.files[index];
-        const categoryFromIndexedKey = req.body[`documentCategories[${index}]`];
-        const categoryFromArray = Array.isArray(req.body.documentCategories)
-          ? req.body.documentCategories[index]
-          : undefined;
-        const rawCategory = categoryFromIndexedKey || categoryFromArray || 'test_report';
-        const category = ['test_report', 'diagnosis_report'].includes(rawCategory)
-          ? rawCategory
-          : 'test_report';
+    const resultDocuments = buildCategorizedDocuments(
+      req.files,
+      {
+        array: req.body.documentCategories,
+        ...Object.fromEntries(
+          Object.keys(req.body)
+            .filter((key) => key.startsWith('documentCategories['))
+            .map((key) => [`indexed:${key.match(/\[(\d+)\]/)?.[1] || ''}`, req.body[key]])
+        )
+      },
+      '/uploads/test-results'
+    );
 
-        const absolutePath = path.join(__dirname, '..', 'uploads', 'test-results', file.filename);
-        const extractedText = await extractDocumentText(absolutePath);
-        const summaryTask = category === 'diagnosis_report' ? 'diagnosis_document' : 'test_document';
-        const aiSummary = await summarizeTask(summaryTask, {
-          reportTag: file.originalname || assignment?.testType?.name || category,
-          text: extractedText || `File: ${file.originalname || 'document'}\nCategory: ${category}`
-        });
+    const result = await processDocuments({
+      documents: resultDocuments,
+      fallbackText: results || '',
+      visitDate: new Date()
+    });
 
-        resultDocuments.push({
-          filePath: `/uploads/test-results/${file.filename}`,
-          category: category,
-          reportTag: '',
-          parsedMetrics: [],
-          aiSummary,
-          aiSummaryGeneratedAt: new Date(),
-          uploadedAt: new Date(),
-          llmExtraction: {
-            status: 'pending',
-            sourceType: category
-          }
-        });
-      }
+    if (result.status === 'clarification_required') {
+      const session = await createClarificationSession({
+        nurseId: req.user._id,
+        flowType: 'test_assignment',
+        assignmentId: assignment._id,
+        metadata: {
+          results: results || ''
+        },
+        documents: resultDocuments,
+        fallbackText: results || '',
+        result
+      });
+
+      return res.status(409).json({
+        success: false,
+        resolutionRequired: true,
+        sessionId: session._id,
+        ambiguities: result.ambiguities,
+        message: 'Nurse clarification is required before the test assignment can be completed.'
+      });
     }
+
+    const extractionFailed = result.status === 'failed';
 
     assignment.status = 'completed';
     assignment.results = results || '';
     assignment.resultDocuments = resultDocuments;
     assignment.structuredData = {
-      extractionStatus: resultDocuments.length ? 'pending' : 'skipped',
+      extractionStatus: extractionFailed
+        ? 'failed'
+        : (resultDocuments.length ? 'pending' : 'skipped'),
+      validationErrors: extractionFailed ? (result.validationErrors || []) : [],
+      rawResponses: extractionFailed && result.rawResponse
+        ? [{ documentPath: 'combined', response: result.rawResponse, status: 'failed' }]
+        : [],
       normalizedFields: {},
-      numericFields: {}
+      numericFields: {},
+      processedAt: extractionFailed ? new Date() : undefined
     };
     assignment.completedAt = new Date();
     await assignment.save();
+
+    if (extractionFailed) {
+      const extractionErrors = result.validationErrors || ['Medical extraction failed'];
+      const processedAt = new Date();
+
+      assignment.resultDocuments = (assignment.resultDocuments || []).map((doc) => ({
+        ...(doc.toObject ? doc.toObject() : doc),
+        llmExtraction: {
+          ...(doc.llmExtraction?.toObject ? doc.llmExtraction.toObject() : (doc.llmExtraction || {})),
+          status: 'failed',
+          diagnosis: '',
+          specialization: '',
+          reportDate: null,
+          nextVisitDate: null,
+          normalizedFields: {},
+          numericFields: {},
+          medications: [],
+          validationErrors: extractionErrors,
+          unknownFields: [],
+          conflicts: [],
+          rawResponse: result.rawResponse || '',
+          processedAt,
+          sourceType: doc.category
+        }
+      }));
+      assignment.markModified('resultDocuments');
+      await assignment.save();
+    } else {
+      await finalizeValidatedTestAssignment(assignment, result.validatedData, result.rawResponse, {});
+    }
 
     // Log in hospital audit
     await HospitalAuditLog.create({
@@ -784,17 +923,183 @@ router.post('/test-assignments/:id/complete', uploadTestResults.array('documents
       relatedId: assignment._id
     });
 
-    if (resultDocuments.length > 0) {
-      queueTestAssignmentPostUploadProcessing(assignment._id);
-    }
-
     res.json({ 
       success: true, 
-      message: 'Test assignment completed successfully',
-      data: assignment 
+      message: extractionFailed
+        ? 'Test assignment completed successfully (AI extraction unavailable for this upload).'
+        : 'Test assignment completed successfully',
+      data: {
+        ...assignment.toObject(),
+        extractionStatus: extractionFailed ? 'failed' : 'completed',
+        extractionErrors: extractionFailed ? (result.validationErrors || []) : []
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+router.post('/upload-sessions/:id/resolve', async (req, res) => {
+  try {
+    const session = await UploadProcessingSession.findOne({
+      _id: req.params.id,
+      nurse: req.user._id
+    });
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Clarification session not found' });
+    }
+
+    const clarifications = req.body?.clarifications || {};
+
+    if (session.flowType === 'medical_record') {
+      const assignment = await RecordAssignment.findOne({
+        _id: session.assignmentId,
+        nurse: req.user._id
+      }).populate('doctor', 'name').populate('patient', 'name patientId');
+
+      if (!assignment) {
+        return res.status(404).json({ success: false, message: 'Assignment not found' });
+      }
+
+      const record = await MedicalRecord.create({
+        patient: session.metadata.patient,
+        hospital: session.metadata.hospital,
+        doctor: session.metadata.doctor,
+        nurse: req.user._id,
+        visitDate: Date.now(),
+        diagnosis: 'See Prescription',
+        prescriptionNotes: session.metadata.prescription || '',
+        categorizedDocuments: session.documents,
+        prescriptionDocuments: session.documents.map((doc) => doc.filePath),
+        prescriptionDocument: session.documents[0]?.filePath,
+        structuredData: {
+          extractionStatus: 'pending',
+          normalizedFields: {},
+          numericFields: {}
+        }
+      });
+
+      const result = await finalizeValidatedMedicalRecord(record, session.validatedData, session.rawResponse, clarifications);
+      if (result.status === 'clarification_required') {
+        await MedicalRecord.findByIdAndDelete(record._id);
+        session.ambiguities = result.ambiguities || [];
+        await session.save();
+        return res.status(422).json({
+          success: false,
+          resolutionRequired: true,
+          sessionId: session._id,
+          ambiguities: result.ambiguities,
+          message: 'More clarification is still required.'
+        });
+      }
+
+      await User.findByIdAndUpdate(session.metadata.patient, { $push: { medicalRecords: record._id } });
+      assignment.status = 'completed';
+      assignment.completedAt = new Date();
+      assignment.medicalRecord = record._id;
+      await assignment.save();
+
+      ActivityLog.create({
+        patient: session.metadata.patient,
+        action: 'record_created',
+        performedBy: { id: req.user._id, role: 'nurse', name: req.user.name },
+        details: `Medical record created by Nurse ${req.user.name} (assigned by Dr. ${assignment.doctor?.name || 'Unknown'})`
+      }).catch(() => {});
+
+      Notification.create({
+        user: session.metadata.patient,
+        type: 'record_created',
+        title: 'New Medical Record',
+        message: `A new medical record was created by Nurse ${req.user.name}.`
+      }).catch(() => {});
+
+      Notification.create({
+        user: session.metadata.doctor,
+        userModel: 'Doctor',
+        type: 'general',
+        title: 'Assignment Completed',
+        message: `Nurse ${req.user.name} completed the record assignment for patient ${assignment.patient?.name || 'Unknown'}.`
+      }).catch(() => {});
+
+      await UploadProcessingSession.deleteOne({ _id: session._id });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Medical record created successfully',
+        data: { recordId: record._id }
+      });
+    }
+
+    const assignment = await TestAssignment.findOne({
+      _id: session.assignmentId,
+      nurse: req.user._id
+    }).populate('testType patient hospital');
+
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Test assignment not found' });
+    }
+
+    assignment.status = 'completed';
+    assignment.results = session.metadata.results || '';
+    assignment.resultDocuments = session.documents;
+    assignment.structuredData = {
+      extractionStatus: 'pending',
+      normalizedFields: {},
+      numericFields: {}
+    };
+    assignment.completedAt = new Date();
+    await assignment.save();
+
+    const result = await finalizeValidatedTestAssignment(assignment, session.validatedData, session.rawResponse, clarifications);
+    if (result.status === 'clarification_required') {
+      assignment.status = 'in_progress';
+      await assignment.save();
+      session.ambiguities = result.ambiguities || [];
+      await session.save();
+      return res.status(422).json({
+        success: false,
+        resolutionRequired: true,
+        sessionId: session._id,
+        ambiguities: result.ambiguities,
+        message: 'More clarification is still required.'
+      });
+    }
+
+    await HospitalAuditLog.create({
+      hospital: assignment.hospital._id || assignment.hospital,
+      action: 'complete_test_assignment',
+      performedBy: {
+        id: req.user._id,
+        role: 'nurse',
+        name: req.user.name
+      },
+      details: {
+        testAssignmentId: assignment._id,
+        testTypeName: assignment.testType?.name || '',
+        patientId: assignment.patient?._id || assignment.patient
+      }
+    });
+
+    await Notification.create({
+      user: assignment.hospital._id || assignment.hospital,
+      userModel: 'Hospital',
+      type: 'test_completed',
+      title: 'Test Assignment Completed',
+      message: `Nurse ${req.user.name} completed test: ${assignment.testType?.name || 'Test'} for patient ${assignment.patient?.name || 'Unknown'}`,
+      relatedModel: 'TestAssignment',
+      relatedId: assignment._id
+    });
+
+    await UploadProcessingSession.deleteOne({ _id: session._id });
+
+    return res.json({
+      success: true,
+      message: 'Test assignment completed successfully',
+      data: assignment
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 

@@ -7,10 +7,82 @@ function stripJsonFences(value = '') {
     .trim();
 }
 
+function normalizeJsonLikeText(value = '') {
+  return String(value || '')
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\t/g, '  ')
+    .trim();
+}
+
+function extractFirstJsonObject(value = '') {
+  const text = String(value || '');
+  const start = text.indexOf('{');
+  if (start < 0) return '';
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start, index + 1);
+      }
+    }
+  }
+
+  return '';
+}
+
+function tryParseJsonCandidates(payload = '') {
+  const cleaned = normalizeJsonLikeText(stripJsonFences(payload));
+  const candidates = [
+    cleaned,
+    extractFirstJsonObject(cleaned)
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      return { parsed: JSON.parse(candidate), source: candidate };
+    } catch {
+      // continue
+    }
+  }
+
+  return { parsed: null, source: '' };
+}
+
 function normalizeMedicationList(value) {
   if (Array.isArray(value)) {
     return value
-      .map((item) => String(item || '').trim())
+      .map((item) => {
+        if (item && typeof item === 'object') {
+          return String(item.name || item.medicine || item.medication || '').trim();
+        }
+        return String(item || '').trim();
+      })
       .filter(Boolean);
   }
 
@@ -22,6 +94,36 @@ function normalizeMedicationList(value) {
   }
 
   return [];
+}
+
+function normalizeMedicationDetails(value) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+      const name = String(item.name || item.medicine || item.medication || '').trim();
+      if (!name) return null;
+
+      const toNumber = (input) => {
+        const parsed = Number(input);
+        return Number.isFinite(parsed) ? parsed : null;
+      };
+
+      return {
+        name,
+        dosage: String(item.dosage || '').trim(),
+        frequency: String(item.frequency || '').trim(),
+        duration: String(item.duration || '').trim(),
+        timing: String(item.timing || item.when || '').trim(),
+        instructions: String(item.instructions || item.notes || '').trim(),
+        durationDays: toNumber(item.durationDays),
+        totalTablets: toNumber(item.totalTablets),
+        tabletsPerDose: toNumber(item.tabletsPerDose),
+        timesPerDay: toNumber(item.timesPerDay)
+      };
+    })
+    .filter(Boolean);
 }
 
 function toPlainObject(value) {
@@ -41,10 +143,10 @@ function validateMedicalExtractionResponse(payload) {
   let parsed = payload;
 
   if (typeof payload === 'string') {
-    const cleaned = stripJsonFences(payload);
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch {
+    const attempt = tryParseJsonCandidates(payload);
+    if (attempt.parsed) {
+      parsed = attempt.parsed;
+    } else {
       return {
         valid: false,
         data: null,
@@ -67,10 +169,7 @@ function validateMedicalExtractionResponse(payload) {
     errors.push('LLM response is missing a valid fields object');
   }
 
-  const specialization = String(objectPayload.specialization || '').trim();
-  if (!specialization) {
-    errors.push('LLM response is missing specialization');
-  }
+  const specialization = String(objectPayload.specialization || '').trim() || 'General Medicine';
 
   const usableFields = {};
   for (const [key, value] of Object.entries(fields || {})) {
@@ -78,24 +177,39 @@ function validateMedicalExtractionResponse(payload) {
     usableFields[key] = value;
   }
 
-  if (!Object.keys(usableFields).length) {
-    errors.push('LLM response does not contain usable extracted fields');
-  }
-
   const nextVisitRaw = objectPayload.nextVisit || objectPayload.nextVisitDate || '';
   const nextVisitDate = nextVisitRaw ? new Date(nextVisitRaw) : null;
+  const nextVisitInDaysRaw = objectPayload.nextVisitInDays;
+  const nextVisitInDays = Number.isFinite(Number(nextVisitInDaysRaw)) ? Number(nextVisitInDaysRaw) : null;
   const reportDateRaw = objectPayload.reportDate || objectPayload.testDate || objectPayload.report_date || '';
   const reportDate = reportDateRaw ? new Date(reportDateRaw) : null;
+  const diagnosis = String(objectPayload.diagnosis || '').trim();
+  const medications = normalizeMedicationList(objectPayload.medications);
+  const medicationDetails = normalizeMedicationDetails(objectPayload.medicationDetails);
+
+  const hasStructuredSignal =
+    Object.keys(usableFields).length > 0 ||
+    Boolean(diagnosis) ||
+    medications.length > 0 ||
+    medicationDetails.length > 0 ||
+    Boolean(nextVisitDate && !Number.isNaN(nextVisitDate.getTime())) ||
+    nextVisitInDays != null;
+
+  if (!hasStructuredSignal) {
+    errors.push('LLM response does not contain usable extracted fields');
+  }
 
   return {
     valid: errors.length === 0,
     errors,
     data: {
-      diagnosis: String(objectPayload.diagnosis || '').trim(),
+      diagnosis,
       specialization,
       fields: usableFields,
-      medications: normalizeMedicationList(objectPayload.medications),
+      medications,
+      medicationDetails,
       nextVisit: nextVisitDate && !Number.isNaN(nextVisitDate.getTime()) ? nextVisitDate : null,
+      nextVisitInDays,
       reportDate: reportDate && !Number.isNaN(reportDate.getTime()) ? reportDate : null
     }
   };

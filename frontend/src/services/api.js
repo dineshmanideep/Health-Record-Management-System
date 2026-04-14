@@ -249,6 +249,7 @@ export const nurseService = {
   completeAssignment: (id, formData) => api.post(`/nurse/assignments/${id}/complete`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }).then((r) => r.data),
+  resolveUploadSession: (sessionId, clarifications) => api.post(`/nurse/upload-sessions/${sessionId}/resolve`, { clarifications }).then((r) => r.data),
   // Hospital test assignments
   getTestAssignments: (status) => api.get(`/nurse/test-assignments${status ? `?status=${status}` : ''}`).then((r) => r.data),
   getTestAssignment: (id) => api.get(`/nurse/test-assignments/${id}`).then((r) => r.data),
