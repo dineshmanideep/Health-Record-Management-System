@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 690" font-family="Arial, sans-serif">
+  <rect width="900" height="690" fill="#0f172a"/>
+
+  <text x="450" y="34" text-anchor="middle" fill="#e2e8f0" font-size="17" font-weight="bold">Medical Record Creation, AI Extraction &amp; Patient Access Lifecycle</text>
+
+  <!-- Arrow defs -->
+  <defs>
+    <marker id="ga" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/>
+    </marker>
+    <marker id="ya" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#f59e0b"/>
+    </marker>
+    <marker id="pa" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#818cf8"/>
+    </marker>
+  </defs>
+
+  <!-- ════════════════════════════════════════════
+       LEFT LANE — Doctor creates record
+  ════════════════════════════════════════════ -->
+  <!-- Lane header -->
+  <rect x="20" y="55" width="260" height="590" rx="10" fill="#1e2940" stroke="#818cf8" stroke-width="1"/>
+  <text x="150" y="78" text-anchor="middle" fill="#818cf8" font-size="12" font-weight="bold">Doctor Creates Record</text>
+
+  <!-- Step D1 -->
+  <rect x="40" y="92" width="220" height="52" rx="7" fill="#0f172a" stroke="#818cf8" stroke-width="1.2"/>
+  <text x="150" y="112" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Doctor Dashboard</text>
+  <text x="150" y="128" text-anchor="middle" fill="#94a3b8" font-size="9">Selects patient from list</text>
+
+  <line x1="150" y1="144" x2="150" y2="170" stroke="#818cf8" stroke-width="1.3" marker-end="url(#pa)"/>
+
+  <!-- Step D2 -->
+  <rect x="40" y="170" width="220" height="52" rx="7" fill="#0f172a" stroke="#818cf8" stroke-width="1.2"/>
+  <text x="150" y="190" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Fill Record Form</text>
+  <text x="150" y="207" text-anchor="middle" fill="#94a3b8" font-size="9">Diagnosis · Symptoms · Medications</text>
+
+  <line x1="150" y1="222" x2="150" y2="248" stroke="#818cf8" stroke-width="1.3" marker-end="url(#pa)"/>
+
+  <!-- Step D3 -->
+  <rect x="40" y="248" width="220" height="52" rx="7" fill="#0f172a" stroke="#818cf8" stroke-width="1.2"/>
+  <text x="150" y="268" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Upload Documents</text>
+  <text x="150" y="285" text-anchor="middle" fill="#94a3b8" font-size="9">PDFs · Prescription images (Multer)</text>
+
+  <line x1="150" y1="300" x2="150" y2="326" stroke="#818cf8" stroke-width="1.3" marker-end="url(#pa)"/>
+
+  <!-- Step D4 -->
+  <rect x="40" y="326" width="220" height="52" rx="7" fill="#0f172a" stroke="#818cf8" stroke-width="1.2"/>
+  <text x="150" y="346" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">POST /api/doctor/record</text>
+  <text x="150" y="363" text-anchor="middle" fill="#94a3b8" font-size="9">JWT validated · Role: doctor</text>
+
+  <line x1="150" y1="378" x2="150" y2="404" stroke="#10b981" stroke-width="1.3" marker-end="url(#ga)"/>
+
+  <!-- Step M1 — saved to MedicalRecord -->
+  <rect x="40" y="404" width="220" height="52" rx="7" fill="#134e3a" stroke="#10b981" stroke-width="1.3"/>
+  <text x="150" y="424" text-anchor="middle" fill="#10b981" font-size="11" font-weight="bold">MedicalRecord Saved</text>
+  <text x="150" y="441" text-anchor="middle" fill="#94a3b8" font-size="9">MongoDB · structuredData = pending</text>
+
+  <!-- Arrow to AI lane -->
+  <line x1="260" y1="430" x2="310" y2="430" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ya)"/>
+
+  <!-- ════════════════════════════════════════════
+       MIDDLE LANE — AI Extraction
+  ════════════════════════════════════════════ -->
+  <rect x="300" y="55" width="280" height="590" rx="10" fill="#1e2715" stroke="#10b981" stroke-width="1"/>
+  <text x="440" y="78" text-anchor="middle" fill="#10b981" font-size="12" font-weight="bold">AI Extraction Pipeline</text>
+
+  <!-- AI1 -->
+  <rect x="320" y="405" width="240" height="52" rx="7" fill="#0f172a" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="440" y="425" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="bold">Trigger AI Parser</text>
+  <text x="440" y="442" text-anchor="middle" fill="#94a3b8" font-size="9">Document text extracted (≤7000 chars)</text>
+
+  <line x1="440" y1="457" x2="440" y2="487" stroke="#f59e0b" stroke-width="1.3" marker-end="url(#ya)"/>
+
+  <!-- AI2 -->
+  <rect x="320" y="487" width="240" height="52" rx="7" fill="#0f172a" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="440" y="507" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="bold">LLM Prompt Sent</text>
+  <text x="440" y="524" text-anchor="middle" fill="#94a3b8" font-size="9">Ollama (local) or Gemini (cloud)</text>
+
+  <line x1="440" y1="539" x2="440" y2="565" stroke="#f59e0b" stroke-width="1.3" marker-end="url(#ya)"/>
+
+  <!-- Decision diamond -->
+  <polygon points="440,565 520,595 440,625 360,595" fill="#0f172a" stroke="#f59e0b" stroke-width="1.3"/>
+  <text x="440" y="591" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="bold">Parse OK?</text>
+
+  <!-- YES -->
+  <line x1="440" y1="625" x2="440" y2="650" stroke="#10b981" stroke-width="1.3" marker-end="url(#ga)"/>
+  <rect x="350" y="650" width="180" height="32" rx="6" fill="#134e3a" stroke="#10b981" stroke-width="1"/>
+  <text x="440" y="671" text-anchor="middle" fill="#10b981" font-size="10" font-weight="bold">structuredData = completed</text>
+
+  <!-- NO path up -->
+  <line x1="360" y1="595" x2="300" y2="595" stroke="#ef4444" stroke-width="1.3"/>
+  <line x1="300" y1="595" x2="300" y2="456" stroke="#ef4444" stroke-width="1.3"/>
+  <text x="285" y="530" fill="#ef4444" font-size="9" transform="rotate(-90,285,530)">failed / retry</text>
+  <rect x="300" y="440" width="10" height="20" fill="#ef4444" rx="2"/>
+
+  <!-- Arrow to patient lane after extraction complete -->
+  <line x1="580" y1="595" x2="620" y2="595" stroke="#818cf8" stroke-width="1.5" marker-end="url(#pa)"/>
+
+  <!-- ════════════════════════════════════════════
+       RIGHT LANE — Patient / Nurse Access
+  ════════════════════════════════════════════ -->
+  <rect x="610" y="55" width="260" height="590" rx="10" fill="#1e1a2e" stroke="#6366f1" stroke-width="1"/>
+  <text x="740" y="78" text-anchor="middle" fill="#6366f1" font-size="12" font-weight="bold">Patient / Nurse Access</text>
+
+  <!-- Nurse vitals path (top) -->
+  <rect x="630" y="92" width="220" height="52" rx="7" fill="#0f172a" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="740" y="112" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Nurse Updates Vitals</text>
+  <text x="740" y="129" text-anchor="middle" fill="#94a3b8" font-size="9">PUT /api/nurse/vitals/:id  (customFields)</text>
+
+  <line x1="740" y1="144" x2="740" y2="170" stroke="#6366f1" stroke-width="1.3" marker-end="url(#pa)"/>
+
+  <!-- Nurse test assignment -->
+  <rect x="630" y="170" width="220" height="52" rx="7" fill="#0f172a" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="740" y="190" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Nurse: Test Assignment</text>
+  <text x="740" y="207" text-anchor="middle" fill="#94a3b8" font-size="9">Upload result docs · update status</text>
+
+  <line x1="740" y1="222" x2="740" y2="248" stroke="#6366f1" stroke-width="1.3" marker-end="url(#pa)"/>
+
+  <!-- OTP sharing box -->
+  <rect x="630" y="248" width="220" height="52" rx="7" fill="#0f172a" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="740" y="268" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="bold">Patient Shares via OTP</text>
+  <text x="740" y="285" text-anchor="middle" fill="#94a3b8" font-size="9">PatientAccessOTP model · time-limited</text>
+
+  <line x1="740" y1="300" x2="740" y2="326" stroke="#6366f1" stroke-width="1.3" marker-end="url(#pa)"/>
+
+  <!-- Patient views -->
+  <rect x="630" y="326" width="220" height="52" rx="7" fill="#0f172a" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="740" y="346" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">GET /api/patient/records</text>
+  <text x="740" y="363" text-anchor="middle" fill="#94a3b8" font-size="9">JWT · role: user · pagination</text>
+
+  <line x1="740" y1="378" x2="740" y2="404" stroke="#10b981" stroke-width="1.3" marker-end="url(#ga)"/>
+
+  <!-- Patient dashboard -->
+  <rect x="630" y="404" width="220" height="52" rx="7" fill="#134e3a" stroke="#10b981" stroke-width="1.3"/>
+  <text x="740" y="424" text-anchor="middle" fill="#10b981" font-size="11" font-weight="bold">Patient Dashboard</text>
+  <text x="740" y="441" text-anchor="middle" fill="#94a3b8" font-size="9">Records · Analytics · Smartwatch</text>
+
+  <line x1="740" y1="457" x2="740" y2="483" stroke="#10b981" stroke-width="1.3" marker-end="url(#ga)"/>
+
+  <!-- AI data display -->
+  <rect x="630" y="483" width="220" height="52" rx="7" fill="#134e3a" stroke="#10b981" stroke-width="1.3"/>
+  <text x="740" y="503" text-anchor="middle" fill="#10b981" font-size="11" font-weight="bold">AI Extracted Data Tab</text>
+  <text x="740" y="520" text-anchor="middle" fill="#94a3b8" font-size="9">Diagnosis · Meds · Metrics · Summary</text>
+
+  <!-- Arrow from AI completed to patient AI tab -->
+  <line x1="530" y1="666" x2="630" y2="509" stroke="#10b981" stroke-width="1" stroke-dasharray="5,3" marker-end="url(#ga)"/>
+
+  <!-- ActivityLog side note at bottom -->
+  <rect x="630" y="560" width="220" height="52" rx="7" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="740" y="580" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="bold">ActivityLog Written</text>
+  <text x="740" y="597" text-anchor="middle" fill="#64748b" font-size="9">Every access event recorded</text>
+</svg>

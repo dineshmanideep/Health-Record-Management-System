@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 540" font-family="Arial, sans-serif">
+  <rect width="900" height="540" fill="#0f172a"/>
+
+  <text x="450" y="34" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="bold">HRMS Database Entity-Relationship Overview</text>
+
+  <!-- Arrow marker -->
+  <defs>
+    <marker id="ea" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#475569"/>
+    </marker>
+    <marker id="eb" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/>
+    </marker>
+  </defs>
+
+  <!-- ── USER (Patient) ──────────────────────────────────── -->
+  <rect x="330" y="55" width="240" height="120" rx="10" fill="#1e293b" stroke="#818cf8" stroke-width="2"/>
+  <rect x="330" y="55" width="240" height="28" rx="10" fill="#818cf8"/>
+  <rect x="330" y="71" width="240" height="12" fill="#818cf8"/>
+  <text x="450" y="73" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">User (Patient)</text>
+  <text x="345" y="96"  fill="#94a3b8" font-size="10">PK  patientId : Number</text>
+  <text x="345" y="111" fill="#e2e8f0" font-size="10">    name, email, role, phone</text>
+  <text x="345" y="126" fill="#e2e8f0" font-size="10">    bloodGroup, emergencyContact</text>
+  <text x="345" y="141" fill="#6366f1" font-size="10">FK  medicalRecords[] → MedicalRecord</text>
+  <text x="345" y="156" fill="#e2e8f0" font-size="10">    accessibilityProfile{}</text>
+
+  <!-- ── DOCTOR ──────────────────────────────────────────── -->
+  <rect x="30" y="55" width="240" height="120" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+  <rect x="30" y="55" width="240" height="28" rx="10" fill="#f59e0b"/>
+  <rect x="30" y="71"  width="240" height="12" fill="#f59e0b"/>
+  <text x="150" y="73" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">Doctor</text>
+  <text x="45" y="96"  fill="#94a3b8" font-size="10">PK  _id : ObjectId</text>
+  <text x="45" y="111" fill="#e2e8f0" font-size="10">    specialization, qualifications[]</text>
+  <text x="45" y="126" fill="#e2e8f0" font-size="10">    experience, consultationFee</text>
+  <text x="45" y="141" fill="#f59e0b" font-size="10">FK  hospitalAffiliation[] → Hospital</text>
+  <text x="45" y="156" fill="#e2e8f0" font-size="10">    accountStatus, licenseNumber</text>
+
+  <!-- ── NURSE ───────────────────────────────────────────── -->
+  <rect x="630" y="55" width="240" height="120" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+  <rect x="630" y="55" width="240" height="28" rx="10" fill="#10b981"/>
+  <rect x="630" y="71"  width="240" height="12" fill="#10b981"/>
+  <text x="750" y="73" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">Nurse</text>
+  <text x="645" y="96"  fill="#94a3b8" font-size="10">PK  _id : ObjectId</text>
+  <text x="645" y="111" fill="#e2e8f0" font-size="10">    department, shift (M/E/N)</text>
+  <text x="645" y="126" fill="#e2e8f0" font-size="10">    qualifications[], licenseNo</text>
+  <text x="645" y="141" fill="#10b981" font-size="10">FK  hospital → Hospital</text>
+  <text x="645" y="156" fill="#e2e8f0" font-size="10">    accountStatus</text>
+
+  <!-- ── HOSPITAL ─────────────────────────────────────────── -->
+  <rect x="330" y="240" width="240" height="120" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+  <rect x="330" y="240" width="240" height="28" rx="10" fill="#ef4444"/>
+  <rect x="330" y="256"  width="240" height="12" fill="#ef4444"/>
+  <text x="450" y="258" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">Hospital</text>
+  <text x="345" y="281" fill="#94a3b8" font-size="10">PK  _id : ObjectId</text>
+  <text x="345" y="296" fill="#e2e8f0" font-size="10">    name, email, registrationNumber</text>
+  <text x="345" y="311" fill="#e2e8f0" font-size="10">    hospitalType, departments[]</text>
+  <text x="345" y="326" fill="#e2e8f0" font-size="10">    totalBeds, availableBeds</text>
+  <text x="345" y="341" fill="#ef4444" font-size="10">    accountStatus (pending/active)</text>
+
+  <!-- ── MEDICAL RECORD ──────────────────────────────────── -->
+  <rect x="330" y="420" width="240" height="100" rx="10" fill="#1e293b" stroke="#06b6d4" stroke-width="2"/>
+  <rect x="330" y="420" width="240" height="28" rx="10" fill="#06b6d4"/>
+  <rect x="330" y="436"  width="240" height="12" fill="#06b6d4"/>
+  <text x="450" y="438" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">MedicalRecord</text>
+  <text x="345" y="460" fill="#06b6d4" font-size="10">FK  patient → User</text>
+  <text x="345" y="475" fill="#06b6d4" font-size="10">FK  doctor → Doctor,  nurse → Nurse</text>
+  <text x="345" y="490" fill="#06b6d4" font-size="10">FK  hospital → Hospital</text>
+  <text x="345" y="505" fill="#e2e8f0" font-size="10">    diagnosis, healthMetrics{}, structuredData{}</text>
+
+  <!-- ── TEST ASSIGNMENT ──────────────────────────────────── -->
+  <rect x="630" y="240" width="240" height="100" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <rect x="630" y="240" width="240" height="28" rx="10" fill="#a78bfa"/>
+  <rect x="630" y="256"  width="240" height="12" fill="#a78bfa"/>
+  <text x="750" y="258" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">TestAssignment</text>
+  <text x="645" y="281" fill="#a78bfa" font-size="10">FK  testType → TestType</text>
+  <text x="645" y="296" fill="#a78bfa" font-size="10">FK  assignedNurse → Nurse</text>
+  <text x="645" y="311" fill="#a78bfa" font-size="10">FK  hospital → Hospital</text>
+  <text x="645" y="326" fill="#e2e8f0" font-size="10">    status, resultDocuments[]</text>
+
+  <!-- ── SMARTWATCH ────────────────────────────────────────── -->
+  <rect x="30" y="240" width="240" height="100" rx="10" fill="#1e293b" stroke="#f472b6" stroke-width="2"/>
+  <rect x="30" y="240" width="240" height="28" rx="10" fill="#f472b6"/>
+  <rect x="30" y="256"  width="240" height="12" fill="#f472b6"/>
+  <text x="150" y="258" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">SmartwatchConnection</text>
+  <text x="45"  y="281" fill="#f472b6" font-size="10">FK  patient → User  (1-to-1)</text>
+  <text x="45"  y="296" fill="#e2e8f0" font-size="10">    provider, deviceId, isConnected</text>
+  <text x="45"  y="311" fill="#e2e8f0" font-size="10">    latestMetrics{HR, steps, SpO2…}</text>
+  <text x="45"  y="326" fill="#e2e8f0" font-size="10">    metricsHistory[]</text>
+
+  <!-- ── ACTIVITY LOG ───────────────────────────────────────── -->
+  <rect x="30" y="400" width="240" height="80" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+  <rect x="30" y="400" width="240" height="24" rx="10" fill="#475569"/>
+  <rect x="30" y="413"  width="240" height="11" fill="#475569"/>
+  <text x="150" y="416" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">ActivityLog</text>
+  <text x="45"  y="438" fill="#64748b" font-size="10">userId, role, action, resource</text>
+  <text x="45"  y="453" fill="#64748b" font-size="10">timestamp, ipAddress</text>
+  <text x="45"  y="468" fill="#64748b" font-size="10">→ Immutable audit trail</text>
+
+  <!-- ══ RELATIONSHIP LINES ════════════════════════════════ -->
+  <!-- User → MedicalRecord (1-many) -->
+  <line x1="450" y1="175" x2="450" y2="240" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#eb)"/>
+  <text x="456" y="212" fill="#06b6d4" font-size="9">1..n</text>
+
+  <!-- User → Smartwatch (1-1) -->
+  <line x1="330" y1="115" x2="270" y2="290" stroke="#f472b6" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ea)"/>
+  <text x="275" y="215" fill="#f472b6" font-size="9">1-1</text>
+
+  <!-- Doctor → MedicalRecord -->
+  <line x1="150" y1="175" x2="380" y2="440" stroke="#f59e0b" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ea)"/>
+
+  <!-- Nurse → MedicalRecord -->
+  <line x1="750" y1="175" x2="530" y2="440" stroke="#10b981" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ea)"/>
+
+  <!-- Hospital → MedicalRecord -->
+  <line x1="450" y1="360" x2="450" y2="420" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ea)"/>
+  <text x="456" y="395" fill="#ef4444" font-size="9">1..n</text>
+
+  <!-- Nurse → TestAssignment -->
+  <line x1="750" y1="175" x2="750" y2="240" stroke="#a78bfa" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ea)"/>
+
+  <!-- Hospital → TestAssignment -->
+  <line x1="570" y1="300" x2="630" y2="300" stroke="#a78bfa" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ea)"/>
+
+  <!-- Doctor/Nurse → Hospital -->
+  <line x1="270" y1="115" x2="330" y2="260" stroke="#f59e0b" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ea)"/>
+  <line x1="630" y1="115" x2="570" y2="260" stroke="#10b981" stroke-width="1.3" stroke-dasharray="4,3" marker-end="url(#ea)"/>
+
+  <!-- User → ActivityLog -->
+  <line x1="365" y1="155" x2="200" y2="400" stroke="#475569" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#ea)"/>
+
+  <!-- Legend -->
+  <rect x="650" y="400" width="220" height="80" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="760" y="420" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="bold">Legend</text>
+  <line x1="665" y1="434" x2="700" y2="434" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="710" y="438" fill="#e2e8f0" font-size="9">Foreign Key reference</text>
+  <rect x="665" y="446" width="16" height="10" rx="2" fill="#1e293b" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="688" y="456" fill="#e2e8f0" font-size="9">Entity (role model)</text>
+  <rect x="665" y="462" width="16" height="10" rx="2" fill="#134e3a" stroke="#10b981" stroke-width="1.5"/>
+  <text x="688" y="472" fill="#e2e8f0" font-size="9">Core data entity</text>
+</svg>

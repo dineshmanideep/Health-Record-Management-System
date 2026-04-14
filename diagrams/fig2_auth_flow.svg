@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 700" font-family="Arial, sans-serif">
+  <!-- Background -->
+  <rect width="780" height="700" fill="#0f172a"/>
+
+  <!-- Title -->
+  <text x="390" y="34" text-anchor="middle" fill="#e2e8f0" font-size="17" font-weight="bold">JWT Authentication &amp; Role-Based Authorisation Flow</text>
+
+  <!-- ── Arrow marker ── -->
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/>
+    </marker>
+    <marker id="r" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#ef4444"/>
+    </marker>
+  </defs>
+
+  <!-- ══ STEP 1: User submits credentials ═══════════════════════ -->
+  <rect x="270" y="55" width="240" height="52" rx="8" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="390" y="77" text-anchor="middle" fill="#818cf8" font-size="12" font-weight="bold">User Submits Credentials</text>
+  <text x="390" y="95" text-anchor="middle" fill="#94a3b8" font-size="10">POST /api/auth/login  {email, password}</text>
+
+  <line x1="390" y1="107" x2="390" y2="138" stroke="#10b981" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="400" y="127" fill="#64748b" font-size="9">HTTPS</text>
+
+  <!-- ══ STEP 2: Role detection ══════════════════════════════════ -->
+  <rect x="270" y="138" width="240" height="52" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="390" y="160" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="bold">getModelByRole(role)</text>
+  <text x="390" y="177" text-anchor="middle" fill="#94a3b8" font-size="10">User · Doctor · Nurse · Hospital · Admin</text>
+
+  <line x1="390" y1="190" x2="390" y2="220" stroke="#10b981" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ══ STEP 3: bcrypt compare ══════════════════════════════════ -->
+  <rect x="270" y="220" width="240" height="52" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="390" y="242" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="bold">bcrypt.compare()</text>
+  <text x="390" y="259" text-anchor="middle" fill="#94a3b8" font-size="10">Verify entered password vs stored hash</text>
+
+  <!-- Decision diamond -->
+  <line x1="390" y1="272" x2="390" y2="302" stroke="#10b981" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <polygon points="390,302 470,342 390,382 310,342" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+  <text x="390" y="338" text-anchor="middle" fill="#10b981" font-size="12" font-weight="bold">Valid?</text>
+
+  <!-- NO branch (left) -->
+  <line x1="310" y1="342" x2="180" y2="342" stroke="#ef4444" stroke-width="1.5" marker-end="url(#r)"/>
+  <text x="245" y="333" text-anchor="middle" fill="#ef4444" font-size="10">NO</text>
+  <rect x="60" y="318" width="120" height="48" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="120" y="338" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="bold">401 Unauthorized</text>
+  <text x="120" y="354" text-anchor="middle" fill="#94a3b8" font-size="9">Invalid credentials</text>
+
+  <!-- YES branch (right) -->
+  <line x1="470" y1="342" x2="560" y2="342" stroke="#10b981" stroke-width="1.5"/>
+  <text x="512" y="333" text-anchor="middle" fill="#10b981" font-size="10">YES</text>
+
+  <!-- ══ STEP 4: Sign JWT ════════════════════════════════════════ -->
+  <line x1="390" y1="382" x2="390" y2="415" stroke="#10b981" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="260" y="415" width="260" height="52" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+  <text x="390" y="437" text-anchor="middle" fill="#10b981" font-size="12" font-weight="bold">jwt.sign({ id, role }, JWT_SECRET)</text>
+  <text x="390" y="454" text-anchor="middle" fill="#94a3b8" font-size="10">Token returned to client</text>
+
+  <line x1="390" y1="467" x2="390" y2="497" stroke="#10b981" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ══ STEP 5: Client stores token ════════════════════════════ -->
+  <rect x="260" y="497" width="260" height="52" rx="8" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="390" y="519" text-anchor="middle" fill="#818cf8" font-size="12" font-weight="bold">Client: localStorage.setItem()</text>
+  <text x="390" y="536" text-anchor="middle" fill="#94a3b8" font-size="10">AuthContext stores user + token</text>
+
+  <line x1="390" y1="549" x2="390" y2="578" stroke="#10b981" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ══ STEP 6: Protected API call ═════════════════════════════ -->
+  <rect x="230" y="578" width="320" height="52" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="390" y="600" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="bold">Subsequent API Call</text>
+  <text x="390" y="617" text-anchor="middle" fill="#94a3b8" font-size="10">Authorization: Bearer &lt;token&gt;  →  protect()</text>
+
+  <!-- Decision diamond 2 -->
+  <line x1="390" y1="630" x2="390" y2="655" stroke="#10b981" stroke-width="1.5" marker-end="url(#a)"/>
+  <polygon points="390,655 490,682 390,709 290,682" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+  <text x="390" y="678" text-anchor="middle" fill="#10b981" font-size="10" font-weight="bold">Role allowed?</text>
+
+  <!-- NO (right) -->
+  <line x1="490" y1="682" x2="620" y2="682" stroke="#ef4444" stroke-width="1.5" marker-end="url(#r)"/>
+  <text x="555" y="672" text-anchor="middle" fill="#ef4444" font-size="10">NO → 403</text>
+  <rect x="620" y="660" width="130" height="44" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="685" y="678" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="bold">403 Forbidden</text>
+  <text x="685" y="694" text-anchor="middle" fill="#94a3b8" font-size="9">Role not permitted</text>
+
+  <!-- YES below — outside canvas hint -->
+  <line x1="390" y1="709" x2="390" y2="730" stroke="#10b981" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="400" y="726" fill="#10b981" font-size="9">YES → Route handler executes</text>
+
+  <!-- getAccessStatusError side note -->
+  <rect x="560" y="318" width="180" height="48" rx="8" fill="#134e3a" stroke="#10b981" stroke-width="1.1"/>
+  <text x="650" y="338" text-anchor="middle" fill="#10b981" font-size="10" font-weight="bold">getAccessStatusError()</text>
+  <text x="650" y="354" text-anchor="middle" fill="#94a3b8" font-size="9">Checks account status (active?)</text>
+  <line x1="560" y1="342" x2="470" y2="342" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3"/>
+</svg>

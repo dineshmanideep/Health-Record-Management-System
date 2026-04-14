@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import { nurseService } from '../../services/api';
 
@@ -252,29 +253,29 @@ const NurseAssignments = () => {
       ) : (
         <>
           {/* Header & Filters */}
-          <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 mb-8 transition-all">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-10">
+          <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 mb-8 transition-all">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 sm:gap-8 mb-6 sm:mb-10">
               <div>
-                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Clinical Inbox</h2>
-                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-2">Authenticated Assignment Queue</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Clinical Inbox</h2>
+                <p className="text-[9px] sm:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-2">Authenticated Assignment Queue</p>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 md:gap-3">
                 {[
-                  { id: 'all', label: 'All Artifacts', count: stats.all, color: 'slate' },
+                  { id: 'all', label: 'All', count: stats.all, color: 'slate' },
                   { id: 'pending', label: 'Pending', count: stats.pending, color: 'amber' },
-                  { id: 'in_progress', label: 'In Progress', count: stats.in_progress, color: 'blue' },
-                  { id: 'completed', label: 'Completed', count: stats.completed, color: 'emerald' }
+                  { id: 'in_progress', label: 'In-Progress', count: stats.in_progress, color: 'blue' },
+                  { id: 'completed', label: 'Done', count: stats.completed, color: 'emerald' }
                 ].map((btn) => (
                   <button
                     key={btn.id}
                     onClick={() => setFilter(btn.id)}
-                    className={`px-6 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 border ${
+                    className={`px-4 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[9px] uppercase tracking-widest transition-all active:scale-95 border ${
                       filter === btn.id 
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl shadow-emerald-600/20' 
                         : 'bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-800 hover:border-emerald-500/30'
                     }`}
                   >
-                    {btn.label} <span className={`ml-2 opacity-60 ${filter === btn.id ? 'text-white' : ''}`}>[{btn.count}]</span>
+                    {btn.label} <span className={`ml-1 sm:ml-2 opacity-60 ${filter === btn.id ? 'text-white' : ''}`}>[{btn.count}]</span>
                   </button>
                 ))}
               </div>
@@ -295,17 +296,17 @@ const NurseAssignments = () => {
                   {filteredAssignments.map((assignment) => (
                     <div 
                       key={assignment._id} 
-                      className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-slate-200/50 dark:border-slate-800 hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group/item relative overflow-hidden"
+                      className="bg-white dark:bg-slate-900 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-slate-200/50 dark:border-slate-800 hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 group/item relative overflow-hidden"
                     >
                       <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover/item:bg-emerald-500/10 transition-colors" />
                       
-                      <div className="flex justify-between items-start mb-8 relative z-10">
+                      <div className="flex justify-between items-start mb-6 sm:mb-8 relative z-10">
                         <div className="flex-1">
-                           <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                           <p className="text-[9px] sm:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 sm:mb-4 flex items-center gap-2">
                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 
                              {assignment.patient?.patientId}
                            </p>
-                           <h3 className="font-black text-2xl text-slate-900 dark:text-white uppercase tracking-tight line-clamp-1 mb-2 group-hover/item:text-emerald-600 dark:group-hover/item:text-emerald-400 transition-colors">
+                           <h3 className="font-black text-xl sm:text-2xl text-slate-900 dark:text-white uppercase tracking-tight line-clamp-1 mb-2 group-hover/item:text-emerald-600 dark:group-hover/item:text-emerald-400 transition-colors">
                             {assignment.patient?.name}
                            </h3>
                            <div className="flex items-center gap-3 mt-4">
@@ -503,123 +504,118 @@ const NurseAssignments = () => {
           )}
 
           {/* Completion Form Modal */}
-          {showCompletionForm && selectedAssignment && (
-            <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center z-[100] p-4 animate-in fade-in duration-500">
-              <div className="bg-white dark:bg-slate-950 rounded-[3.5rem] shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-slate-200 dark:border-emerald-500/10 flex flex-col">
-                <div className="flex justify-between items-center px-12 py-10 border-b dark:border-slate-800/50 sticky top-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
+          {showCompletionForm && selectedAssignment && createPortal(
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center z-[999] p-2 sm:p-4 animate-in fade-in duration-300">
+              <div className="bg-white dark:bg-slate-950 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl max-w-4xl w-full max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-slate-200 dark:border-emerald-500/10 flex flex-col">
+                <div className="flex justify-between items-center px-6 md:px-12 py-6 md:py-10 border-b dark:border-slate-800/50 sticky top-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
                   <div>
-                    <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Protocol Finalization</h3>
-                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-2 italic">Authenticated Output Generation</p>
+                    <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Protocol Finalization</h3>
+                    <p className="text-[9px] md:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-1 md:mt-2 italic">Authenticated Output Generation</p>
                   </div>
                   <button
                     onClick={() => setShowCompletionForm(false)}
-                    className="w-12 h-12 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-2xl font-black text-slate-400 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+                    className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-xl md:text-2xl font-black text-slate-400 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
                   >
                     ×
                   </button>
                 </div>
-
-                <div className="p-12 overflow-y-auto custom-scrollbar flex-1">
+                <div className="p-6 md:p-12 overflow-y-auto custom-scrollbar flex-1">
                   {message.text && (
-                    <div className="mb-10 p-6 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center border-l-4 border-rose-500">
+                    <div className="mb-6 md:mb-10 p-4 md:p-6 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-center border-l-4 border-rose-500">
                       ⚠️ SYNTAX ERROR: {message.text}
                     </div>
                   )}
-
-                  <form onSubmit={handleCompleteAssignment} className="space-y-12">
+                  <form onSubmit={handleCompleteAssignment} className="space-y-8 md:space-y-12">
                     <div>
-                      <label className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2 mb-4 block italic italic">
+                      <label className="text-[10px] md:text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2 mb-3 md:mb-4 block italic">
                         Clinical Observations & Regimen *
                       </label>
                       <textarea
                         value={prescription}
                         onChange={(e) => setPrescription(e.target.value)}
-                        rows={8}
+                        rows={6}
                         placeholder="Define the patient findings and medical directives..."
-                        className="w-full px-8 py-7 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] text-sm font-bold dark:text-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all outline-none resize-none leading-relaxed"
+                        className="w-full px-5 md:px-8 py-5 md:py-7 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-[1.5rem] md:rounded-[2.5rem] text-sm font-bold dark:text-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all outline-none resize-none leading-relaxed"
                         required
                       />
                     </div>
-
                     <div>
-                       <div className="flex justify-between items-center mb-6 px-2">
-                          <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] italic">Telemetry Artifacts</span>
-                          <button
-                            type="button"
-                            onClick={handleFileAdd}
-                            className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all"
-                          >
-                            + Add Data Node
-                          </button>
-                       </div>
-                      
+                      <div className="flex justify-between items-center mb-4 md:mb-6 px-2">
+                        <span className="text-[10px] md:text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] italic">Telemetry Artifacts</span>
+                        <button
+                          type="button"
+                          onClick={handleFileAdd}
+                          className="px-4 md:px-6 py-2 md:py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[8px] md:text-[9px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all"
+                        >
+                          + Add Data Node
+                        </button>
+                      </div>
                       {files.length === 0 ? (
-                        <div className="bg-slate-50 dark:bg-slate-900/30 p-12 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200 dark:border-slate-800">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] italic">No binary objects attached</p>
+                        <div className="bg-slate-50 dark:bg-slate-900/30 p-8 md:p-12 rounded-[1.5rem] md:rounded-[2.5rem] text-center border-2 border-dashed border-slate-200 dark:border-slate-800">
+                          <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] italic">No binary objects attached</p>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                           {files.map((item, index) => (
-                            <div key={index} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] relative group border border-slate-100 dark:border-slate-800 hover:border-emerald-500/30 transition-all shadow-sm">
+                            <div key={index} className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] relative group border border-slate-100 dark:border-slate-800 hover:border-emerald-500/30 transition-all shadow-sm">
                               <button
                                 type="button"
                                 onClick={() => handleFileRemove(index)}
-                                className="absolute -top-3 -right-3 w-8 h-8 bg-rose-500 text-white rounded-xl flex items-center justify-center text-sm shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute -top-2 -right-2 md:-top-3 md:-right-3 w-7 h-7 md:w-8 md:h-8 bg-rose-500 text-white rounded-lg md:rounded-xl flex items-center justify-center text-xs md:text-sm shadow-xl opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
                               >
                                 ×
                               </button>
-                              
-                              <div className="space-y-4">
-                                 <div>
-                                   <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-2 px-1">Classification</label>
-                                   <select
-                                     value={item.category}
-                                     onChange={(e) => handleCategoryChange(index, e.target.value)}
-                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl text-[11px] font-black uppercase dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all appearance-none cursor-pointer"
-                                   >
-                                     <option value="test_report">Diagnostic Report</option>
-                                     <option value="diagnosis_report">Clinical Analysis</option>
-                                   </select>
-                                 </div>
-                                 <div>
-                                   <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-2 px-1">Data Stream</label>
-                                   <div className="relative">
-                                     <input
-                                       type="file"
-                                       onChange={(e) => handleFileChange(index, e)}
-                                       accept=".jpg,.jpeg,.png,.pdf"
-                                       className="w-full text-[10px] font-bold dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-slate-900 dark:file:bg-white file:text-white dark:file:text-slate-900 hover:file:opacity-80 transition-all cursor-pointer"
-                                     />
-                                   </div>
-                                   {item.file && <p className="text-[9px] font-black text-emerald-500 mt-2 truncate italic px-1">Linked: {item.file.name}</p>}
-                                 </div>
+                              <div className="space-y-3 md:space-y-4">
+                                <div>
+                                  <label className="text-[8px] md:text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1.5 md:mb-2 px-1">Classification</label>
+                                  <select
+                                    value={item.category}
+                                    onChange={(e) => handleCategoryChange(index, e.target.value)}
+                                    className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl text-[10px] md:text-[11px] font-black uppercase dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all appearance-none cursor-pointer"
+                                  >
+                                    <option value="test_report">Diagnostic Report</option>
+                                    <option value="diagnosis_report">Clinical Analysis</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-[8px] md:text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1.5 md:mb-2 px-1">Data Stream</label>
+                                  <div className="relative">
+                                    <input
+                                      type="file"
+                                      onChange={(e) => handleFileChange(index, e)}
+                                      accept=".jpg,.jpeg,.png,.pdf"
+                                      className="w-full text-[9px] md:text-[10px] font-bold dark:text-slate-400 file:mr-3 md:file:mr-4 file:py-1.5 md:file:py-2 file:px-3 md:file:px-4 file:rounded-xl file:border-0 file:text-[8px] md:file:text-[9px] file:font-black file:uppercase file:bg-slate-900 dark:file:bg-white file:text-white dark:file:text-slate-900 hover:file:opacity-80 transition-all cursor-pointer"
+                                    />
+                                  </div>
+                                  {item.file && <p className="text-[8px] md:text-[9px] font-black text-emerald-500 mt-1.5 md:mt-2 truncate italic px-1">Linked: {item.file.name}</p>}
+                                </div>
                               </div>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
-
-                    <div className="flex flex-col sm:flex-row gap-6 pt-10 border-t dark:border-slate-800">
+                    <div className="flex flex-col sm:flex-row gap-4 md:gap-6 pt-6 md:pt-10 border-t dark:border-slate-800">
                       <button
                         type="submit"
                         disabled={submitting}
-                        className="flex-1 py-5 bg-emerald-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl shadow-emerald-500/30 active:scale-95 transition-all disabled:opacity-50 hover:bg-emerald-700 hover:-translate-y-1"
+                        className="flex-1 py-4 md:py-5 bg-emerald-600 text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-[10px] md:text-[11px] uppercase tracking-widest shadow-2xl shadow-emerald-500/30 active:scale-95 transition-all disabled:opacity-50 hover:bg-emerald-700 hover:-translate-y-1"
                       >
-                        {submitting ? 'Transmitting Data...' : 'Finalize & Transmit'}
+                        {submitting ? 'Transmitting...' : 'Finalize & Transmit'}
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowCompletionForm(false)}
-                        className="flex-1 py-5 bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 rounded-[2rem] font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all border border-slate-100 dark:border-slate-800"
+                        className="flex-1 py-4 md:py-5 bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 rounded-[1.5rem] md:rounded-[2rem] font-black text-[10px] md:text-[11px] uppercase tracking-widest active:scale-95 transition-all border border-slate-100 dark:border-slate-800"
                       >
-                        Abort Submission
+                        Abort
                       </button>
                     </div>
                   </form>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </>
       )}

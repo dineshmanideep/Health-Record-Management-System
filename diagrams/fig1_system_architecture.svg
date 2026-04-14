@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" font-family="Arial, sans-serif">
+  <!-- Background -->
+  <rect width="900" height="560" fill="#0f172a"/>
+
+  <!-- Title -->
+  <text x="450" y="36" text-anchor="middle" fill="#e2e8f0" font-size="18" font-weight="bold">Health Record Management System — Three-Tier Architecture</text>
+
+  <!-- ══════════════════════════════════════════════
+       TIER 1 — PRESENTATION
+  ══════════════════════════════════════════════ -->
+  <rect x="30" y="60" width="840" height="130" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+  <text x="45" y="82" fill="#10b981" font-size="12" font-weight="bold">PRESENTATION TIER — React 19 (Vite SPA) · Tailwind CSS v4</text>
+
+  <!-- Role boxes -->
+  <!-- Patient -->
+  <rect x="50"  y="92" width="140" height="84" rx="8" fill="#0f172a" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="120" y="112" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Patient</text>
+  <text x="120" y="128" text-anchor="middle" fill="#94a3b8" font-size="9">Dashboard · Records</text>
+  <text x="120" y="142" text-anchor="middle" fill="#94a3b8" font-size="9">Analytics · Smartwatch</text>
+  <text x="120" y="156" text-anchor="middle" fill="#94a3b8" font-size="9">Activity Logs · Profile</text>
+
+  <!-- Doctor -->
+  <rect x="210" y="92" width="130" height="84" rx="8" fill="#0f172a" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="275" y="112" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Doctor</text>
+  <text x="275" y="128" text-anchor="middle" fill="#94a3b8" font-size="9">Dashboard · Patients</text>
+  <text x="275" y="142" text-anchor="middle" fill="#94a3b8" font-size="9">Patient Records</text>
+  <text x="275" y="156" text-anchor="middle" fill="#94a3b8" font-size="9">Assign Records · Logs</text>
+
+  <!-- Nurse -->
+  <rect x="360" y="92" width="130" height="84" rx="8" fill="#0f172a" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="425" y="112" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Nurse</text>
+  <text x="425" y="128" text-anchor="middle" fill="#94a3b8" font-size="9">Dashboard</text>
+  <text x="425" y="142" text-anchor="middle" fill="#94a3b8" font-size="9">Assignments</text>
+  <text x="425" y="156" text-anchor="middle" fill="#94a3b8" font-size="9">Test Assignments · Logs</text>
+
+  <!-- Hospital -->
+  <rect x="510" y="92" width="140" height="84" rx="8" fill="#0f172a" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="580" y="112" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Hospital</text>
+  <text x="580" y="128" text-anchor="middle" fill="#94a3b8" font-size="9">Dashboard · Doctors</text>
+  <text x="580" y="142" text-anchor="middle" fill="#94a3b8" font-size="9">Nurses · Tests</text>
+  <text x="580" y="156" text-anchor="middle" fill="#94a3b8" font-size="9">Test Assignments · Logs</text>
+
+  <!-- Admin -->
+  <rect x="670" y="92" width="180" height="84" rx="8" fill="#0f172a" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="760" y="112" text-anchor="middle" fill="#818cf8" font-size="11" font-weight="bold">Admin</text>
+  <text x="760" y="128" text-anchor="middle" fill="#94a3b8" font-size="9">Dashboard · Hospitals</text>
+  <text x="760" y="142" text-anchor="middle" fill="#94a3b8" font-size="9">Doctors · Nurses</text>
+  <text x="760" y="156" text-anchor="middle" fill="#94a3b8" font-size="9">System Management</text>
+
+  <!-- Arrows tier1 -> tier2 -->
+  <line x1="120" y1="200" x2="120" y2="240" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="275" y1="200" x2="275" y2="240" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="425" y1="200" x2="425" y2="240" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="580" y1="200" x2="580" y2="240" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="760" y1="200" x2="760" y2="240" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════════
+       TIER 2 — APPLICATION
+  ══════════════════════════════════════════════ -->
+  <rect x="30" y="240" width="840" height="150" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="45" y="262" fill="#f59e0b" font-size="12" font-weight="bold">APPLICATION TIER — Node.js · Express.js v5 · RESTful API</text>
+
+  <!-- Auth middleware -->
+  <rect x="50"  y="272" width="180" height="72" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.1"/>
+  <text x="140" y="292" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="bold">Auth Middleware</text>
+  <text x="140" y="307" text-anchor="middle" fill="#94a3b8" font-size="9">JWT protect()</text>
+  <text x="140" y="320" text-anchor="middle" fill="#94a3b8" font-size="9">authorize(...roles)</text>
+  <text x="140" y="333" text-anchor="middle" fill="#94a3b8" font-size="9">bcryptjs password hash</text>
+
+  <!-- Route groups -->
+  <rect x="250" y="272" width="120" height="72" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.1"/>
+  <text x="310" y="292" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="bold">/api/patient</text>
+  <text x="310" y="307" text-anchor="middle" fill="#94a3b8" font-size="9">records · analytics</text>
+  <text x="310" y="320" text-anchor="middle" fill="#94a3b8" font-size="9">smartwatch · profile</text>
+
+  <rect x="385" y="272" width="120" height="72" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.1"/>
+  <text x="445" y="292" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="bold">/api/doctor</text>
+  <text x="445" y="307" text-anchor="middle" fill="#94a3b8" font-size="9">patients · record</text>
+  <text x="445" y="320" text-anchor="middle" fill="#94a3b8" font-size="9">audit-logs</text>
+
+  <rect x="520" y="272" width="120" height="72" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.1"/>
+  <text x="580" y="292" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="bold">/api/nurse</text>
+  <text x="580" y="307" text-anchor="middle" fill="#94a3b8" font-size="9">assignments · vitals</text>
+  <text x="580" y="320" text-anchor="middle" fill="#94a3b8" font-size="9">test-assignments</text>
+
+  <rect x="655" y="272" width="210" height="72" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.1"/>
+  <text x="760" y="292" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="bold">/api/hospital · /api/admin</text>
+  <text x="760" y="307" text-anchor="middle" fill="#94a3b8" font-size="9">staff mgmt · tests · approvals</text>
+  <text x="760" y="320" text-anchor="middle" fill="#94a3b8" font-size="9">audit-logs · user mgmt</text>
+
+  <!-- AI box -->
+  <rect x="250" y="355" width="620" height="28" rx="6" fill="#134e3a" stroke="#10b981" stroke-width="1.1"/>
+  <text x="560" y="373" text-anchor="middle" fill="#10b981" font-size="10" font-weight="bold">AI Document Parser — Ollama (qwen2.5vl:7b) / Google Gemini 2.0-flash · Multer file upload</text>
+
+  <!-- Arrows tier2 -> tier3 -->
+  <line x1="350" y1="395" x2="350" y2="425" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <line x1="550" y1="395" x2="550" y2="425" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+  <!-- ══════════════════════════════════════════════
+       TIER 3 — DATA
+  ══════════════════════════════════════════════ -->
+  <rect x="30" y="425" width="840" height="110" rx="10" fill="#1e293b" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="45" y="447" fill="#818cf8" font-size="12" font-weight="bold">DATA TIER — MongoDB · Mongoose ODM (19 Schemas)</text>
+
+  <rect x="50"  y="460" width="130" height="60" rx="8" fill="#0f172a" stroke="#818cf8" stroke-width="1.1"/>
+  <text x="115" y="478" text-anchor="middle" fill="#a5b4fc" font-size="10" font-weight="bold">User / Auth</text>
+  <text x="115" y="493" text-anchor="middle" fill="#94a3b8" font-size="9">User · Doctor</text>
+  <text x="115" y="507" text-anchor="middle" fill="#94a3b8" font-size="9">Nurse · Hospital · Admin</text>
+
+  <rect x="200" y="460" width="140" height="60" rx="8" fill="#0f172a" stroke="#818cf8" stroke-width="1.1"/>
+  <text x="270" y="478" text-anchor="middle" fill="#a5b4fc" font-size="10" font-weight="bold">Medical Records</text>
+  <text x="270" y="493" text-anchor="middle" fill="#94a3b8" font-size="9">MedicalRecord</text>
+  <text x="270" y="507" text-anchor="middle" fill="#94a3b8" font-size="9">RecordAssignment</text>
+
+  <rect x="360" y="460" width="140" height="60" rx="8" fill="#0f172a" stroke="#818cf8" stroke-width="1.1"/>
+  <text x="430" y="478" text-anchor="middle" fill="#a5b4fc" font-size="10" font-weight="bold">Tests &amp; Workflows</text>
+  <text x="430" y="493" text-anchor="middle" fill="#94a3b8" font-size="9">TestAssignment</text>
+  <text x="430" y="507" text-anchor="middle" fill="#94a3b8" font-size="9">TestType</text>
+
+  <rect x="520" y="460" width="150" height="60" rx="8" fill="#0f172a" stroke="#818cf8" stroke-width="1.1"/>
+  <text x="595" y="478" text-anchor="middle" fill="#a5b4fc" font-size="10" font-weight="bold">Access &amp; Security</text>
+  <text x="595" y="493" text-anchor="middle" fill="#94a3b8" font-size="9">PatientAccessOTP</text>
+  <text x="595" y="507" text-anchor="middle" fill="#94a3b8" font-size="9">HospitalOTP · DoctorAccess</text>
+
+  <rect x="690" y="460" width="160" height="60" rx="8" fill="#0f172a" stroke="#818cf8" stroke-width="1.1"/>
+  <text x="770" y="478" text-anchor="middle" fill="#a5b4fc" font-size="10" font-weight="bold">Monitoring</text>
+  <text x="770" y="493" text-anchor="middle" fill="#94a3b8" font-size="9">ActivityLog · Notification</text>
+  <text x="770" y="507" text-anchor="middle" fill="#94a3b8" font-size="9">HospitalAuditLog · Smartwatch</text>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#10b981"/>
+    </marker>
+    <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/>
+    </marker>
+  </defs>
+</svg>
