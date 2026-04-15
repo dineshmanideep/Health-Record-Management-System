@@ -22,6 +22,11 @@ const PRESCRIPTION_SIGNAL_PATTERN = /\b(tablet|tab\b|capsule|cap\b|syrup|drops|o
 const FOLLOW_UP_SIGNAL_PATTERN = /\b(next visit|follow[\s-]?up|review (?:after|in)|revisit|consult (?:again|after)|after\s+\d+\s*(?:day|week|month)s?|in\s+\d+\s*(?:day|week|month)s?)\b/i;
 const LAB_DOSAGE_UNIT_PATTERN = /(?:\/\s*(?:dl|ml|l)|\b(?:mg\/dl|g\/dl|ng\/dl|pg\/ml|mmol\/l|miu\/l|uiu\/ml|iu\/ml)\b)/i;
 const LIKELY_LAB_TERM_PATTERN = /\b(tsh|t3|t4|ft3|ft4|hemoglobin|hgb|rbc|wbc|platelet|pcv|glucose|sugar|cholesterol|triglyceride|creatinine|urea|bilirubin|sgot|sgpt|ast|alt)\b/i;
+const MEDICATION_EVIDENCE_ALIASES = {
+  levothyroxine: ['levothyroxine', 'thyroxine', 'lt4', 'l thyroxine', 'thyronorm', 'thyrowell', 'eltroxin', 'euthyrox'],
+  'vitamin d3': ['vitamin d3', 'cholecalciferol', 'd rise', 'd-rise', 'd3'],
+  metformin: ['metformin', 'glyciphage', 'glucophage']
+};
 
 function normalizeEvidenceText(value = '') {
   return String(value || '')
@@ -59,6 +64,20 @@ function hasPartialEvidenceForMedicationName(name = '', evidenceText = '') {
   return significantTokens.some((token) => evidenceText.includes(token));
 }
 
+function hasMedicationAliasEvidence(name = '', evidenceText = '') {
+  const normalizedName = normalizeEvidenceText(name);
+  if (!normalizedName || !evidenceText) return false;
+
+  const aliases = MEDICATION_EVIDENCE_ALIASES[normalizedName] || [];
+  if (!aliases.length) return false;
+
+  return aliases.some((alias) => {
+    const normalizedAlias = normalizeEvidenceText(alias);
+    if (!normalizedAlias) return false;
+    return evidenceText.includes(normalizedAlias);
+  });
+}
+
 function isLabLikeDosageText(value = '') {
   const normalized = String(value || '').toLowerCase().replace(/\s+/g, '');
   if (!normalized) return false;
@@ -69,6 +88,229 @@ function isLikelyLabTerm(value = '') {
   const normalized = normalizeEvidenceText(value);
   if (!normalized) return false;
   return LIKELY_LAB_TERM_PATTERN.test(normalized);
+}
+
+function stripMedicationFormPrefix(name = '') {
+  return String(name || '')
+    .replace(/^\s*(?:tab(?:let)?\.?|cap(?:sule)?\.?|syp\.?|syrup|inj(?:ection)?\.?|drop(?:s)?\.?|ointment\.?|cream\.?)\s+/i, '')
+    .trim();
+}
+
+function hasPrescriptionHintInDocuments(documents = []) {
+  return (documents || []).some((document) => {
+    const reportTag = String(document?.reportTag || '').trim();
+    if (!reportTag) return false;
+    return /(prescription|\brx\b|medication|medicine)/i.test(reportTag);
+  });
+}
+
+function hasStructuredMedicationEvidence(item = {}) {
+  const dosage = String(item?.dosage || '').trim();
+  const frequency = String(item?.frequency || '').trim();
+  const timing = String(item?.timing || '').trim();
+  const instructions = String(item?.instructions || '').trim();
+  const duration = String(item?.duration || '').trim();
+
+  const scheduleText = `${frequency} ${timing} ${instructions}`.toLowerCase();
+  const dosageText = dosage.toLowerCase();
+
+  const hasDosePattern = /\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?)\b/i.test(dosageText)
+    || /\b(?:one|two|three|once|twice|thrice|\d+)\b/i.test(dosageText);
+
+  const hasSchedulePattern = /\b(?:once|twice|thrice|daily|day|week|month|morning|night|before\s+food|after\s+food|od|bd|tid|hs)\b/i.test(scheduleText);
+
+  const hasDurationEvidence = Number.isFinite(item?.durationDays)
+    || Number.isFinite(item?.totalTablets)
+    || Number.isFinite(item?.tabletsPerDose)
+    || Number.isFinite(item?.timesPerDay)
+    || /\b\d+\s*(?:day|days|week|weeks|month|months)\b/i.test(duration);
+
+  return hasDosePattern || (hasSchedulePattern && hasDurationEvidence);
+}
+
+function normalizeYear(yearValue) {
+  const yearNumber = Number(yearValue);
+  if (!Number.isFinite(yearNumber)) return null;
+  if (yearNumber >= 100) return yearNumber;
+  return yearNumber >= 70 ? (1900 + yearNumber) : (2000 + yearNumber);
+}
+
+function buildValidDate(yearValue, monthValue, dayValue) {
+  const year = normalizeYear(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return null;
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+
+  const now = new Date();
+  if (date.getFullYear() < 1990 || date.getTime() > now.getTime() + (24 * 60 * 60 * 1000)) {
+    return null;
+  }
+
+  return date;
+}
+
+function parseDateFromText(value = '') {
+  const text = String(value || '').replace(/[,]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  const yearFirstMatch = text.match(/\b(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})\b/);
+  if (yearFirstMatch) {
+    const parsed = buildValidDate(yearFirstMatch[1], yearFirstMatch[2], yearFirstMatch[3]);
+    if (parsed) return parsed;
+  }
+
+  const monthNameMatch = text.match(/\b(\d{1,2})\s*(?:-|\/|\s)\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(?:-|\/|\s)?\s*(\d{2,4})\b/i);
+  if (monthNameMatch) {
+    const monthLookup = {
+      jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+      jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12
+    };
+    const monthToken = monthNameMatch[2].slice(0, 4).toLowerCase();
+    const month = monthLookup[monthToken] || monthLookup[monthToken.slice(0, 3)];
+    if (month) {
+      const parsed = buildValidDate(monthNameMatch[3], month, monthNameMatch[1]);
+      if (parsed) return parsed;
+    }
+  }
+
+  const dmyMatch = text.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/);
+  if (dmyMatch) {
+    const day = Number(dmyMatch[1]);
+    const month = Number(dmyMatch[2]);
+    let parsed = buildValidDate(dmyMatch[3], month, day);
+
+    if (!parsed && day <= 12 && month <= 31) {
+      parsed = buildValidDate(dmyMatch[3], day, month);
+    }
+
+    if (parsed) return parsed;
+  }
+
+  return null;
+}
+
+function extractAllDatesFromText(value = '') {
+  const text = String(value || '').replace(/[,]/g, ' ');
+  const collected = [];
+  const seen = new Set();
+
+  const register = (date = null) => {
+    if (!date || Number.isNaN(date.getTime())) return;
+    const key = date.toISOString().slice(0, 10);
+    if (seen.has(key)) return;
+    seen.add(key);
+    collected.push(date);
+  };
+
+  let match;
+  const yearFirstRegex = /\b(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})\b/g;
+  while ((match = yearFirstRegex.exec(text)) !== null) {
+    register(buildValidDate(match[1], match[2], match[3]));
+  }
+
+  const dmyRegex = /\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/g;
+  while ((match = dmyRegex.exec(text)) !== null) {
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+
+    let parsed = buildValidDate(match[3], month, day);
+    if (!parsed && day <= 12 && month <= 31) {
+      parsed = buildValidDate(match[3], day, month);
+    }
+    register(parsed);
+  }
+
+  const monthNameRegex = /\b(\d{1,2})\s*(?:-|\/|\s)\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(?:-|\/|\s)?\s*(\d{2,4})\b/gi;
+  while ((match = monthNameRegex.exec(text)) !== null) {
+    const monthLookup = {
+      jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+      jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12
+    };
+    const monthToken = match[2].slice(0, 4).toLowerCase();
+    const month = monthLookup[monthToken] || monthLookup[monthToken.slice(0, 3)];
+    if (!month) continue;
+
+    register(buildValidDate(match[3], month, match[1]));
+  }
+
+  return collected;
+}
+
+function inferClinicalReportDate(sourceText = '', fallbackDate = null) {
+  const candidates = [];
+
+  const addCandidate = (date, priority, reason) => {
+    if (!date || Number.isNaN(date.getTime())) return;
+    candidates.push({ date, priority, reason });
+  };
+
+  const text = String(sourceText || '').replace(/\r/g, '\n');
+
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  for (const line of lines) {
+    const normalizedLine = line.toLowerCase();
+    const hasRegnLikeLabel = /(regn|registration)\s*[.\-:]?\s*d(?:ate|ata|te)?/.test(normalizedLine);
+    const hasReportedLikeLabel = /(reported?|report)\s*[.\-:]?\s*d(?:ate|ata|te)?/.test(normalizedLine);
+
+    if (!(hasRegnLikeLabel && hasReportedLikeLabel)) continue;
+
+    const lineDates = extractAllDatesFromText(line);
+    if (!lineDates.length) continue;
+
+    // Most lab headers list registration/sample first and reported date second.
+    addCandidate(lineDates[0], 1, 'header_regn_date');
+    if (lineDates[1]) {
+      addCandidate(lineDates[1], 3, 'header_reported_date');
+    }
+  }
+
+  const labeledDateRules = [
+    {
+      priority: 1,
+      pattern: /(?:sample\s*[.\-:]?\s*d(?:ate|ata|te)?|collection\s*[.\-:]?\s*d(?:ate|ata|te)?|specimen\s*[.\-:]?\s*d(?:ate|ata|te)?|date\s*of\s*collection|test\s*[.\-:]?\s*d(?:ate|ata|te)?|regn(?:istration)?\s*[.\-:]?\s*d(?:ate|ata|te)?|reg\s*[.\-:]?\s*d(?:ate|ata|te)?)\s*[:\-]?\s*([^\n]{0,120})/gi,
+      reason: 'sample_or_registration_date'
+    },
+    {
+      priority: 3,
+      pattern: /(?:reported?\s*[.\-:]?\s*d(?:ate|ata|te)?|report\s*[.\-:]?\s*d(?:ate|ata|te)?)\s*[:\-]?\s*([^\n]{0,120})/gi,
+      reason: 'reported_date'
+    }
+  ];
+
+  for (const rule of labeledDateRules) {
+    let match;
+    while ((match = rule.pattern.exec(text)) !== null) {
+      const parsed = parseDateFromText(match[1]);
+      addCandidate(parsed, rule.priority, rule.reason);
+    }
+  }
+
+  const allDates = extractAllDatesFromText(text);
+  if (allDates.length > 1) {
+    const earliest = [...allDates].sort((left, right) => left.getTime() - right.getTime())[0];
+    addCandidate(earliest, 2, 'earliest_detected_date');
+  }
+
+  const fallbackParsed = fallbackDate ? new Date(fallbackDate) : null;
+  if (fallbackParsed && !Number.isNaN(fallbackParsed.getTime())) {
+    addCandidate(fallbackParsed, 4, 'llm_report_date');
+  }
+
+  if (!candidates.length) {
+    return fallbackParsed && !Number.isNaN(fallbackParsed.getTime()) ? fallbackParsed : null;
+  }
+
+  candidates.sort((left, right) => {
+    if (left.priority !== right.priority) return left.priority - right.priority;
+    return left.date.getTime() - right.date.getTime();
+  });
+
+  return candidates[0].date;
 }
 
 function sanitizeClinicalPlan({
@@ -84,12 +326,15 @@ function sanitizeClinicalPlan({
   const hasPrescriptionSignal = PRESCRIPTION_SIGNAL_PATTERN.test(evidenceText);
   const hasPrescriptionContext = hasPrescriptionSignal || Boolean(hasPrescriptionDocumentHint);
   const hasFollowUpSignal = FOLLOW_UP_SIGNAL_PATTERN.test(evidenceText);
+  const sparseEvidenceText = evidenceText.replace(/\s+/g, '').length < 80;
 
   const filteredMedicationDetails = (medicationDetails || []).filter((item) => {
     const name = String(item?.name || '').trim();
     if (!name) return false;
 
     const hasNameEvidence = hasEvidenceForMedicationName(name, evidenceText);
+    const hasAliasEvidence = hasMedicationAliasEvidence(name, evidenceText);
+    const hasStrongNameEvidence = hasNameEvidence || hasAliasEvidence;
     const hasPartialNameEvidence = hasPartialEvidenceForMedicationName(name, evidenceText);
     const hasInstructionSignal = Boolean(
       String(item?.frequency || '').trim() ||
@@ -110,8 +355,15 @@ function sanitizeClinicalPlan({
       return false;
     }
 
-    if (!hasNameEvidence) {
-      if (!(hasPrescriptionContext && hasInstructionSignal && !dosageLooksLabLike)) {
+    if (!hasStrongNameEvidence) {
+      if (!(
+        hasPrescriptionContext
+        && !dosageLooksLabLike
+        && (
+          hasPartialNameEvidence
+          || (hasInstructionSignal && hasStructuredMedicationEvidence(item))
+        )
+      )) {
         return false;
       }
     }
@@ -119,8 +371,35 @@ function sanitizeClinicalPlan({
     return true;
   });
 
+  // OCR on image-based prescriptions can be sparse. If a prescription-tagged upload has
+  // structured medication rows from LLM, keep them unless they look lab-like.
+  const recoveryMedicationDetails = (sparseEvidenceText && hasPrescriptionDocumentHint)
+    ? (medicationDetails || []).filter((item) => {
+      const name = String(item?.name || '').trim();
+      if (!name) return false;
+
+      const nameLooksLabLike = isLikelyLabTerm(name);
+      const dosageLooksLabLike = isLabLikeDosageText(item?.dosage || '');
+      const hasInstructionSignal = Boolean(
+        String(item?.frequency || '').trim() ||
+        String(item?.timing || '').trim() ||
+        String(item?.instructions || '').trim() ||
+        String(item?.duration || '').trim() ||
+        Number.isFinite(item?.durationDays)
+      );
+
+      if (nameLooksLabLike || dosageLooksLabLike) return false;
+      return hasInstructionSignal || hasStructuredMedicationEvidence(item);
+    })
+    : [];
+
+  const finalMedicationDetails = mergeMedicationDetails([
+    ...filteredMedicationDetails,
+    ...recoveryMedicationDetails
+  ]);
+
   const detailNames = new Set(
-    filteredMedicationDetails
+    finalMedicationDetails
       .map((item) => String(item?.name || '').trim())
       .filter(Boolean)
       .map((name) => name.toLowerCase())
@@ -128,9 +407,11 @@ function sanitizeClinicalPlan({
 
   const filteredMedications = uniqueNonEmpty([
     ...(medications || []),
-    ...filteredMedicationDetails.map((item) => item.name)
+    ...finalMedicationDetails.map((item) => item.name)
   ]).filter((name) => {
     const hasNameEvidence = hasEvidenceForMedicationName(name, evidenceText);
+    const hasAliasEvidence = hasMedicationAliasEvidence(name, evidenceText);
+    const hasStrongNameEvidence = hasNameEvidence || hasAliasEvidence;
     const hasPartialNameEvidence = hasPartialEvidenceForMedicationName(name, evidenceText);
     const nameLooksLabLike = isLikelyLabTerm(name);
     const includedInDetails = detailNames.has(String(name || '').trim().toLowerCase());
@@ -139,12 +420,27 @@ function sanitizeClinicalPlan({
       return false;
     }
 
-    if (!hasNameEvidence && !includedInDetails && !(hasPrescriptionContext && hasPartialNameEvidence)) {
+    if (!hasStrongNameEvidence && !includedInDetails && !(hasPrescriptionContext && hasPartialNameEvidence)) {
       return false;
     }
 
     return true;
   });
+
+  const recoveryMedicationNames = (sparseEvidenceText && hasPrescriptionDocumentHint)
+    ? uniqueNonEmpty(medications).filter((name) => {
+      const normalized = String(name || '').trim();
+      if (!normalized) return false;
+      if (isLikelyLabTerm(normalized)) return false;
+      return true;
+    })
+    : [];
+
+  const finalMedications = uniqueNonEmpty([
+    ...filteredMedications,
+    ...recoveryMedicationNames,
+    ...finalMedicationDetails.map((item) => item.name)
+  ]);
 
   let sanitizedNextVisitDate = nextVisitDate || null;
   if (sanitizedNextVisitDate && visitDate) {
@@ -159,8 +455,8 @@ function sanitizeClinicalPlan({
   }
 
   return {
-    medications: filteredMedications,
-    medicationDetails: filteredMedicationDetails,
+    medications: finalMedications,
+    medicationDetails: finalMedicationDetails,
     nextVisitDate: sanitizedNextVisitDate
   };
 }
@@ -224,6 +520,8 @@ function buildExtractionPrompt({ combinedText = '', fallbackText = '', documentL
     '{',
     '"diagnosis": "...",',
     '"specialization": "...",',
+    '"registrationDate": "YYYY-MM-DD",',
+    '"reportedDate": "YYYY-MM-DD",',
     '"reportDate": "YYYY-MM-DD",',
     '"fields": {',
     '  "field_name_from_source": {',
@@ -253,7 +551,9 @@ function buildExtractionPrompt({ combinedText = '', fallbackText = '', documentL
     'Rules:',
     '- Use numeric values where applicable.',
     '- If report or sample date is visible, include it in reportDate.',
+    '- If both registration/test date and reported date are present, set registrationDate and reportedDate separately, and set reportDate to registration/test date.',
     '- If prescription notes mention medicines, dosage, after food/before food, morning/night, or duration, capture them in medicationDetails.',
+    '- Add medicine names only when they are explicitly present in report text or prescription context. Do not guess medicine names.',
     '- If next visit is relative such as "after 1 week", fill nextVisitInDays.',
     '- Do not invent missing information.',
     '- Never infer medications from lab values unless explicitly present in prescription context.',
@@ -354,8 +654,9 @@ async function collectDocumentSources(documents = []) {
 function computeMedicationDurations(medicationDetails = [], visitDate = null) {
   const startDate = visitDate ? new Date(visitDate) : new Date();
   return (medicationDetails || []).map((item) => {
+    const cleanedName = stripMedicationFormPrefix(item.name);
     const normalized = {
-      name: canonicalizeMedicationName(item.name),
+      name: canonicalizeMedicationName(cleanedName),
       dosage: item.dosage || '',
       frequency: item.frequency || '',
       duration: item.duration || '',
@@ -459,12 +760,108 @@ function medicationDetailCompleteness(item = {}) {
   return score;
 }
 
+function choosePreferredText(existingValue = '', candidateValue = '') {
+  const existing = String(existingValue || '').trim();
+  const candidate = String(candidateValue || '').trim();
+  if (!candidate) return existing;
+  if (!existing) return candidate;
+
+  const existingWeight = normalizeMedicationToken(existing).length;
+  const candidateWeight = normalizeMedicationToken(candidate).length;
+  return candidateWeight > existingWeight ? candidate : existing;
+}
+
+function choosePreferredNumber(existingValue, candidateValue) {
+  const hasExisting = Number.isFinite(existingValue);
+  const hasCandidate = Number.isFinite(candidateValue);
+  if (!hasExisting && !hasCandidate) return null;
+  if (!hasExisting) return candidateValue;
+  if (!hasCandidate) return existingValue;
+  return Math.max(existingValue, candidateValue);
+}
+
+function choosePreferredDate(existingValue, candidateValue, mode = 'earliest') {
+  const existingDate = existingValue ? new Date(existingValue) : null;
+  const candidateDate = candidateValue ? new Date(candidateValue) : null;
+  const existingValid = existingDate && !Number.isNaN(existingDate.getTime());
+  const candidateValid = candidateDate && !Number.isNaN(candidateDate.getTime());
+
+  if (!existingValid && !candidateValid) return null;
+  if (!existingValid) return candidateDate;
+  if (!candidateValid) return existingDate;
+
+  if (mode === 'latest') {
+    return candidateDate.getTime() > existingDate.getTime() ? candidateDate : existingDate;
+  }
+
+  return candidateDate.getTime() < existingDate.getTime() ? candidateDate : existingDate;
+}
+
+function areMedicationEntriesMergeable(left = {}, right = {}) {
+  const leftName = normalizeMedicationToken(left?.name || '');
+  const rightName = normalizeMedicationToken(right?.name || '');
+  if (!leftName || !rightName || leftName !== rightName) return false;
+
+  const leftDosage = normalizeMedicationToken(left?.dosage || '');
+  const rightDosage = normalizeMedicationToken(right?.dosage || '');
+  if (!leftDosage || !rightDosage) return true;
+  return leftDosage === rightDosage;
+}
+
+function mergeMedicationEntry(existing = {}, candidate = {}) {
+  const betterBase = medicationDetailCompleteness(candidate) > medicationDetailCompleteness(existing)
+    ? candidate
+    : existing;
+  const weaker = betterBase === candidate ? existing : candidate;
+
+  const merged = {
+    ...betterBase,
+    name: choosePreferredText(stripMedicationFormPrefix(betterBase.name), stripMedicationFormPrefix(weaker.name)),
+    dosage: choosePreferredText(betterBase.dosage, weaker.dosage),
+    frequency: choosePreferredText(betterBase.frequency, weaker.frequency),
+    duration: choosePreferredText(betterBase.duration, weaker.duration),
+    timing: choosePreferredText(betterBase.timing, weaker.timing),
+    instructions: choosePreferredText(betterBase.instructions, weaker.instructions),
+    durationDays: choosePreferredNumber(betterBase.durationDays, weaker.durationDays),
+    totalTablets: choosePreferredNumber(betterBase.totalTablets, weaker.totalTablets),
+    tabletsPerDose: choosePreferredNumber(betterBase.tabletsPerDose, weaker.tabletsPerDose),
+    timesPerDay: choosePreferredNumber(betterBase.timesPerDay, weaker.timesPerDay),
+    startDate: choosePreferredDate(betterBase.startDate, weaker.startDate, 'earliest'),
+    endDate: choosePreferredDate(betterBase.endDate, weaker.endDate, 'latest')
+  };
+
+  if (merged.startDate && merged.endDate && merged.startDate.getTime() > merged.endDate.getTime()) {
+    merged.endDate = null;
+  }
+
+  return merged;
+}
+
 function mergeMedicationDetails(items = []) {
-  const byKey = new Map();
+  const merged = [];
 
   for (const item of items || []) {
     if (!item || typeof item !== 'object') continue;
-    const key = [
+
+    const normalizedItem = {
+      ...item,
+      name: canonicalizeMedicationName(stripMedicationFormPrefix(item.name))
+    };
+
+    if (!normalizeMedicationToken(normalizedItem.name)) continue;
+
+    const existingIndex = merged.findIndex((existingItem) => areMedicationEntriesMergeable(existingItem, normalizedItem));
+    if (existingIndex < 0) {
+      merged.push(normalizedItem);
+      continue;
+    }
+
+    merged[existingIndex] = mergeMedicationEntry(merged[existingIndex], normalizedItem);
+  }
+
+  const bySignature = new Map();
+  for (const item of merged) {
+    const signature = [
       normalizeMedicationToken(item.name),
       normalizeMedicationToken(item.dosage),
       normalizeMedicationToken(item.frequency),
@@ -472,21 +869,13 @@ function mergeMedicationDetails(items = []) {
       normalizeMedicationToken(item.instructions)
     ].join('|');
 
-    const fallbackKey = [
-      normalizeMedicationToken(item.name),
-      normalizeMedicationToken(item.dosage)
-    ].join('|');
-
-    const finalKey = key.replace(/\|/g, '') ? key : fallbackKey;
-    if (!finalKey || !finalKey.replace(/\|/g, '')) continue;
-
-    const existing = byKey.get(finalKey);
+    const existing = bySignature.get(signature);
     if (!existing || medicationDetailCompleteness(item) > medicationDetailCompleteness(existing)) {
-      byKey.set(finalKey, item);
+      bySignature.set(signature, item);
     }
   }
 
-  return Array.from(byKey.values());
+  return Array.from(bySignature.values());
 }
 
 function mergeValidatedPayloads(payloads = []) {
@@ -786,10 +1175,19 @@ async function normalizeValidatedMedicalData(validatedData = {}, options = {}) {
     hasPrescriptionDocumentHint: Boolean(options.hasPrescriptionDocumentHint)
   });
 
+  const llmPreferredDate =
+    validatedData.registrationDate
+    || normalized.reportDate
+    || validatedData.reportDate
+    || validatedData.reportedDate
+    || null;
+
+  const inferredReportDate = inferClinicalReportDate(options.sourceText || '', llmPreferredDate);
+
   return {
     diagnosis,
     specialization,
-    reportDate: normalized.reportDate || validatedData.reportDate || null,
+    reportDate: inferredReportDate,
     normalizedFields: normalized.normalizedFields,
     numericFields: normalized.numericFields,
     parsedMetrics: normalized.parsedMetrics,
@@ -816,10 +1214,7 @@ async function extractStructuredMedicalData(options = {}) {
   const activeProvider = result?.providerUsed || AI_RUNTIME_CONFIG.provider;
   const rawResponse = result?.content || '';
   const sourceText = result?.sourceText || '';
-  const hasPrescriptionDocumentHint = (options.documents || []).some((document) => {
-    const label = `${document?.reportTag || ''} ${document?.filePath || ''} ${document?.category || ''}`;
-    return /(prescription|\brx\b|medication|medicine)/i.test(label);
-  });
+  const hasPrescriptionDocumentHint = hasPrescriptionHintInDocuments(options.documents || []);
   const providerError = result?.error || '';
 
   if (!rawResponse) {

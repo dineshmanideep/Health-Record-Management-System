@@ -5,8 +5,18 @@ const { extractStructuredMedicalData, normalizeValidatedMedicalData } = require(
 const { buildCustomFields, buildHealthMetrics } = require('./medicalFieldNormalization');
 const { getFieldDisplayLabel } = require('./medicalCanonicalization');
 
+let postUploadProcessingQueue = Promise.resolve();
+
 function toAbsoluteUploadPath(filePath = '') {
   return path.join(__dirname, '..', String(filePath || '').replace(/^\/+/, ''));
+}
+
+function hasPrescriptionHintInDocuments(documents = []) {
+  return (documents || []).some((document) => {
+    const reportTag = String(document?.reportTag || '').trim();
+    if (!reportTag) return false;
+    return /(prescription|\brx\b|medication|medicine)/i.test(reportTag);
+  });
 }
 
 function toProcessingDocuments(documents = []) {
@@ -183,6 +193,17 @@ function applyResultToTestAssignment(assignment, result) {
   };
 }
 
+function enqueuePostUploadProcessing(taskName, taskFn) {
+  postUploadProcessingQueue = postUploadProcessingQueue
+    .catch(() => {})
+    .then(() => taskFn())
+    .catch((error) => {
+      console.error(`${taskName} failed:`, error.message || error);
+    });
+
+  return postUploadProcessingQueue;
+}
+
 async function processMedicalRecord(recordId, clarificationSelections = {}) {
   const record = await MedicalRecord.findById(recordId);
   if (!record) return null;
@@ -224,10 +245,7 @@ async function processTestAssignment(assignmentId, clarificationSelections = {})
 }
 
 async function finalizeValidatedMedicalRecord(record, validatedData, rawResponse, clarificationSelections = {}) {
-  const hasPrescriptionDocumentHint = (record.categorizedDocuments || []).some((document) => {
-    const label = `${document?.reportTag || ''} ${document?.filePath || ''} ${document?.category || ''}`;
-    return /(prescription|\brx\b|medication|medicine)/i.test(label);
-  });
+  const hasPrescriptionDocumentHint = hasPrescriptionHintInDocuments(record.categorizedDocuments || []);
 
   const normalized = await normalizeValidatedMedicalData(validatedData, {
     clarificationSelections,
@@ -256,10 +274,7 @@ async function finalizeValidatedMedicalRecord(record, validatedData, rawResponse
 }
 
 async function finalizeValidatedTestAssignment(assignment, validatedData, rawResponse, clarificationSelections = {}) {
-  const hasPrescriptionDocumentHint = (assignment.resultDocuments || []).some((document) => {
-    const label = `${document?.reportTag || ''} ${document?.filePath || ''} ${document?.category || ''}`;
-    return /(prescription|\brx\b|medication|medicine)/i.test(label);
-  });
+  const hasPrescriptionDocumentHint = hasPrescriptionHintInDocuments(assignment.resultDocuments || []);
 
   const normalized = await normalizeValidatedMedicalData(validatedData, {
     clarificationSelections,
@@ -287,17 +302,13 @@ async function finalizeValidatedTestAssignment(assignment, validatedData, rawRes
 
 function queueMedicalRecordPostUploadProcessing(recordId) {
   setImmediate(() => {
-    processMedicalRecord(recordId).catch((error) => {
-      console.error('Medical record LLM post-upload processing failed:', error.message || error);
-    });
+    enqueuePostUploadProcessing('Medical record LLM post-upload processing', () => processMedicalRecord(recordId));
   });
 }
 
 function queueTestAssignmentPostUploadProcessing(assignmentId) {
   setImmediate(() => {
-    processTestAssignment(assignmentId).catch((error) => {
-      console.error('Test assignment LLM post-upload processing failed:', error.message || error);
-    });
+    enqueuePostUploadProcessing('Test assignment LLM post-upload processing', () => processTestAssignment(assignmentId));
   });
 }
 

@@ -79,7 +79,17 @@ function normalizeMedicationList(value) {
     return value
       .map((item) => {
         if (item && typeof item === 'object') {
-          return String(item.name || item.medicine || item.medication || '').trim();
+          return String(
+            item.name
+            || item.medicine
+            || item.medication
+            || item.medicineName
+            || item.drug
+            || item.drugName
+            || item.tablet
+            || item.brand
+            || ''
+          ).trim();
         }
         return String(item || '').trim();
       })
@@ -97,12 +107,41 @@ function normalizeMedicationList(value) {
 }
 
 function normalizeMedicationDetails(value) {
+  if (typeof value === 'string') {
+    return value
+      .split(/\n|;|,/)
+      .map((line) => String(line || '').trim())
+      .filter(Boolean)
+      .map((name) => ({
+        name,
+        dosage: '',
+        frequency: '',
+        duration: '',
+        timing: '',
+        instructions: '',
+        durationDays: null,
+        totalTablets: null,
+        tabletsPerDose: null,
+        timesPerDay: null
+      }));
+  }
+
   if (!Array.isArray(value)) return [];
 
   return value
     .map((item) => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
-      const name = String(item.name || item.medicine || item.medication || '').trim();
+      const name = String(
+        item.name
+        || item.medicine
+        || item.medication
+        || item.medicineName
+        || item.drug
+        || item.drugName
+        || item.tablet
+        || item.brand
+        || ''
+      ).trim();
       if (!name) return null;
 
       const toNumber = (input) => {
@@ -112,9 +151,9 @@ function normalizeMedicationDetails(value) {
 
       return {
         name,
-        dosage: String(item.dosage || '').trim(),
-        frequency: String(item.frequency || '').trim(),
-        duration: String(item.duration || '').trim(),
+        dosage: String(item.dosage || item.dose || item.strength || '').trim(),
+        frequency: String(item.frequency || item.schedule || item.interval || '').trim(),
+        duration: String(item.duration || item.days || '').trim(),
         timing: String(item.timing || item.when || '').trim(),
         instructions: String(item.instructions || item.notes || '').trim(),
         durationDays: toNumber(item.durationDays),
@@ -181,6 +220,20 @@ function validateMedicalExtractionResponse(payload) {
   const nextVisitDate = nextVisitRaw ? new Date(nextVisitRaw) : null;
   const nextVisitInDaysRaw = objectPayload.nextVisitInDays;
   const nextVisitInDays = Number.isFinite(Number(nextVisitInDaysRaw)) ? Number(nextVisitInDaysRaw) : null;
+  const registrationDateRaw = objectPayload.registrationDate
+    || objectPayload.regnDate
+    || objectPayload.registration_date
+    || objectPayload.regn_date
+    || objectPayload.sampleDate
+    || objectPayload.collectionDate
+    || '';
+  const registrationDate = registrationDateRaw ? new Date(registrationDateRaw) : null;
+  const reportedDateRaw = objectPayload.reportedDate
+    || objectPayload.reported_date
+    || objectPayload.releaseDate
+    || objectPayload.release_date
+    || '';
+  const reportedDate = reportedDateRaw ? new Date(reportedDateRaw) : null;
   const reportDateRaw = objectPayload.reportDate || objectPayload.testDate || objectPayload.report_date || '';
   const reportDate = reportDateRaw ? new Date(reportDateRaw) : null;
   const diagnosis = String(objectPayload.diagnosis || '').trim();
@@ -210,6 +263,8 @@ function validateMedicalExtractionResponse(payload) {
       medicationDetails,
       nextVisit: nextVisitDate && !Number.isNaN(nextVisitDate.getTime()) ? nextVisitDate : null,
       nextVisitInDays,
+      registrationDate: registrationDate && !Number.isNaN(registrationDate.getTime()) ? registrationDate : null,
+      reportedDate: reportedDate && !Number.isNaN(reportedDate.getTime()) ? reportedDate : null,
       reportDate: reportDate && !Number.isNaN(reportDate.getTime()) ? reportDate : null
     }
   };

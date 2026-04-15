@@ -101,7 +101,7 @@ const SPECIALIZATION_DEFINITIONS = [
 ];
 
 const MEDICATION_DEFINITIONS = [
-  { canonical: 'Levothyroxine', aliases: ['levothyroxine', 'thyroxine', 'eltroxin', 'euthyrox'] },
+  { canonical: 'Levothyroxine', aliases: ['levothyroxine', 'thyroxine', 'eltroxin', 'euthyrox', 'lt4', 'l thyroxine', 'thyronorm', 'thyrowell'] },
   { canonical: 'Metformin', aliases: ['metformin', 'glyciphage', 'glucophage'] },
   { canonical: 'Insulin', aliases: ['insulin', 'insulin glargine', 'insulin lispro', 'insulin aspart'] },
   { canonical: 'Amlodipine', aliases: ['amlodipine'] },

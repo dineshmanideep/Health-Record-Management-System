@@ -322,6 +322,58 @@ function dedupeParsedMetrics(metrics = []) {
   return Array.from(byKey.values());
 }
 
+function resolveBloodSugarDuplicates(normalizedFields = {}, numericFields = {}, parsedMetrics = []) {
+  const bloodSugarKeys = ['bloodSugar', 'fastingBloodSugar', 'postMealBloodSugar', 'randomBloodSugar'];
+  const populatedKeys = bloodSugarKeys.filter((key) => Number.isFinite(numericFields?.[key]));
+  if (populatedKeys.length <= 1) {
+    return {
+      normalizedFields,
+      numericFields,
+      parsedMetrics
+    };
+  }
+
+  const priority = {
+    fastingBloodSugar: 4,
+    postMealBloodSugar: 3,
+    randomBloodSugar: 2,
+    bloodSugar: 1
+  };
+
+  const sorted = [...populatedKeys].sort((left, right) => {
+    const diff = (priority[right] || 0) - (priority[left] || 0);
+    if (diff !== 0) return diff;
+    return Math.abs((numericFields?.[right] || 0)) - Math.abs((numericFields?.[left] || 0));
+  });
+
+  const keepKey = sorted[0];
+  const dropSet = new Set(populatedKeys.filter((key) => key !== keepKey));
+
+  if (!dropSet.size) {
+    return {
+      normalizedFields,
+      numericFields,
+      parsedMetrics
+    };
+  }
+
+  const nextNormalizedFields = { ...(normalizedFields || {}) };
+  const nextNumericFields = { ...(numericFields || {}) };
+
+  for (const key of dropSet) {
+    delete nextNormalizedFields[key];
+    delete nextNumericFields[key];
+  }
+
+  const nextParsedMetrics = (parsedMetrics || []).filter((metric) => !dropSet.has(metric?.name));
+
+  return {
+    normalizedFields: nextNormalizedFields,
+    numericFields: nextNumericFields,
+    parsedMetrics: nextParsedMetrics
+  };
+}
+
 function normalizeFieldEntries(fields = {}) {
   const normalizedFields = {};
   const numericFields = {};
@@ -483,12 +535,16 @@ async function normalizeFieldEntriesWithCatalog(fields = {}, clarificationSelect
   const uniqueParsedMetrics = dedupeParsedMetrics(parsedMetrics);
   uniqueParsedMetrics.sort((a, b) => rankMetric(b) - rankMetric(a));
 
+  const bloodSugarResolved = resolveBloodSugarDuplicates(normalizedFields, numericFields, uniqueParsedMetrics);
+  const finalParsedMetrics = dedupeParsedMetrics(bloodSugarResolved.parsedMetrics);
+  finalParsedMetrics.sort((a, b) => rankMetric(b) - rankMetric(a));
+
   return {
-    normalizedFields,
-    numericFields,
-    parsedMetrics: uniqueParsedMetrics,
+    normalizedFields: bloodSugarResolved.normalizedFields,
+    numericFields: bloodSugarResolved.numericFields,
+    parsedMetrics: finalParsedMetrics,
     reportDate,
-    importantFindings: uniqueParsedMetrics.slice(0, 8),
+    importantFindings: finalParsedMetrics.slice(0, 8),
     unknownFields: Array.from(new Set(unknownFields)),
     conflicts,
     ambiguities,

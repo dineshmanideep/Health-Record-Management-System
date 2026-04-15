@@ -270,30 +270,47 @@ function upsertEntryInCache(entries = [], updatedEntry = null) {
   return [...entries, updatedEntry];
 }
 
+function isDuplicateKeyError(error) {
+  return Number(error?.code) === 11000;
+}
+
 async function createLearnedEntry({ unifiedName = '', inputName = '', entries = [] }) {
   const displayName = buildDisplayName(unifiedName, inputName);
   const canonicalKey = createUniqueCanonicalKey(displayName, entries);
   const aliasList = uniqueNonEmpty([inputName, unifiedName]);
 
-  const created = await MedicalFieldCatalog.findOneAndUpdate(
-    { canonicalKey },
-    {
-      $setOnInsert: {
-        canonicalKey,
-        displayName,
-        source: 'learned'
+  try {
+    const created = await MedicalFieldCatalog.findOneAndUpdate(
+      { canonicalKey },
+      {
+        $setOnInsert: {
+          canonicalKey,
+          displayName,
+          source: 'learned'
+        },
+        $addToSet: {
+          aliases: { $each: aliasList }
+        }
       },
-      $addToSet: {
-        aliases: { $each: aliasList }
+      {
+        upsert: true,
+        returnDocument: 'after'
       }
-    },
-    {
-      upsert: true,
-      returnDocument: 'after'
-    }
-  ).lean();
+    ).lean();
 
-  return created;
+    return created;
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) {
+      throw error;
+    }
+
+    const existing = await MedicalFieldCatalog.findOne({ canonicalKey }).lean();
+    if (!existing) {
+      throw error;
+    }
+
+    return persistAliases(existing, aliasList);
+  }
 }
 
 function buildResponseShape(internalResolutions = []) {
@@ -406,14 +423,25 @@ async function resolveFieldsWithLLM({ extractedFields = {}, clarificationSelecti
 
     let matchedExisting = Boolean(targetEntry);
     if (!targetEntry) {
+      const refreshedEntries = await loadCatalogEntries();
+      const refreshedMatch = findCatalogEntry(refreshedEntries, llmUnifiedName)
+        || findCatalogEntry(refreshedEntries, inputName);
+
+      if (refreshedMatch) {
+        const updated = await persistAliases(refreshedMatch, [inputName, llmUnifiedName]);
+        targetEntry = updated;
+        matchedExisting = true;
+        catalogEntries = upsertEntryInCache(refreshedEntries, targetEntry);
+      } else {
       const proposedUnifiedName = llmUnifiedName || inputName;
       targetEntry = await createLearnedEntry({
         unifiedName: proposedUnifiedName,
         inputName,
-        entries: catalogEntries
+        entries: refreshedEntries
       });
       matchedExisting = false;
-      catalogEntries = upsertEntryInCache(catalogEntries, targetEntry);
+      catalogEntries = upsertEntryInCache(refreshedEntries, targetEntry);
+      }
     } else {
       const updated = await persistAliases(targetEntry, [inputName, llmUnifiedName]);
       targetEntry = updated;
