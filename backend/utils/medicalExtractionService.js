@@ -99,8 +99,12 @@ function stripMedicationFormPrefix(name = '') {
 function hasPrescriptionHintInDocuments(documents = []) {
   return (documents || []).some((document) => {
     const reportTag = String(document?.reportTag || '').trim();
-    if (!reportTag) return false;
-    return /(prescription|\brx\b|medication|medicine)/i.test(reportTag);
+    const fileName = path.basename(String(document?.filePath || ''));
+    const folderName = path.basename(path.dirname(String(document?.filePath || '')));
+    const sourceType = String(document?.llmExtraction?.sourceType || document?.category || '').trim();
+    const evidence = `${reportTag} ${fileName} ${folderName} ${sourceType}`.trim();
+    if (!evidence) return false;
+    return /(prescription|\brx\b|medication|medicine)/i.test(evidence);
   });
 }
 
@@ -1175,6 +1179,32 @@ async function normalizeValidatedMedicalData(validatedData = {}, options = {}) {
     hasPrescriptionDocumentHint: Boolean(options.hasPrescriptionDocumentHint)
   });
 
+  const prescriptionMedicationFallbackDetails = (
+    Boolean(options.hasPrescriptionDocumentHint)
+    && !sanitizedPlan.medicationDetails?.length
+    && Array.isArray(medicationDetails)
+    && medicationDetails.length > 0
+  )
+    ? mergeMedicationDetails(
+      medicationDetails.filter((item) => {
+        const name = String(item?.name || '').trim();
+        if (!name) return false;
+        if (isLikelyLabTerm(name)) return false;
+        if (isLabLikeDosageText(item?.dosage || '')) return false;
+        return true;
+      })
+    )
+    : [];
+
+  const finalMedicationDetails = prescriptionMedicationFallbackDetails.length
+    ? prescriptionMedicationFallbackDetails
+    : sanitizedPlan.medicationDetails;
+
+  const finalMedications = uniqueNonEmpty([
+    ...(sanitizedPlan.medications || []),
+    ...finalMedicationDetails.map((item) => item?.name)
+  ]);
+
   const llmPreferredDate =
     validatedData.registrationDate
     || normalized.reportDate
@@ -1195,8 +1225,8 @@ async function normalizeValidatedMedicalData(validatedData = {}, options = {}) {
     unknownFields: normalized.unknownFields,
     conflicts: normalized.conflicts,
     ambiguities: normalized.ambiguities,
-    medications: sanitizedPlan.medications,
-    medicationDetails: sanitizedPlan.medicationDetails,
+    medications: finalMedications,
+    medicationDetails: finalMedicationDetails,
     nextVisitDate: sanitizedPlan.nextVisitDate
   };
 }

@@ -14,8 +14,12 @@ function toAbsoluteUploadPath(filePath = '') {
 function hasPrescriptionHintInDocuments(documents = []) {
   return (documents || []).some((document) => {
     const reportTag = String(document?.reportTag || '').trim();
-    if (!reportTag) return false;
-    return /(prescription|\brx\b|medication|medicine)/i.test(reportTag);
+    const fileName = path.basename(String(document?.filePath || ''));
+    const folderName = path.basename(path.dirname(String(document?.filePath || '')));
+    const sourceType = String(document?.llmExtraction?.sourceType || document?.category || '').trim();
+    const evidence = `${reportTag} ${fileName} ${folderName} ${sourceType}`.trim();
+    if (!evidence) return false;
+    return /(prescription|\brx\b|medication|medicine)/i.test(evidence);
   });
 }
 

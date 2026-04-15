@@ -75,6 +75,18 @@ function tryParseJsonCandidates(payload = '') {
 }
 
 function normalizeMedicationList(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return [
+      ...(normalizeMedicationList(value.items) || []),
+      ...(normalizeMedicationList(value.list) || []),
+      ...(normalizeMedicationList(value.values) || []),
+      ...(normalizeMedicationList(value.medications) || []),
+      ...(normalizeMedicationList(value.medicines) || []),
+      ...(normalizeMedicationList(value.drugs) || []),
+      ...(normalizeMedicationList(value.names) || [])
+    ];
+  }
+
   if (Array.isArray(value)) {
     return value
       .map((item) => {
@@ -107,6 +119,22 @@ function normalizeMedicationList(value) {
 }
 
 function normalizeMedicationDetails(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return [
+      ...(normalizeMedicationDetails(value.items) || []),
+      ...(normalizeMedicationDetails(value.list) || []),
+      ...(normalizeMedicationDetails(value.values) || []),
+      ...(normalizeMedicationDetails(value.medicationDetails) || []),
+      ...(normalizeMedicationDetails(value.medicineDetails) || []),
+      ...(normalizeMedicationDetails(value.medications) || []),
+      ...(normalizeMedicationDetails(value.medicines) || []),
+      ...(normalizeMedicationDetails(value.drugs) || []),
+      ...(normalizeMedicationDetails(value.tablets) || []),
+      ...(normalizeMedicationDetails(value.schedule) || []),
+      ...(normalizeMedicationDetails(value.rx) || [])
+    ];
+  }
+
   if (typeof value === 'string') {
     return value
       .split(/\n|;|,/)
@@ -130,6 +158,24 @@ function normalizeMedicationDetails(value) {
 
   return value
     .map((item) => {
+      if (typeof item === 'string') {
+        const name = String(item || '').trim();
+        if (!name) return null;
+
+        return {
+          name,
+          dosage: '',
+          frequency: '',
+          duration: '',
+          timing: '',
+          instructions: '',
+          durationDays: null,
+          totalTablets: null,
+          tabletsPerDose: null,
+          timesPerDay: null
+        };
+      }
+
       if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
       const name = String(
         item.name
@@ -167,6 +213,46 @@ function normalizeMedicationDetails(value) {
 
 function toPlainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
+function uniqueMedicationNames(values = []) {
+  const seen = new Set();
+  const result = [];
+
+  for (const value of values || []) {
+    const name = String(value || '').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(name);
+  }
+
+  return result;
+}
+
+function dedupeMedicationDetails(details = []) {
+  const byKey = new Map();
+
+  for (const item of details || []) {
+    const name = String(item?.name || '').trim();
+    if (!name) continue;
+
+    const key = [
+      name.toLowerCase(),
+      String(item?.dosage || '').trim().toLowerCase(),
+      String(item?.frequency || '').trim().toLowerCase(),
+      String(item?.timing || '').trim().toLowerCase(),
+      String(item?.instructions || '').trim().toLowerCase(),
+      String(item?.duration || '').trim().toLowerCase()
+    ].join('|');
+
+    if (!byKey.has(key)) {
+      byKey.set(key, item);
+    }
+  }
+
+  return Array.from(byKey.values());
 }
 
 function isSupportedFieldValue(value) {
@@ -237,8 +323,43 @@ function validateMedicalExtractionResponse(payload) {
   const reportDateRaw = objectPayload.reportDate || objectPayload.testDate || objectPayload.report_date || '';
   const reportDate = reportDateRaw ? new Date(reportDateRaw) : null;
   const diagnosis = String(objectPayload.diagnosis || '').trim();
-  const medications = normalizeMedicationList(objectPayload.medications);
-  const medicationDetails = normalizeMedicationDetails(objectPayload.medicationDetails);
+
+  const medicationNameCandidates = [
+    objectPayload.medications,
+    objectPayload.medicines,
+    objectPayload.medicineNames,
+    objectPayload.drugs,
+    objectPayload.tablets,
+    objectPayload.prescription,
+    objectPayload.prescriptions,
+    objectPayload.prescribedMedicines,
+    objectPayload.rx,
+    objectPayload.rxMedicines
+  ];
+
+  const medicationDetailCandidates = [
+    objectPayload.medicationDetails,
+    objectPayload.medicineDetails,
+    objectPayload.drugDetails,
+    objectPayload.tabletSchedule,
+    objectPayload.medicationSchedule,
+    objectPayload.prescriptionDetails,
+    objectPayload.prescriptions,
+    objectPayload.rxDetails,
+    objectPayload.rx,
+    objectPayload.medications,
+    objectPayload.medicines,
+    objectPayload.tablets
+  ];
+
+  const medicationDetails = dedupeMedicationDetails(
+    medicationDetailCandidates.flatMap((candidate) => normalizeMedicationDetails(candidate))
+  );
+
+  const medications = uniqueMedicationNames([
+    ...medicationNameCandidates.flatMap((candidate) => normalizeMedicationList(candidate)),
+    ...medicationDetails.map((item) => item?.name)
+  ]);
 
   const hasStructuredSignal =
     Object.keys(usableFields).length > 0 ||
