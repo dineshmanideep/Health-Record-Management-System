@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+import { useLanguage } from '../../context/LanguageContext';
 import { profileService } from '../../services/api';
 
 const SPECIALIZATIONS = [
@@ -8,10 +9,10 @@ const SPECIALIZATIONS = [
   'Ophthalmology', 'ENT', 'Psychiatry', 'Gastroenterology'
 ];
 
-const InfoRow = ({ label, value }) => (
+const InfoRow = ({ label, value, emptyLabel }) => (
   <div className="flex items-center py-6 border-b border-slate-100 dark:border-slate-800/50 last:border-0 group">
     <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] w-56 shrink-0 italic group-hover:text-emerald-500 transition-colors">{label}</span>
-    <span className="text-sm font-black text-slate-800 dark:text-white flex-1 uppercase tracking-widest">{value || 'Registry Null'}</span>
+    <span className="text-sm font-black text-slate-800 dark:text-white flex-1 uppercase tracking-widest">{value || emptyLabel}</span>
   </div>
 );
 
@@ -25,6 +26,7 @@ const FormField = ({ label, children }) => (
 const inputCls = "w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-black dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all";
 
 const DoctorProfile = () => {
+  const { t } = useLanguage();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
@@ -35,7 +37,7 @@ const DoctorProfile = () => {
   useEffect(() => {
     profileService.doctor.get()
       .then((res) => { if (res.success) setProfile(res.data); })
-      .catch(() => setError('Failed to load credentials from registry'));
+      .catch(() => setError(t({ en: 'Failed to load credentials from registry', hi: 'क्रेडेंशियल लोड नहीं हो सके' })));
   }, []);
 
   const startEdit = () => {
@@ -60,22 +62,22 @@ const DoctorProfile = () => {
       if (res.success) {
         setProfile(res.data);
         setEditing(false);
-        setSaveMsg({ type: 'success', text: 'Credentials synchronized successfully' });
+        setSaveMsg({ type: 'success', text: t({ en: 'Credentials synchronized successfully', hi: 'क्रेडेंशियल सफलतापूर्वक अपडेट हुए' }) });
         setTimeout(() => setSaveMsg({ type: '', text: '' }), 3000);
       }
     } catch (err) {
-      setSaveMsg({ type: 'error', text: err?.response?.data?.message || 'Synchronization protocol failed' });
+      setSaveMsg({ type: 'error', text: err?.response?.data?.message || t({ en: 'Synchronization failed', hi: 'सिंक नहीं हो सका' }) });
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <DashboardLayout title="Physician Identity">
+    <DashboardLayout title={t({ en: 'Physician Identity', hi: 'डॉक्टर प्रोफाइल' })}>
       <div className="space-y-10 pb-24 max-w-5xl">
         {error && (
           <div className="bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 p-6 rounded-[2.5rem] border-l-4 border-rose-500 shadow-xl shadow-rose-500/10 text-[10px] font-black uppercase tracking-widest">
-            ⚠️ SYSTEM ERROR: {error}
+            ⚠️ {t({ en: 'SYSTEM ERROR', hi: 'सिस्टम त्रुटि' })}: {error}
           </div>
         )}
         {saveMsg.text && !editing && (
@@ -91,7 +93,7 @@ const DoctorProfile = () => {
         {!profile ? (
           <div className="flex flex-col items-center justify-center py-40 animate-pulse">
             <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-8" />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Downloading Physician Artifacts...</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">{t({ en: 'Downloading Physician Artifacts...', hi: 'डॉक्टर डेटा लोड हो रहा है...' })}</p>
           </div>
         ) : (
           <>
@@ -105,12 +107,12 @@ const DoctorProfile = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-2 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 
-                    Physician Node // {profile.licenseNumber}
+                    {t({ en: 'Physician Node', hi: 'डॉक्टर नोड' })} // {profile.licenseNumber}
                   </p>
-                  <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Dr. {profile.name}</h2>
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{t({ en: 'Dr.', hi: 'डॉ.' })} {profile.name}</h2>
                   <div className="flex flex-wrap items-center gap-3 mt-4">
                     <span className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest rounded-xl border border-emerald-100 dark:border-emerald-800/40">
-                      {profile.specialization || 'General Protocol'}
+                      {profile.specialization || t({ en: 'General', hi: 'सामान्य' })}
                     </span>
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-2">
                        <span className="text-lg opacity-50">📧</span> {profile.email}
@@ -120,11 +122,11 @@ const DoctorProfile = () => {
                 <div className="flex gap-4 shrink-0">
                   <div className="text-center px-6 py-4 bg-slate-50 dark:bg-slate-950 rounded-[2rem] border border-slate-100 dark:border-slate-800">
                     <p className="text-2xl font-black text-slate-900 dark:text-white tracking-widest">{profile.patients?.length ?? 0}</p>
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 italic">Subjects</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 italic">{t({ en: 'Subjects', hi: 'मरीज' })}</p>
                   </div>
                   <div className="text-center px-6 py-4 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-[2rem] border border-emerald-100/50 dark:border-emerald-800/20">
                     <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-widest">{profile.experience ?? 0}</p>
-                    <p className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mt-1 italic">Cycles</p>
+                    <p className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mt-1 italic">{t({ en: 'Years', hi: 'साल' })}</p>
                   </div>
                 </div>
               </div>
@@ -134,10 +136,10 @@ const DoctorProfile = () => {
             <div className="bg-white dark:bg-slate-900 rounded-[3.5rem] border border-slate-200/50 dark:border-slate-800 overflow-hidden shadow-sm">
               <div className="px-10 py-8 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                 <div>
-                  <h3 className="text-xl font-black text-slate-950 dark:text-white uppercase tracking-tight">Credential Matrix</h3>
+                  <h3 className="text-xl font-black text-slate-950 dark:text-white uppercase tracking-tight">{t({ en: 'Credential Matrix', hi: 'क्रेडेंशियल सूची' })}</h3>
                   <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-2 italic flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Verified Physician Artifacts
+                    {t({ en: 'Verified physician details', hi: 'सत्यापित डॉक्टर विवरण' })}
                   </p>
                 </div>
                 {!editing && (
@@ -145,7 +147,7 @@ const DoctorProfile = () => {
                     onClick={startEdit}
                     className="px-8 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all active:scale-95 hover:-translate-y-1"
                   >
-                    Modify Artifacts
+                    {t({ en: 'Edit Details', hi: 'विवरण बदलें' })}
                   </button>
                 )}
               </div>
@@ -153,30 +155,30 @@ const DoctorProfile = () => {
               {editing ? (
                 <div className="p-10 space-y-10">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <FormField label="Subject Identifier">
+                    <FormField label={t({ en: 'Full Name', hi: 'पूरा नाम' })}>
                       <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
                     </FormField>
-                    <FormField label="Comm Link frequency">
+                    <FormField label={t({ en: 'Phone Number', hi: 'फोन नंबर' })}>
                       <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={inputCls} />
                     </FormField>
-                    <FormField label="Protocol Specialization">
+                    <FormField label={t({ en: 'Specialization', hi: 'विशेषज्ञता' })}>
                       <select value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} className={inputCls}>
-                        <option value="">SELECT VECTOR...</option>
+                        <option value="">{t({ en: 'Select specialization...', hi: 'विशेषज्ञता चुनें...' })}</option>
                         {SPECIALIZATIONS.map((s) => (
                           <option key={s} value={s}>{s.toUpperCase()}</option>
                         ))}
                       </select>
                     </FormField>
-                    <FormField label="Academic Credentials">
+                    <FormField label={t({ en: 'Qualification', hi: 'योग्यता' })}>
                       <input type="text" value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} className={inputCls} />
                     </FormField>
-                    <FormField label="Experience Cycles">
+                    <FormField label={t({ en: 'Experience (Years)', hi: 'अनुभव (साल)' })}>
                       <input type="number" min="0" value={form.experience} onChange={(e) => setForm({ ...form, experience: e.target.value })} className={inputCls} />
                     </FormField>
-                    <FormField label="Consultation Energy ($)">
+                    <FormField label={t({ en: 'Consultation Fee ($)', hi: 'कंसल्टेशन फीस ($)' })}>
                       <input type="number" min="0" value={form.consultationFee} onChange={(e) => setForm({ ...form, consultationFee: e.target.value })} className={inputCls} />
                     </FormField>
-                    <FormField label="Deployment Division">
+                    <FormField label={t({ en: 'Department', hi: 'विभाग' })}>
                       <input type="text" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={inputCls} />
                     </FormField>
                   </div>
@@ -187,29 +189,29 @@ const DoctorProfile = () => {
                       disabled={saving}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50"
                     >
-                      {saving ? 'SYNCHRONIZING...' : 'COMMIT CHANGES'}
+                      {saving ? t({ en: 'Saving...', hi: 'सेव हो रहा है...' }) : t({ en: 'Save Changes', hi: 'बदलाव सेव करें' })}
                     </button>
                     <button
                       onClick={() => setEditing(false)}
                       className="bg-slate-50 dark:bg-slate-950 text-slate-400 px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all border border-slate-100 dark:border-slate-800"
                     >
-                      ABORT
+                      {t({ en: 'Cancel', hi: 'रद्द करें' })}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="px-10 pb-10">
-                  <InfoRow label="Physician Artifact" value={`DR. ${profile.name}`} />
-                  <InfoRow label="Access Vector" value={profile.email} />
-                  <InfoRow label="Protocol Role" value="AUTHORITY · PHYSICIAN" />
-                  <InfoRow label="Medical Division" value={profile.specialization} />
-                  <InfoRow label="Academic Degree" value={profile.qualification} />
-                  <InfoRow label="License Identifier" value={profile.licenseNumber} />
-                  <InfoRow label="Operation Cycles" value={profile.experience != null ? `${profile.experience} YEARS` : '0 YEARS'} />
-                  <InfoRow label="Deployment Division" value={profile.department} />
-                  <InfoRow label="Comm Frequency" value={profile.phone} />
+                  <InfoRow label={t({ en: 'Doctor Name', hi: 'डॉक्टर नाम' })} value={`${t({ en: 'DR.', hi: 'डॉ.' })} ${profile.name}`} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
+                  <InfoRow label={t({ en: 'Email', hi: 'ईमेल' })} value={profile.email} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
+                  <InfoRow label={t({ en: 'Role', hi: 'भूमिका' })} value={t({ en: 'Physician', hi: 'डॉक्टर' })} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
+                  <InfoRow label={t({ en: 'Specialization', hi: 'विशेषज्ञता' })} value={profile.specialization} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
+                  <InfoRow label={t({ en: 'Qualification', hi: 'योग्यता' })} value={profile.qualification} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
+                  <InfoRow label={t({ en: 'License Number', hi: 'लाइसेंस नंबर' })} value={profile.licenseNumber} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
+                  <InfoRow label={t({ en: 'Experience', hi: 'अनुभव' })} value={profile.experience != null ? `${profile.experience} ${t({ en: 'YEARS', hi: 'साल' })}` : `0 ${t({ en: 'YEARS', hi: 'साल' })}`} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
+                  <InfoRow label={t({ en: 'Department', hi: 'विभाग' })} value={profile.department} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
+                  <InfoRow label={t({ en: 'Phone', hi: 'फोन' })} value={profile.phone} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
                   {profile.consultationFee != null && (
-                    <InfoRow label="Service Energy" value={`$${profile.consultationFee} PER CYCLE`} />
+                    <InfoRow label={t({ en: 'Consultation Fee', hi: 'कंसल्टेशन फीस' })} value={`$${profile.consultationFee} ${t({ en: 'PER VISIT', hi: 'प्रति विज़िट' })}`} emptyLabel={t({ en: 'Registry Null', hi: 'उपलब्ध नहीं' })} />
                   )}
                 </div>
               )}

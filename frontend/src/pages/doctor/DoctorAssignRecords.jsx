@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import LoadingScreen from '../../components/LoadingScreen';
 import toast from 'react-hot-toast';
+import { useLanguage } from '../../context/LanguageContext';
 import { doctorService } from '../../services/api';
 
 const DoctorAssignRecords = () => {
@@ -23,6 +24,7 @@ const DoctorAssignRecords = () => {
   const [voiceNote, setVoiceNote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const { t } = useLanguage();
 
   useEffect(() => {
     fetchData();
@@ -39,7 +41,7 @@ const DoctorAssignRecords = () => {
       setNurses(nursesRes.data || []);
       setAssignments(assignmentsRes.data || []);
     } catch (error) {
-      toast.error('Failed to synchronize deployment data');
+      toast.error(t({ en: 'Failed to synchronize assignment data', hi: 'असाइनमेंट डेटा सिंक नहीं हो सका' }));
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
@@ -49,7 +51,7 @@ const DoctorAssignRecords = () => {
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length + attachments.length > 5) {
-      setMessage({ type: 'error', text: 'Maximum 5 attachments allowed' });
+      setMessage({ type: 'error', text: t({ en: 'Maximum 5 attachments allowed', hi: 'अधिकतम 5 फाइलें ही जोड़ें' }) });
       return;
     }
     setAttachments([...attachments, ...files]);
@@ -62,7 +64,7 @@ const DoctorAssignRecords = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedPatient || !selectedNurse || !selectedHospital || !instructions.trim()) {
-      setMessage({ type: 'error', text: 'Please fill all required fields' });
+      setMessage({ type: 'error', text: t({ en: 'Please fill all required fields', hi: 'सभी जरूरी फ़ील्ड भरें' }) });
       return;
     }
 
@@ -85,7 +87,7 @@ const DoctorAssignRecords = () => {
       }
 
       await doctorService.createAssignment(formData);
-      setMessage({ type: 'success', text: 'Assignment created successfully!' });
+      setMessage({ type: 'success', text: t({ en: 'Assignment created successfully!', hi: 'असाइनमेंट सफलतापूर्वक बना' }) });
       
       // Reset form
       setSelectedPatient('');
@@ -101,7 +103,7 @@ const DoctorAssignRecords = () => {
     } catch (error) {
       setMessage({ 
         type: 'error', 
-        text: error?.response?.data?.message || 'Failed to create assignment' 
+        text: error?.response?.data?.message || t({ en: 'Failed to create assignment', hi: 'असाइनमेंट नहीं बन पाया' }) 
       });
     } finally {
       setSubmitting(false);
@@ -109,39 +111,39 @@ const DoctorAssignRecords = () => {
   };
 
   const handleCancel = async (id) => {
-    if (!confirm('Are you sure you want to cancel this assignment?')) return;
+    if (!confirm(t({ en: 'Are you sure you want to cancel this assignment?', hi: 'क्या आप यह असाइनमेंट रद्द करना चाहते हैं?' }))) return;
     
     try {
       await doctorService.cancelAssignment(id);
-      toast.success('Assignment aborted successfully');
+      toast.success(t({ en: 'Assignment cancelled successfully', hi: 'असाइनमेंट रद्द हो गया' }));
       fetchData();
     } catch (error) {
-      toast.error('Abort sequence failed. Please retry.');
+      toast.error(t({ en: 'Cancel failed. Please retry.', hi: 'रद्द नहीं हो सका। फिर कोशिश करें।' }));
     }
   };
 
   const getStatusText = (status) => {
     const text = {
-      pending: 'Pending',
-      in_progress: 'In Progress',
-      completed: 'Completed',
-      cancelled: 'Cancelled'
+      pending: t({ en: 'Pending', hi: 'लंबित' }),
+      in_progress: t({ en: 'In Progress', hi: 'चल रहा है' }),
+      completed: t({ en: 'Completed', hi: 'पूरा हुआ' }),
+      cancelled: t({ en: 'Cancelled', hi: 'रद्द' })
     };
     return text[status] || status;
   };
 
   return (
-    <DashboardLayout title="Assign Medical Records">
+    <DashboardLayout title={t({ en: 'Assign Medical Records', hi: 'रिकॉर्ड असाइन करें' })}>
       {loading ? (
-        <LoadingScreen message="Initializing Clinical Protocol" />
+        <LoadingScreen message={t({ en: 'Loading assignment data', hi: 'असाइनमेंट डेटा लोड हो रहा है' })} />
       ) : (
         <>
           {/* Header */}
           <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800 mb-6 group overflow-hidden relative">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-6 relative z-10">
               <div>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Record Assignments</h2>
-                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Deploy clinical personnel for data entry</p>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{t({ en: 'Record Assignments', hi: 'रिकॉर्ड असाइनमेंट' })}</h2>
+                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">{t({ en: 'Assign nurses for data entry', hi: 'डेटा एंट्री के लिए नर्स को असाइन करें' })}</p>
               </div>
               <button
                 onClick={() => setShowForm(!showForm)}
@@ -151,7 +153,7 @@ const DoctorAssignRecords = () => {
                     : 'bg-indigo-600 text-white shadow-indigo-500/20 hover:bg-indigo-700'
                 }`}
               >
-                {showForm ? 'Abort Operation' : '+ New Assignment'}
+                {showForm ? t({ en: 'Cancel', hi: 'रद्द करें' }) : t({ en: '+ New Assignment', hi: '+ नया असाइनमेंट' })}
               </button>
             </div>
 
@@ -167,12 +169,12 @@ const DoctorAssignRecords = () => {
           {/* Assignment Form */}
           {showForm && (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border-2 border-indigo-500/20 mb-8 animate-in zoom-in-95 duration-300">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8">Clinical Instruction Protocol</h3>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8">{t({ en: 'Assignment Details', hi: 'असाइनमेंट विवरण' })}</h3>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
-                      Target Subject *
+                      {t({ en: 'Patient *', hi: 'मरीज *' })}
                     </label>
                     <select
                       value={selectedPatient}
@@ -180,7 +182,7 @@ const DoctorAssignRecords = () => {
                       className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none appearance-none cursor-pointer"
                       required
                     >
-                      <option value="">-- Choose Subject --</option>
+                      <option value="">{t({ en: '-- Choose Patient --', hi: '-- मरीज चुनें --' })}</option>
                       {patients.map((p) => (
                         <option key={p.patient?._id} value={p.patient?._id}>
                           {p.patient?.name} 
@@ -191,7 +193,7 @@ const DoctorAssignRecords = () => {
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
-                      Designated Personnel *
+                      {t({ en: 'Nurse *', hi: 'नर्स *' })}
                     </label>
                     <select
                       value={selectedNurse}
@@ -199,7 +201,7 @@ const DoctorAssignRecords = () => {
                       className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none appearance-none cursor-pointer"
                       required
                     >
-                      <option value="">-- Choose Personnel --</option>
+                      <option value="">{t({ en: '-- Choose Nurse --', hi: '-- नर्स चुनें --' })}</option>
                       {nurses.map((n) => (
                         <option key={n.nurse?._id} value={n.nurse?._id}>
                           {n.nurse?.name} 
@@ -211,7 +213,7 @@ const DoctorAssignRecords = () => {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
-                    Facility Node *
+                    {t({ en: 'Hospital *', hi: 'अस्पताल *' })}
                   </label>
                   <select
                     value={selectedHospital}
@@ -219,7 +221,7 @@ const DoctorAssignRecords = () => {
                     className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none appearance-none cursor-pointer"
                     required
                   >
-                    <option value="">-- Choose Facility --</option>
+                    <option value="">{t({ en: '-- Choose Hospital --', hi: '-- अस्पताल चुनें --' })}</option>
                     {nurses.map((n) => n.hospitalId).filter((h, i, arr) => 
                       h && arr.findIndex(x => x?._id === h?._id) === i
                     ).map((h) => (
@@ -232,12 +234,12 @@ const DoctorAssignRecords = () => {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
-                    Clinical Directives *
+                    {t({ en: 'Instructions *', hi: 'निर्देश *' })}
                   </label>
                   <textarea
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
-                    placeholder="Provide detailed instruction set for the personnel..."
+                    placeholder={t({ en: 'Write clear instructions for the nurse...', hi: 'नर्स के लिए साफ निर्देश लिखें...' })}
                     rows={4}
                     className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all outline-none resize-none"
                     required
@@ -247,7 +249,7 @@ const DoctorAssignRecords = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
-                      Temporal Deadline (Optional)
+                      {t({ en: 'Due Date (Optional)', hi: 'ड्यू डेट (वैकल्पिक)' })}
                     </label>
                     <input
                       type="datetime-local"
@@ -259,7 +261,7 @@ const DoctorAssignRecords = () => {
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
-                      Artifact Attachments (Max 5)
+                      {t({ en: 'Attachments (Max 5)', hi: 'फाइलें (अधिकतम 5)' })}
                     </label>
                     <input
                       type="file"
@@ -273,14 +275,14 @@ const DoctorAssignRecords = () => {
                       htmlFor="assignment-files"
                       className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-400 dark:text-slate-500 text-center cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-all block"
                     >
-                      {attachments.length > 0 ? `📦 ${attachments.length} Artifacts Ready` : '📂 Upload Clinical Artifacts'}
+                      {attachments.length > 0 ? `📦 ${attachments.length} ${t({ en: 'files ready', hi: 'फाइल तैयार' })}` : t({ en: '📂 Upload Files', hi: '📂 फाइलें अपलोड करें' })}
                     </label>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">
-                    Voice Note (Optional)
+                    {t({ en: 'Voice Note (Optional)', hi: 'वॉइस नोट (वैकल्पिक)' })}
                   </label>
                   <input
                     type="file"
@@ -293,7 +295,7 @@ const DoctorAssignRecords = () => {
                     htmlFor="assignment-voice-note"
                     className="w-full px-5 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-400 dark:text-slate-500 text-center cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-all block"
                   >
-                    {voiceNote ? '🎙️ Voice Note Ready' : '🎙️ Upload Doctor Voice Note'}
+                    {voiceNote ? t({ en: '🎙️ Voice Note Ready', hi: '🎙️ वॉइस नोट तैयार' }) : t({ en: '🎙️ Upload Voice Note', hi: '🎙️ वॉइस नोट अपलोड करें' })}
                   </label>
                   {voiceNote && (
                     <div className="flex items-center justify-between gap-3 px-2 py-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800/40">
@@ -303,7 +305,7 @@ const DoctorAssignRecords = () => {
                         onClick={() => setVoiceNote(null)}
                         className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600"
                       >
-                        Remove
+                        {t({ en: 'Remove', hi: 'हटाएं' })}
                       </button>
                     </div>
                   )}
@@ -319,7 +321,7 @@ const DoctorAssignRecords = () => {
                           onClick={() => removeAttachment(index)}
                           className="text-red-500 hover:text-red-600 uppercase tracking-widest text-[9px]"
                         >
-                          Remove
+                          {t({ en: 'Remove', hi: 'हटाएं' })}
                         </button>
                       </div>
                     ))}
@@ -332,14 +334,14 @@ const DoctorAssignRecords = () => {
                     disabled={submitting}
                     className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50"
                   >
-                    {submitting ? 'Synchronizing...' : 'Deploy Assignment'}
+                    {submitting ? t({ en: 'Submitting...', hi: 'भेजा जा रहा है...' }) : t({ en: 'Create Assignment', hi: 'असाइनमेंट बनाएं' })}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
                     className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"
                   >
-                    Abort
+                    {t({ en: 'Cancel', hi: 'रद्द करें' })}
                   </button>
                 </div>
               </form>
@@ -348,9 +350,9 @@ const DoctorAssignRecords = () => {
 
           {/* Assignments List */}
           <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800 overflow-hidden">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8">Deployment History</h3>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8">{t({ en: 'Assignment History', hi: 'असाइनमेंट इतिहास' })}</h3>
             {assignments.length === 0 ? (
-              <p className="text-center py-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">No active personnel deployments recorded</p>
+              <p className="text-center py-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t({ en: 'No assignments yet', hi: 'अभी कोई असाइनमेंट नहीं' })}</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {assignments.map((assignment) => (
@@ -367,13 +369,13 @@ const DoctorAssignRecords = () => {
                           {getStatusText(assignment.status)}
                         </span>
                         <p className="font-black text-slate-900 dark:text-white mt-4 text-sm line-clamp-1">{assignment.patient?.name}</p>
-                        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">ID: {assignment.patient?.patientId}</p>
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">{t({ en: 'ID', hi: 'आईडी' })}: {assignment.patient?.patientId}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase">{new Date(assignment.createdAt).toLocaleDateString()}</p>
                         {assignment.dueDate && (
                           <p className={`text-[9px] font-black uppercase mt-1 ${new Date(assignment.dueDate) < new Date() ? 'text-red-500' : 'text-amber-500'}`}>
-                            LIMIT: {new Date(assignment.dueDate).toLocaleDateString()}
+                            {t({ en: 'DUE', hi: 'ड्यू' })}: {new Date(assignment.dueDate).toLocaleDateString()}
                           </p>
                         )}
                       </div>
@@ -391,7 +393,7 @@ const DoctorAssignRecords = () => {
                     </div>
 
                     <div className="bg-white dark:bg-slate-700/50 p-4 rounded-2xl mb-6">
-                      <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">clinical directives</p>
+                      <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">{t({ en: 'Instructions', hi: 'निर्देश' })}</p>
                       <p className="text-[11px] font-bold dark:text-slate-300 line-clamp-3 italic opacity-80">"{assignment.instructions}"</p>
                     </div>
 
@@ -401,7 +403,7 @@ const DoctorAssignRecords = () => {
                           onClick={() => navigate(`/doctor/patient-records/${assignment.patient._id}`)}
                           className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                         >
-                          Access Record
+                          {t({ en: 'View Record', hi: 'रिकॉर्ड देखें' })}
                         </button>
                       )}
                       {assignment.status === 'pending' && (
@@ -409,7 +411,7 @@ const DoctorAssignRecords = () => {
                           onClick={() => handleCancel(assignment._id)}
                           className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                         >
-                          Abort
+                          {t({ en: 'Cancel', hi: 'रद्द करें' })}
                         </button>
                       )}
                       {assignment.attachments?.length > 0 && (

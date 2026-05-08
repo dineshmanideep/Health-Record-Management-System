@@ -51,6 +51,7 @@ import AdminNurses from './pages/admin/AdminNurses';
 
 import { ThemeProvider } from './context/ThemeContext';
 import { AccessibilityProvider } from './context/AccessibilityContext';
+import { LanguageProvider } from './context/LanguageContext';
 import ContextVoiceHelpButton from './components/ContextVoiceHelpButton';
 import FloatingNav from './components/FloatingNav';
 import AccessibilityTools from './components/AccessibilityTools';
@@ -58,6 +59,7 @@ import AccessibilityTools from './components/AccessibilityTools';
 function App() {
   return (
     <ThemeProvider>
+      <LanguageProvider>
       <Router>
         <AuthProvider>
         <AccessibilityProvider>
@@ -363,6 +365,7 @@ function App() {
         </AccessibilityProvider>
       </AuthProvider>
     </Router>
+      </LanguageProvider>
   </ThemeProvider>
   );
 }

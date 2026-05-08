@@ -1,21 +1,15 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { patientService } from '../../services/api';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar
 } from 'recharts';
 
-const providerOptions = [
-  { value: 'apple_health', label: 'Apple Health', icon: '🍎' },
-  { value: 'google_fit', label: 'Google Fit', icon: '🏃' },
-  { value: 'fitbit', label: 'Fitbit', icon: '⌚' },
-  { value: 'garmin', label: 'Garmin', icon: '🛰️' },
-  { value: 'other', label: 'Other', icon: '📱' }
-];
-
 const PatientSmartwatchInsights = () => {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [status, setStatus] = useState(null);
   const [metricsData, setMetricsData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +17,14 @@ const PatientSmartwatchInsights = () => {
   const [days, setDays] = useState(7);
   const [message, setMessage] = useState('');
   const [form, setForm] = useState({ provider: 'google_fit', deviceId: '', apiBaseUrl: '', apiToken: '' });
+
+  const providerOptions = [
+    { value: 'apple_health', label: 'Apple Health', icon: '🍎' },
+    { value: 'google_fit', label: 'Google Fit', icon: '🏃' },
+    { value: 'fitbit', label: 'Fitbit', icon: '⌚' },
+    { value: 'garmin', label: 'Garmin', icon: '🛰️' },
+    { value: 'other', label: t({ en: 'Other', hi: 'अन्य' }), icon: '📱' }
+  ];
 
   const loadData = useCallback(async (selectedDays = days) => {
     try {
@@ -34,7 +36,7 @@ const PatientSmartwatchInsights = () => {
       if (statusRes?.data?.provider) {
         setForm((prev) => ({ ...prev, provider: statusRes.data.provider, deviceId: statusRes.data.deviceId || '', apiBaseUrl: statusRes.data.apiBaseUrl || '' }));
       }
-    } catch { setMessage('Failed to load data.'); }
+    } catch { setMessage(t({ en: 'Failed to load data.', hi: 'डेटा लोड नहीं हो सका।' })); }
   }, [days]);
 
   useEffect(() => { loadData().finally(() => setLoading(false)); }, [loadData]);
@@ -58,24 +60,24 @@ const PatientSmartwatchInsights = () => {
     event.preventDefault(); setBusy(true); setMessage('');
     try {
       const response = await patientService.connectSmartwatch({ ...form });
-      setMessage(response?.message || 'Device linked!');
+      setMessage(response?.message || t({ en: 'Device linked!', hi: 'डिवाइस जुड़ गया!' }));
       await loadData(days);
       setForm((prev) => ({ ...prev, apiToken: '' }));
-    } catch (error) { setMessage(error?.response?.data?.message || 'Connection failed.'); }
+    } catch (error) { setMessage(error?.response?.data?.message || t({ en: 'Connection failed.', hi: 'कनेक्शन नहीं हो सका।' })); }
     finally { setBusy(false); }
   };
 
   const syncNow = async () => {
     setBusy(true); setMessage('');
     try { await patientService.syncSmartwatch(); await loadData(days); }
-    catch { setMessage('Sync failed.'); }
+    catch { setMessage(t({ en: 'Sync failed.', hi: 'सिंक नहीं हो पाया।' })); }
     finally { setBusy(false); }
   };
 
   const disconnectSmartwatch = async () => {
     setBusy(true); setMessage('');
     try { await patientService.disconnectSmartwatch(); await loadData(days); }
-    catch { setMessage('Disconnect failed.'); }
+    catch { setMessage(t({ en: 'Disconnect failed.', hi: 'डिस्कनेक्ट नहीं हो सका।' })); }
     finally { setBusy(false); }
   };
 
@@ -111,11 +113,11 @@ const PatientSmartwatchInsights = () => {
   );
 
   return (
-    <DashboardLayout title="Smartwatch Insights">
+    <DashboardLayout title={t({ en: 'Smartwatch Insights', hi: 'स्मार्टवॉच जानकारी' })}>
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24">
           <div className="w-10 h-10 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-sm text-slate-400 font-medium">Loading health metrics...</p>
+          <p className="text-sm text-slate-400 font-medium">{t({ en: 'Loading health metrics...', hi: 'हेल्थ डेटा लोड हो रहा है...' })}</p>
         </div>
       ) : (
         <div className="space-y-6 pb-12 animate-fadeIn">
@@ -126,24 +128,24 @@ const PatientSmartwatchInsights = () => {
                 <div className="flex items-center gap-2.5 mb-4">
                   <div className={`w-2.5 h-2.5 rounded-full ${status?.isConnected ? 'bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50' : 'bg-slate-300 dark:bg-slate-700'}`} />
                   <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                    {status?.isConnected ? 'Device Connected' : 'Connect Your Device'}
+                    {status?.isConnected ? t({ en: 'Device Connected', hi: 'डिवाइस जुड़ा है' }) : t({ en: 'Connect Your Device', hi: 'अपना डिवाइस जोड़ें' })}
                   </h2>
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md leading-relaxed mb-5">
-                  Link your smartwatch to get real-time health telemetry and insights.
+                  {t({ en: 'Link your smartwatch to get real-time health telemetry and insights.', hi: 'रियल-टाइम हेल्थ डेटा के लिए अपनी स्मार्टवॉच जोड़ें।' })}
                 </p>
                 
                 {status?.isConnected && (
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl inline-flex items-center gap-3 border border-slate-100 dark:border-slate-800">
                     <span className="text-xl">{providerOptions.find(p => p.value === status.provider)?.icon}</span>
                     <div>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Source</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t({ en: 'Source', hi: 'स्रोत' })}</p>
                       <p className="text-xs font-semibold text-slate-800 dark:text-white">{providerOptions.find(p => p.value === status.provider)?.label}</p>
                     </div>
                     <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
                     <div>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last Sync</p>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-white">{status.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleTimeString() : 'Pending'}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t({ en: 'Last Sync', hi: 'आख़िरी सिंक' })}</p>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-white">{status.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleTimeString() : t({ en: 'Pending', hi: 'लंबित' })}</p>
                     </div>
                   </div>
                 )}
@@ -153,18 +155,18 @@ const PatientSmartwatchInsights = () => {
                 <form onSubmit={connectSmartwatch} className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Provider</label>
+                      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">{t({ en: 'Provider', hi: 'प्रोवाइडर' })}</label>
                       <select value={form.provider} onChange={(e) => updateForm('provider', e.target.value)}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                         {providerOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                     </div>
-                    <InputField label="Device ID" value={form.deviceId} onChange={(e) => updateForm('deviceId', e.target.value)} placeholder="watch-xyz" />
+                    <InputField label={t({ en: 'Device ID', hi: 'डिवाइस आईडी' })} value={form.deviceId} onChange={(e) => updateForm('deviceId', e.target.value)} placeholder="watch-xyz" />
                   </div>
-                  <InputField label="API Token" value={form.apiToken} onChange={(e) => updateForm('apiToken', e.target.value)} type="password" placeholder="••••••••" />
+                  <InputField label={t({ en: 'API Token', hi: 'API टोकन' })} value={form.apiToken} onChange={(e) => updateForm('apiToken', e.target.value)} type="password" placeholder="••••••••" />
                   <div className="flex gap-2 pt-1">
                     <button type="submit" disabled={busy} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50">
-                      {status?.isConnected ? 'Reconfigure' : 'Connect'}
+                      {status?.isConnected ? t({ en: 'Reconfigure', hi: 'फिर से सेट करें' }) : t({ en: 'Connect', hi: 'कनेक्ट करें' })}
                     </button>
                     {status?.isConnected && (
                       <>
@@ -181,25 +183,25 @@ const PatientSmartwatchInsights = () => {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <MetricCard label="Heart Rate" value={latest?.heartRate} unit="bpm" icon="💓" color="bg-red-500" />
+            <MetricCard label={t({ en: 'Heart Rate', hi: 'हार्ट रेट' })} value={latest?.heartRate} unit="bpm" icon="💓" color="bg-red-500" />
             <MetricCard label="SpO2" value={latest?.spo2} unit="%" icon="🫁" color="bg-emerald-500" />
-            <MetricCard label="Steps" value={latest?.steps} unit="steps" icon="👟" color="bg-indigo-500" />
-            <MetricCard label="Calories" value={latest?.calories} unit="kcal" icon="🔥" color="bg-orange-500" />
-            <MetricCard label="Sleep" value={latest?.sleepHours} unit="hrs" icon="🌙" color="bg-purple-500" />
+            <MetricCard label={t({ en: 'Steps', hi: 'कदम' })} value={latest?.steps} unit={t({ en: 'steps', hi: 'steps' })} icon="👟" color="bg-indigo-500" />
+            <MetricCard label={t({ en: 'Calories', hi: 'कैलोरी' })} value={latest?.calories} unit="kcal" icon="🔥" color="bg-orange-500" />
+            <MetricCard label={t({ en: 'Sleep', hi: 'नींद' })} value={latest?.sleepHours} unit={t({ en: 'hrs', hi: 'hrs' })} icon="🌙" color="bg-purple-500" />
           </div>
 
           {/* Charts */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Timeline Analytics</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Health metrics over time</p>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">{t({ en: 'Timeline Analytics', hi: 'टाइमलाइन विश्लेषण' })}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{t({ en: 'Health metrics over time', hi: 'समय के साथ हेल्थ डेटा' })}</p>
               </div>
               <select value={days} onChange={(e) => changeDays(Number(e.target.value))} disabled={busy}
                 className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
-                <option value={7}>Last 7 Days</option>
-                <option value={14}>Last 14 Days</option>
-                <option value={30}>Last 30 Days</option>
+                <option value={7}>{t({ en: 'Last 7 Days', hi: 'पिछले 7 दिन' })}</option>
+                <option value={14}>{t({ en: 'Last 14 Days', hi: 'पिछले 14 दिन' })}</option>
+                <option value={30}>{t({ en: 'Last 30 Days', hi: 'पिछले 30 दिन' })}</option>
               </select>
             </div>
 
@@ -234,23 +236,23 @@ const PatientSmartwatchInsights = () => {
               </div>
             ) : (
               <div className="py-16 text-center">
-                <p className="text-sm text-slate-400">No data available. Connect your device to start tracking.</p>
+                <p className="text-sm text-slate-400">{t({ en: 'No data available. Connect your device to start tracking.', hi: 'डेटा उपलब्ध नहीं है। ट्रैकिंग के लिए डिवाइस जोड़ें।' })}</p>
               </div>
             )}
           </div>
 
           {/* Data Table */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-5">Raw Data Feed</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-5">{t({ en: 'Raw Data Feed', hi: 'रॉ डेटा' })}</h3>
             <div className="overflow-x-auto -mx-5 sm:-mx-6">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50">
-                    <th className="py-3 px-5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Time</th>
-                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">Heart Rate</th>
-                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">Steps</th>
+                    <th className="py-3 px-5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{t({ en: 'Time', hi: 'समय' })}</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">{t({ en: 'Heart Rate', hi: 'हार्ट रेट' })}</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">{t({ en: 'Steps', hi: 'कदम' })}</th>
                     <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">SpO2</th>
-                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-right pr-5">Sleep</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-right pr-5">{t({ en: 'Sleep', hi: 'नींद' })}</th>
                   </tr>
                 </thead>
                 <tbody>

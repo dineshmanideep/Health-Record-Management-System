@@ -17,8 +17,8 @@ const Admin = require('../models/Admin');
 
 const ADMIN = {
   name: 'System Admin',
-  email: 'admin@hrms.com',
-  password: 'Admin@1234',
+  email: 'admin@gmail.com',
+  password: 'password',
   phone: '0000000000',
   role: 'admin',
   accessLevel: 'super-admin',

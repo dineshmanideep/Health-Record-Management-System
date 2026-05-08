@@ -3,6 +3,7 @@ import { Link, useNavigate, Navigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getPasswordError } from '../utils/passwordValidation';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 
@@ -30,6 +31,7 @@ const Signup = () => {
   const navigate = useNavigate();
   const { signup, isAuthenticated, loading: authLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { language, toggleLanguage, t } = useLanguage();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -62,11 +64,11 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error(t({ en: 'Passwords do not match', hi: 'पासवर्ड मेल नहीं खाते' }));
       return;
     }
     if (!validatePassword()) {
-      toast.error('Invalid password format');
+      toast.error(t({ en: 'Invalid password format', hi: 'पासवर्ड का फॉर्मेट सही नहीं है' }));
       return;
     }
 
@@ -78,23 +80,23 @@ const Signup = () => {
     const result = await signup(signupData);
     if (result.success) {
       if (result.pending) {
-        toast.success('Registration submitted for approval');
+        toast.success(t({ en: 'Registration submitted for approval', hi: 'रजिस्ट्रेशन समीक्षा के लिए भेजा गया' }));
         setPendingState({ isPending: true, message: result.message, role: formData.role });
       } else {
-        toast.success('Account created successfully!');
+        toast.success(t({ en: 'Account created successfully!', hi: 'अकाउंट सफलतापूर्वक बन गया!' }));
         navigate('/dashboard');
       }
     } else {
-      toast.error(result.message || 'Signup failed. Please try again.');
+      toast.error(result.message || t({ en: 'Signup failed. Please try again.', hi: 'साइन अप नहीं हो सका। फिर से कोशिश करें।' }));
     }
     setLoading(false);
   };
 
   const roleOptions = [
-    { value: 'user', label: 'Patient', icon: '🛡️' },
-    { value: 'doctor', label: 'Doctor', icon: '🩺' },
-    { value: 'nurse', label: 'Nurse', icon: '💉' },
-    { value: 'hospital', label: 'Hospital', icon: '🏥' }
+    { value: 'user', label: t({ en: 'Patient', hi: 'मरीज' }), icon: '🛡️' },
+    { value: 'doctor', label: t({ en: 'Doctor', hi: 'डॉक्टर' }), icon: '🩺' },
+    { value: 'nurse', label: t({ en: 'Nurse', hi: 'नर्स' }), icon: '💉' },
+    { value: 'hospital', label: t({ en: 'Hospital', hi: 'अस्पताल' }), icon: '🏥' }
   ];
 
   // Pending approval screen
@@ -106,22 +108,22 @@ const Signup = () => {
           <div className="w-20 h-20 bg-emerald-600 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-6 shadow-lg shadow-emerald-500/20">
             {icons[pendingState.role] || '✅'}
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-3 tracking-tight">Account Submitted!</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-3 tracking-tight">{t({ en: 'Account Submitted!', hi: 'अकाउंट भेज दिया गया!' })}</h2>
           <p className="text-slate-500 dark:text-slate-400 mb-6 leading-relaxed text-sm">{pendingState.message}</p>
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl p-4 mb-6 text-left">
-            <p className="text-amber-700 dark:text-amber-400 text-xs font-semibold mb-2 uppercase tracking-wider">What happens next?</p>
+            <p className="text-amber-700 dark:text-amber-400 text-xs font-semibold mb-2 uppercase tracking-wider">{t({ en: 'What happens next?', hi: 'अब आगे क्या होगा?' })}</p>
             {pendingState.role === 'hospital' && (
               <ul className="text-amber-600 dark:text-amber-400/80 text-xs space-y-1.5">
-                <li>• An admin will review your registration</li>
-                <li>• Once approved, you can log in and manage your staff</li>
-                <li>• You can then generate OTPs to invite doctors and nurses</li>
+                <li>• {t({ en: 'An admin will review your registration', hi: 'एक एडमिन आपका रजिस्ट्रेशन देखेगा' })}</li>
+                <li>• {t({ en: 'Once approved, you can log in and manage your staff', hi: 'मंजूरी के बाद आप लॉगिन करके स्टाफ संभालेंगे' })}</li>
+                <li>• {t({ en: 'You can then generate OTPs to invite doctors and nurses', hi: 'फिर आप OTP बनाकर डॉक्टर और नर्स को बुला सकते हैं' })}</li>
               </ul>
             )}
             {(pendingState.role === 'doctor' || pendingState.role === 'nurse') && (
               <ul className="text-amber-600 dark:text-amber-400/80 text-xs space-y-1.5">
-                <li>• An admin will verify your license number</li>
-                <li>• Once verified, you can log in to your account</li>
-                <li>• Hospitals can then invite you to affiliate using an OTP</li>
+                <li>• {t({ en: 'An admin will verify your license number', hi: 'एक एडमिन आपका लाइसेंस नंबर जांचेगा' })}</li>
+                <li>• {t({ en: 'Once verified, you can log in to your account', hi: 'जांच के बाद आप अपने अकाउंट में लॉगिन कर पाएंगे' })}</li>
+                <li>• {t({ en: 'Hospitals can then invite you to affiliate using an OTP', hi: 'फिर अस्पताल OTP से आपको जोड़ सकते हैं' })}</li>
               </ul>
             )}
           </div>
@@ -129,7 +131,7 @@ const Signup = () => {
             to="/login"
             className="inline-flex w-full justify-center py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
           >
-            Go to Login
+            {t({ en: 'Go to Login', hi: 'लॉगिन पर जाएं' })}
           </Link>
         </div>
       </div>
@@ -147,16 +149,16 @@ const Signup = () => {
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg shadow-emerald-500/20">✚</div>
-            <span className="text-white text-lg font-bold">HRMS Portal</span>
+            <span className="text-white text-lg font-bold">HRMS {t({ en: 'Portal', hi: 'पोर्टल' })}</span>
           </div>
         </div>
         
         <div className="relative z-10 flex-1 flex flex-col justify-center">
           <h1 className="text-4xl xl:text-5xl font-extrabold text-white mb-6 leading-tight tracking-tight">
-            Join the future of healthcare
+            {t({ en: 'Join the future of healthcare', hi: 'हेल्थकेयर के नए दौर से जुड़ें' })}
           </h1>
           <p className="text-lg text-slate-400 leading-relaxed max-w-md">
-            Create your account to start managing medical records securely. Whether you're a patient, doctor, nurse, or hospital.
+            {t({ en: 'Create your account to start managing medical records securely. Whether you\'re a patient, doctor, nurse, or hospital.', hi: 'अपना अकाउंट बनाएं और मेडिकल रिकॉर्ड सुरक्षित रूप से संभालें। चाहे आप मरीज हों, डॉक्टर हों, नर्स हों या अस्पताल।' })}
           </p>
         </div>
         
@@ -171,23 +173,30 @@ const Signup = () => {
         >
           {theme === 'light' ? '🌙' : '☀️'}
         </button>
+        <button
+          onClick={toggleLanguage}
+          title={t({ en: 'Switch language', hi: 'भाषा बदलें' })}
+          className="absolute top-6 right-16 w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:scale-105 transition-all flex items-center justify-center z-10"
+        >
+          {language === 'en' ? 'EN' : 'HI'}
+        </button>
 
         <div className="w-full max-w-lg my-8 animate-fadeIn">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
             <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg shadow-emerald-500/20">✚</div>
-            <span className="text-lg font-bold text-slate-900 dark:text-white">HRMS Portal</span>
+            <span className="text-lg font-bold text-slate-900 dark:text-white">HRMS {t({ en: 'Portal', hi: 'पोर्टल' })}</span>
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">Create your account</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Fill in your details to get started</p>
+            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">{t({ en: 'Create your account', hi: 'अपना अकाउंट बनाएं' })}</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{t({ en: 'Fill in your details to get started', hi: 'शुरू करने के लिए अपनी जानकारी भरें' })}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Role Selection */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2.5 uppercase tracking-wider">I am a...</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2.5 uppercase tracking-wider">{t({ en: 'I am a...', hi: 'मैं हूँ...' })}</label>
               <div className="grid grid-cols-4 gap-2">
                 {roleOptions.map((role) => (
                   <button
@@ -209,20 +218,20 @@ const Signup = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <InputField
-                label={formData.role === 'hospital' ? 'Hospital Name' : 'Full Name'}
+                label={formData.role === 'hospital' ? t({ en: 'Hospital Name', hi: 'अस्पताल का नाम' }) : t({ en: 'Full Name', hi: 'पूरा नाम' })}
                 id="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder={formData.role === 'hospital' ? 'Hospital name' : 'Your full name'}
+                placeholder={formData.role === 'hospital' ? t({ en: 'Hospital name', hi: 'अस्पताल का नाम' }) : t({ en: 'Your full name', hi: 'आपका पूरा नाम' })}
                 required
               />
               <InputField
-                label="Email"
+                label={t({ en: 'Email', hi: 'ईमेल' })}
                 id="email"
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="you@example.com"
+                placeholder={t({ en: 'you@example.com', hi: 'you@example.com' })}
                 required
               />
             </div>
@@ -230,49 +239,49 @@ const Signup = () => {
             {/* Doctor/Nurse: License Number */}
             {(formData.role === 'doctor' || formData.role === 'nurse') && (
               <InputField
-                label={formData.role === 'doctor' ? 'Medical License Number' : 'Nursing License Number'}
+                label={formData.role === 'doctor' ? t({ en: 'Medical License Number', hi: 'मेडिकल लाइसेंस नंबर' }) : t({ en: 'Nursing License Number', hi: 'नर्सिंग लाइसेंस नंबर' })}
                 id="licenseNumber"
                 value={formData.licenseNumber}
                 onChange={handleChange}
-                placeholder={`Enter your ${formData.role === 'doctor' ? 'medical' : 'nursing'} license number`}
+                placeholder={t({ en: `Enter your ${formData.role === 'doctor' ? 'medical' : 'nursing'} license number`, hi: 'अपना लाइसेंस नंबर लिखें' })}
                 required
-                hint="This will be verified by an admin before activation."
+                hint={t({ en: 'This will be verified by an admin before activation.', hi: 'इसे एडमिन द्वारा जांचा जाएगा।' })}
               />
             )}
 
             {/* Hospital: Registration Number */}
             {formData.role === 'hospital' && (
               <InputField
-                label="Hospital Registration Number"
+                label={t({ en: 'Hospital Registration Number', hi: 'अस्पताल रजिस्ट्रेशन नंबर' })}
                 id="registrationNumber"
                 value={formData.registrationNumber}
                 onChange={handleChange}
-                placeholder="Enter registration number"
+                placeholder={t({ en: 'Enter registration number', hi: 'रजिस्ट्रेशन नंबर लिखें' })}
                 required
-                hint="This will be verified by an admin before activation."
+                hint={t({ en: 'This will be verified by an admin before activation.', hi: 'इसे एडमिन द्वारा जांचा जाएगा।' })}
               />
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <InputField
-                  label="Password"
+                  label={t({ en: 'Password', hi: 'पासवर्ड' })}
                   id="password"
                   type="password"
                   value={formData.password}
                   onChange={handleChange}
-                  placeholder="Create a password"
+                  placeholder={t({ en: 'Create a password', hi: 'पासवर्ड बनाएं' })}
                   required
                 />
                 <PasswordStrengthIndicator password={formData.password} />
               </div>
               <InputField
-                label="Confirm Password"
+                label={t({ en: 'Confirm Password', hi: 'पासवर्ड फिर से लिखें' })}
                 id="confirmPassword"
                 type="password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                placeholder="Re-enter password"
+                placeholder={t({ en: 'Re-enter password', hi: 'पासवर्ड फिर से लिखें' })}
                 required
               />
             </div>
@@ -285,17 +294,17 @@ const Signup = () => {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Creating Account...
+                  {t({ en: 'Creating Account...', hi: 'अकाउंट बन रहा है...' })}
                 </span>
-              ) : 'Create Account'}
+              ) : t({ en: 'Create Account', hi: 'अकाउंट बनाएं' })}
             </button>
           </form>
 
           <div className="text-center mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Already have an account?{' '}
+              {t({ en: 'Already have an account?', hi: 'पहले से अकाउंट है?' })}{' '}
               <Link to="/login" className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">
-                Sign in
+                {t({ en: 'Sign in', hi: 'साइन इन' })}
               </Link>
             </p>
           </div>

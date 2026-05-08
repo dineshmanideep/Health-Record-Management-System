@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import DashboardLayout from '../../components/DashboardLayout';
+import { useLanguage } from '../../context/LanguageContext';
 import { nurseService } from '../../services/api';
 
 const NurseAssignments = () => {
@@ -18,6 +19,7 @@ const NurseAssignments = () => {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ show: false, type: 'error', text: '' });
   const [resolutionState, setResolutionState] = useState({ visible: false, sessionId: '', ambiguities: [], clarifications: {} });
+  const { t } = useLanguage();
 
   const showToast = (type, text) => {
     setToast({ show: true, type, text });
@@ -83,12 +85,12 @@ const NurseAssignments = () => {
   const handleStartAssignment = async (id) => {
     try {
       await nurseService.startAssignment(id);
-      setMessage({ type: 'success', text: 'Assignment started! You can now work on it.' });
+      setMessage({ type: 'success', text: t({ en: 'Assignment started. You can proceed.', hi: 'असाइनमेंट शुरू हो गया। अब आप आगे बढ़ सकते हैं।' }) });
       fetchAssignments();
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
       console.error('Error starting assignment:', error);
-      setMessage({ type: 'error', text: 'Failed to start assignment. Please try again.' });
+      setMessage({ type: 'error', text: t({ en: 'Failed to start assignment. Please try again.', hi: 'असाइनमेंट शुरू नहीं हो सका। फिर कोशिश करें।' }) });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     }
   };
@@ -127,7 +129,7 @@ const NurseAssignments = () => {
       }
       setFiles(clearedFiles);
       event.target.value = '';
-      showToast('error', 'Unsupported file. Use PDF, JPG, JPEG, or PNG.');
+      showToast('error', t({ en: 'Unsupported file. Use PDF, JPG, JPEG, or PNG.', hi: 'असमर्थित फाइल। PDF, JPG, JPEG, या PNG उपयोग करें।' }));
       return;
     }
 
@@ -149,8 +151,8 @@ const NurseAssignments = () => {
   const handleCompleteAssignment = async (e) => {
     e.preventDefault();
     if (!prescription.trim()) {
-      setMessage({ type: 'error', text: 'Please provide prescription text' });
-      showToast('error', 'Please provide prescription text.');
+      setMessage({ type: 'error', text: t({ en: 'Please provide prescription text', hi: 'कृपया प्रिस्क्रिप्शन टेक्स्ट लिखें' }) });
+      showToast('error', t({ en: 'Please provide prescription text.', hi: 'कृपया प्रिस्क्रिप्शन टेक्स्ट लिखें।' }));
       return;
     }
 
@@ -172,7 +174,7 @@ const NurseAssignments = () => {
       });
 
       await nurseService.completeAssignment(selectedAssignment._id, submitData);
-      setMessage({ type: 'success', text: 'Medical record created successfully! Redirecting...' });
+      setMessage({ type: 'success', text: t({ en: 'Medical record created successfully! Redirecting...', hi: 'रिकॉर्ड सफलतापूर्वक बना! रीडायरेक्ट हो रहा है...' }) });
       
       setTimeout(() => {
         setShowCompletionForm(false);
@@ -194,14 +196,14 @@ const NurseAssignments = () => {
         });
         setMessage({
           type: 'error',
-          text: payload.message || 'Clarification is required to complete this record.'
+          text: payload.message || t({ en: 'Clarification is required to complete this record.', hi: 'रिकॉर्ड पूरा करने के लिए स्पष्टीकरण चाहिए।' })
         });
         return;
       }
-      showToast('error', error?.response?.data?.message || 'Failed to complete assignment');
+      showToast('error', error?.response?.data?.message || t({ en: 'Failed to complete assignment', hi: 'असाइनमेंट पूरा नहीं हो सका' }));
       setMessage({ 
         type: 'error', 
-        text: error?.response?.data?.message || 'Failed to complete assignment' 
+        text: error?.response?.data?.message || t({ en: 'Failed to complete assignment', hi: 'असाइनमेंट पूरा नहीं हो सका' }) 
       });
     } finally {
       setSubmitting(false);
@@ -223,7 +225,7 @@ const NurseAssignments = () => {
     setSubmitting(true);
     try {
       await nurseService.resolveUploadSession(resolutionState.sessionId, resolutionState.clarifications);
-      setMessage({ type: 'success', text: 'Medical record created successfully! Redirecting...' });
+      setMessage({ type: 'success', text: t({ en: 'Medical record created successfully! Redirecting...', hi: 'रिकॉर्ड सफलतापूर्वक बना! रीडायरेक्ट हो रहा है...' }) });
       setTimeout(() => {
         setShowCompletionForm(false);
         setSelectedAssignment(null);
@@ -232,10 +234,10 @@ const NurseAssignments = () => {
         fetchAssignments();
       }, 1500);
     } catch (error) {
-      showToast('error', error?.response?.data?.message || 'Failed to resolve clarification');
+      showToast('error', error?.response?.data?.message || t({ en: 'Failed to resolve clarification', hi: 'स्पष्टीकरण हल नहीं हो सका' }));
       setMessage({
         type: 'error',
-        text: error?.response?.data?.message || 'Failed to resolve clarification'
+        text: error?.response?.data?.message || t({ en: 'Failed to resolve clarification', hi: 'स्पष्टीकरण हल नहीं हो सका' })
       });
     } finally {
       setSubmitting(false);
@@ -254,10 +256,10 @@ const NurseAssignments = () => {
 
   const getStatusText = (status) => {
     const text = {
-      pending: 'Pending',
-      in_progress: 'In Progress',
-      completed: 'Completed',
-      cancelled: 'Cancelled'
+      pending: t({ en: 'Pending', hi: 'लंबित' }),
+      in_progress: t({ en: 'In Progress', hi: 'चल रहा है' }),
+      completed: t({ en: 'Completed', hi: 'पूरा हुआ' }),
+      cancelled: t({ en: 'Cancelled', hi: 'रद्द' })
     };
     return text[status] || status;
   };
@@ -273,7 +275,7 @@ const NurseAssignments = () => {
   const filteredAssignments = assignments;
 
   return (
-    <DashboardLayout title="My Assignments">
+    <DashboardLayout title={t({ en: 'My Assignments', hi: 'मेरे असाइनमेंट' })}>
       {toast.show && (
         <div
           role="status"
@@ -301,14 +303,14 @@ const NurseAssignments = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-40 animate-pulse">
            <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-           <p className="mt-8 text-slate-400 font-black tracking-[0.3em] uppercase text-[10px]">Synchronizing Active protocols...</p>
+           <p className="mt-8 text-slate-400 font-black tracking-[0.3em] uppercase text-[10px]">{t({ en: 'Loading assignments...', hi: 'असाइनमेंट लोड हो रहे हैं...' })}</p>
         </div>
       ) : (
         <>
           {resolutionState.visible && (
             <div className="mb-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-[2rem] p-6">
-              <h3 className="text-sm font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider mb-2">Clarification Required</h3>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mb-4">Processing found an ambiguous blood sugar field. Confirm the correct test type to finish the record.</p>
+              <h3 className="text-sm font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider mb-2">{t({ en: 'Clarification Required', hi: 'स्पष्टीकरण जरूरी' })}</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mb-4">{t({ en: 'An ambiguous blood sugar field was found. Confirm the correct test type to finish the record.', hi: 'ब्लड शुगर फील्ड अस्पष्ट है। रिकॉर्ड पूरा करने के लिए सही टेस्ट प्रकार चुनें।' })}</p>
               <div className="space-y-4">
                 {resolutionState.ambiguities.map((item) => (
                   <div key={item.rawFieldName} className="bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-900/40 rounded-2xl p-4">
@@ -320,7 +322,7 @@ const NurseAssignments = () => {
                     >
                       {(item.options || []).map((option) => (
                         <option key={option} value={option}>
-                          {option === 'post_meal' ? 'Post-Meal Blood Sugar' : `${option.charAt(0).toUpperCase()}${option.slice(1).replace('_', ' ')} Blood Sugar`}
+                          {option === 'post_meal' ? t({ en: 'Post-Meal Blood Sugar', hi: 'भोजन के बाद ब्लड शुगर' }) : `${option.charAt(0).toUpperCase()}${option.slice(1).replace('_', ' ')} ${t({ en: 'Blood Sugar', hi: 'ब्लड शुगर' })}`}
                         </option>
                       ))}
                     </select>
@@ -333,7 +335,7 @@ const NurseAssignments = () => {
                   disabled={submitting}
                   className="px-5 py-3 rounded-xl bg-amber-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-50"
                 >
-                  {submitting ? 'Resolving...' : 'Confirm And Complete'}
+                  {submitting ? t({ en: 'Resolving...', hi: 'हल हो रहा है...' }) : t({ en: 'Confirm And Complete', hi: 'पुष्टि करें और पूरा करें' })}
                 </button>
               </div>
             </div>
@@ -343,15 +345,15 @@ const NurseAssignments = () => {
           <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 mb-8 transition-all">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 sm:gap-8 mb-6 sm:mb-10">
               <div>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Clinical Inbox</h2>
-                <p className="text-[9px] sm:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-2">Authenticated Assignment Queue</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">{t({ en: 'Assignment Inbox', hi: 'असाइनमेंट इनबॉक्स' })}</h2>
+                <p className="text-[9px] sm:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-2">{t({ en: 'Assignment Queue', hi: 'असाइनमेंट कतार' })}</p>
               </div>
               <div className="flex flex-wrap gap-2 md:gap-3">
                 {[
-                  { id: 'all', label: 'All', count: stats.all, color: 'slate' },
-                  { id: 'pending', label: 'Pending', count: stats.pending, color: 'amber' },
-                  { id: 'in_progress', label: 'In-Progress', count: stats.in_progress, color: 'blue' },
-                  { id: 'completed', label: 'Done', count: stats.completed, color: 'emerald' }
+                  { id: 'all', label: t({ en: 'All', hi: 'सभी' }), count: stats.all, color: 'slate' },
+                  { id: 'pending', label: t({ en: 'Pending', hi: 'लंबित' }), count: stats.pending, color: 'amber' },
+                  { id: 'in_progress', label: t({ en: 'In Progress', hi: 'चल रहा है' }), count: stats.in_progress, color: 'blue' },
+                  { id: 'completed', label: t({ en: 'Done', hi: 'पूरा' }), count: stats.completed, color: 'emerald' }
                 ].map((btn) => (
                   <button
                     key={btn.id}
@@ -376,10 +378,10 @@ const NurseAssignments = () => {
                 <div className="bg-white dark:bg-slate-900 p-20 rounded-[3.5rem] shadow-sm text-center border border-slate-200/50 dark:border-slate-800">
                   <div className="w-20 h-20 rounded-[2rem] bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-4xl mx-auto mb-8">🩺</div>
                   <p className="text-slate-800 dark:text-slate-100 font-black uppercase tracking-[0.2em] text-sm mb-3">
-                    {filter === 'all' ? 'No Doctor Tasks Yet' : `No ${getStatusText(filter)} Tasks`}
+                    {filter === 'all' ? t({ en: 'No doctor tasks yet', hi: 'अभी कोई डॉक्टर कार्य नहीं' }) : `${t({ en: 'No', hi: 'कोई' })} ${getStatusText(filter)} ${t({ en: 'tasks', hi: 'कार्य' })}`}
                   </p>
                   <p className="text-slate-500 dark:text-slate-400 text-sm font-medium max-w-md mx-auto leading-relaxed">
-                    When a doctor assigns a patient record workflow, it will appear here with instructions, attachments, and completion actions.
+                    {t({ en: 'Assigned tasks will appear here with instructions and attachments.', hi: 'असाइन किए गए कार्य यहां निर्देशों और फाइलों के साथ दिखेंगे।' })}
                   </p>
                 </div>
               ) : (
@@ -416,7 +418,7 @@ const NurseAssignments = () => {
                            <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">{new Date(assignment.createdAt).toLocaleDateString()}</p>
                            {assignment.dueDate && (
                              <p className={`text-[9px] font-black uppercase mt-3 tracking-widest px-3 py-1 rounded-lg ${new Date(assignment.dueDate) < new Date() ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-500' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-500'}`}>
-                               DEADLINE: {new Date(assignment.dueDate).toLocaleDateString()}
+                               {t({ en: 'DEADLINE', hi: 'डेडलाइन' })}: {new Date(assignment.dueDate).toLocaleDateString()}
                              </p>
                            )}
                         </div>
@@ -424,11 +426,11 @@ const NurseAssignments = () => {
                       
                       <div className="grid grid-cols-2 gap-4 mb-10 relative z-10">
                          <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Source Node</p>
-                            <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase truncate">Dr. {assignment.doctor?.name}</p>
+                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">{t({ en: 'Doctor', hi: 'डॉक्टर' })}</p>
+                             <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase truncate">{t({ en: 'Dr.', hi: 'डॉ.' })} {assignment.doctor?.name}</p>
                          </div>
                          <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">Facility</p>
+                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5">{t({ en: 'Hospital', hi: 'अस्पताल' })}</p>
                             <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase truncate">{assignment.hospital?.name}</p>
                          </div>
                       </div>
@@ -438,14 +440,14 @@ const NurseAssignments = () => {
                           onClick={() => handleViewDetails(assignment)}
                           className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 border-none"
                         >
-                          Access Profile
+                          {t({ en: 'View Details', hi: 'विवरण देखें' })}
                         </button>
                         {assignment.status === 'pending' && (
                           <button
                             onClick={() => handleStartAssignment(assignment._id)}
                             className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 transition-all active:scale-95 hover:bg-emerald-700"
                           >
-                            Synchronize
+                            {t({ en: 'Start', hi: 'शुरू करें' })}
                           </button>
                         )}
                         {assignment.status === 'in_progress' && (
@@ -453,7 +455,7 @@ const NurseAssignments = () => {
                             onClick={() => { setSelectedAssignment(assignment); handleStartCompletion(); }}
                             className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20 transition-all active:scale-95 hover:bg-blue-700"
                           >
-                            Finalize
+                            {t({ en: 'Complete', hi: 'पूरा करें' })}
                           </button>
                         )}
                       </div>
@@ -469,26 +471,26 @@ const NurseAssignments = () => {
             <div className="bg-white dark:bg-slate-900 p-12 rounded-[3.5rem] shadow-2xl border border-slate-200/50 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-500 pb-20">
               <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12 border-b dark:border-slate-800 pb-10">
                 <div>
-                  <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Protocol Parameters</h3>
+                  <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">{t({ en: 'Assignment Details', hi: 'असाइनमेंट विवरण' })}</h3>
                   <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Secure Diagnostic Subsystem
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> {t({ en: 'Secure Diagnostic Subsystem', hi: 'सुरक्षित डायग्नोस्टिक सिस्टम' })}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedAssignment(null)}
                   className="px-8 py-3 bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all border border-slate-100 dark:border-slate-800"
                 >
-                  ← Terminate View
+                  ← {t({ en: 'Close', hi: 'बंद करें' })}
                 </button>
               </div>
 
               <div className="space-y-12">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {[
-                    { label: 'Artifact Subject', val: selectedAssignment.patient?.name, sub: selectedAssignment.patient?.patientId },
-                    { label: 'Reporting Lead', val: `Dr. ${selectedAssignment.doctor?.name}`, sub: selectedAssignment.doctor?.email },
-                    { label: 'Physical Node', val: selectedAssignment.hospital?.name, sub: 'Facility Core' },
-                    { label: 'Current Phase', val: getStatusText(selectedAssignment.status), sub: 'Protocol Status', isStatus: true }
+                    { label: t({ en: 'Patient', hi: 'मरीज' }), val: selectedAssignment.patient?.name, sub: selectedAssignment.patient?.patientId },
+                    { label: t({ en: 'Doctor', hi: 'डॉक्टर' }), val: `${t({ en: 'Dr.', hi: 'डॉ.' })} ${selectedAssignment.doctor?.name}`, sub: selectedAssignment.doctor?.email },
+                    { label: t({ en: 'Hospital', hi: 'अस्पताल' }), val: selectedAssignment.hospital?.name, sub: t({ en: 'Facility', hi: 'सुविधा' }) },
+                    { label: t({ en: 'Status', hi: 'स्थिति' }), val: getStatusText(selectedAssignment.status), sub: t({ en: 'Assignment Status', hi: 'असाइनमेंट स्थिति' }), isStatus: true }
                   ].map((item, i) => (
                     <div key={i} className="bg-slate-50 dark:bg-slate-950/50 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">{item.label}</p>
@@ -507,7 +509,7 @@ const NurseAssignments = () => {
                 <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-10 rounded-[3rem] border-l-[8px] border-emerald-500 shadow-sm relative overflow-hidden">
                   <div className="absolute top-4 right-6 text-6xl opacity-10">📝</div>
                   <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Executive Directives
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {t({ en: 'Instructions', hi: 'निर्देश' })}
                   </p>
                   <p className="text-slate-800 dark:text-slate-200 font-bold text-lg leading-relaxed italic whitespace-pre-wrap">
                     "{selectedAssignment.instructions}"
@@ -516,7 +518,7 @@ const NurseAssignments = () => {
 
                 {selectedAssignment.attachments && selectedAssignment.attachments.length > 0 && (
                   <div>
-                    <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] block mb-6 ml-2 italic">Supporting Clinical Artifacts</span>
+                    <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] block mb-6 ml-2 italic">{t({ en: 'Attachments', hi: 'फाइलें' })}</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       {selectedAssignment.attachments.map((attachment, index) => {
                          const fileUrl = resolveFileUrl(attachment);
@@ -529,9 +531,9 @@ const NurseAssignments = () => {
                             className="bg-white dark:bg-slate-950 p-6 rounded-[2rem] hover:bg-emerald-600 group border border-slate-100 dark:border-slate-800 transition-all duration-300 flex items-center justify-between no-underline shadow-sm"
                           >
                             <span className="text-[11px] font-black text-slate-800 dark:text-slate-200 group-hover:text-white uppercase tracking-widest flex items-center gap-4">
-                              <span className="text-2xl group-hover:scale-110 transition-transform">📄</span> Artifact_{index + 1}
+                              <span className="text-2xl group-hover:scale-110 transition-transform">📄</span> {t({ en: 'File', hi: 'फाइल' })}_{index + 1}
                             </span>
-                            <span className="text-[10px] font-black text-emerald-500 group-hover:text-white/80 uppercase tracking-widest group-hover:translate-x-1 transition-transform">Access ↗</span>
+                            <span className="text-[10px] font-black text-emerald-500 group-hover:text-white/80 uppercase tracking-widest group-hover:translate-x-1 transition-transform">{t({ en: 'Open', hi: 'खोलें' })} ↗</span>
                           </a>
                         );
                       })}
@@ -541,16 +543,16 @@ const NurseAssignments = () => {
 
                 {selectedAssignment.voiceNote?.filePath && (
                   <div className="bg-indigo-50/60 dark:bg-indigo-900/10 p-8 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-900/30">
-                    <p className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-4">Doctor Voice Note</p>
+                    <p className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-4">{t({ en: 'Doctor Voice Note', hi: 'डॉक्टर वॉइस नोट' })}</p>
                     <audio
                       controls
                       src={resolveFileUrl(selectedAssignment.voiceNote.filePath)}
                       className="w-full mb-4"
                     />
                     <div className="bg-white dark:bg-slate-950 rounded-2xl p-5 border border-slate-200 dark:border-slate-800">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Transcript</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t({ en: 'Transcript', hi: 'ट्रांसक्रिप्ट' })}</p>
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                        {selectedAssignment.voiceNote.transcript || 'Transcript is not available for this voice note yet.'}
+                        {selectedAssignment.voiceNote.transcript || t({ en: 'Transcript is not available for this voice note yet.', hi: 'इस वॉइस नोट का ट्रांसक्रिप्ट अभी उपलब्ध नहीं है।' })}
                       </p>
                     </div>
                   </div>
@@ -559,7 +561,7 @@ const NurseAssignments = () => {
                 {selectedAssignment.dueDate && (
                   <div className="bg-rose-500 p-8 rounded-[2.5rem] flex items-center justify-between shadow-2xl shadow-rose-500/20 text-white">
                     <div>
-                      <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.3em] mb-1.5 italic">Submission Vector Deadline</p>
+                      <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.3em] mb-1.5 italic">{t({ en: 'Submission Deadline', hi: 'सबमिशन डेडलाइन' })}</p>
                       <p className="text-xl font-black uppercase tracking-tight">{new Date(selectedAssignment.dueDate).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                     <span className="text-4xl animate-bounce">⏱️</span>
@@ -572,7 +574,7 @@ const NurseAssignments = () => {
                       onClick={() => handleStartAssignment(selectedAssignment._id)}
                       className="flex-1 py-5 bg-emerald-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-emerald-500/20 active:scale-95 transition-all hover:bg-emerald-700 hover:-translate-y-1"
                     >
-                      Initialize Assignment
+                      {t({ en: 'Start Assignment', hi: 'असाइनमेंट शुरू करें' })}
                     </button>
                   )}
                   {selectedAssignment.status === 'in_progress' && (
@@ -580,14 +582,14 @@ const NurseAssignments = () => {
                       onClick={handleStartCompletion}
                       className="flex-1 py-5 bg-blue-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-blue-500/20 active:scale-95 transition-all hover:bg-blue-700 hover:-translate-y-1"
                     >
-                      Finalize Output
+                      {t({ en: 'Finalize Output', hi: 'आउटपुट पूरा करें' })}
                     </button>
                   )}
                   <button
                     onClick={() => setSelectedAssignment(null)}
                     className="flex-1 py-5 bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all border border-slate-100 dark:border-slate-800"
                   >
-                    Close Protocol
+                    {t({ en: 'Close', hi: 'बंद करें' })}
                   </button>
                 </div>
               </div>
@@ -600,8 +602,8 @@ const NurseAssignments = () => {
               <div className="bg-white dark:bg-slate-950 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl max-w-4xl w-full max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-slate-200 dark:border-emerald-500/10 flex flex-col">
                 <div className="flex justify-between items-center px-6 md:px-12 py-6 md:py-10 border-b dark:border-slate-800/50 sticky top-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-10">
                   <div>
-                    <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Protocol Finalization</h3>
-                    <p className="text-[9px] md:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-1 md:mt-2 italic">Authenticated Output Generation</p>
+                    <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase">{t({ en: 'Complete Assignment', hi: 'असाइनमेंट पूरा करें' })}</h3>
+                    <p className="text-[9px] md:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-1 md:mt-2 italic">{t({ en: 'Finalize output', hi: 'आउटपुट फाइनल करें' })}</p>
                   </div>
                   <button
                     onClick={() => setShowCompletionForm(false)}
@@ -613,19 +615,19 @@ const NurseAssignments = () => {
                 <div className="p-6 md:p-12 overflow-y-auto custom-scrollbar flex-1">
                   {message.text && (
                     <div className="mb-6 md:mb-10 p-4 md:p-6 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-center border-l-4 border-rose-500">
-                      ⚠️ SYNTAX ERROR: {message.text}
+                      ⚠️ {t({ en: 'Error', hi: 'त्रुटि' })}: {message.text}
                     </div>
                   )}
                   <form onSubmit={handleCompleteAssignment} className="space-y-8 md:space-y-12">
                     <div>
                       <label className="text-[10px] md:text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-2 mb-3 md:mb-4 block italic">
-                        Clinical Observations & Regimen *
+                        {t({ en: 'Clinical Observations & Regimen *', hi: 'क्लिनिकल नोट्स और निर्देश *' })}
                       </label>
                       <textarea
                         value={prescription}
                         onChange={(e) => setPrescription(e.target.value)}
                         rows={6}
-                        placeholder="Define the patient findings and medical directives..."
+                        placeholder={t({ en: 'Write findings and instructions...', hi: 'निष्कर्ष और निर्देश लिखें...' })}
                         className="w-full px-5 md:px-8 py-5 md:py-7 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-[1.5rem] md:rounded-[2.5rem] text-sm font-bold dark:text-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all outline-none resize-none leading-relaxed"
                         required
                       />
@@ -638,12 +640,12 @@ const NurseAssignments = () => {
                           onClick={handleFileAdd}
                           className="px-4 md:px-6 py-2 md:py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[8px] md:text-[9px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all"
                         >
-                          + Add Data Node
+                          + {t({ en: 'Add File', hi: 'फाइल जोड़ें' })}
                         </button>
                       </div>
                       {files.length === 0 ? (
                         <div className="bg-slate-50 dark:bg-slate-900/30 p-8 md:p-12 rounded-[1.5rem] md:rounded-[2.5rem] text-center border-2 border-dashed border-slate-200 dark:border-slate-800">
-                          <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] italic">No binary objects attached</p>
+                          <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] italic">{t({ en: 'No files attached', hi: 'कोई फाइल नहीं जोड़ी गई' })}</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -658,18 +660,18 @@ const NurseAssignments = () => {
                               </button>
                               <div className="space-y-3 md:space-y-4">
                                 <div>
-                                  <label className="text-[8px] md:text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1.5 md:mb-2 px-1">Classification</label>
+                                  <label className="text-[8px] md:text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1.5 md:mb-2 px-1">{t({ en: 'Category', hi: 'कैटेगरी' })}</label>
                                   <select
                                     value={item.category}
                                     onChange={(e) => handleCategoryChange(index, e.target.value)}
                                     className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl text-[10px] md:text-[11px] font-black uppercase dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all appearance-none cursor-pointer"
                                   >
-                                    <option value="test_report">Diagnostic Report</option>
-                                    <option value="diagnosis_report">Clinical Analysis</option>
+                                    <option value="test_report">{t({ en: 'Diagnostic Report', hi: 'डायग्नोस्टिक रिपोर्ट' })}</option>
+                                    <option value="diagnosis_report">{t({ en: 'Clinical Analysis', hi: 'क्लिनिकल एनालिसिस' })}</option>
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="text-[8px] md:text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1.5 md:mb-2 px-1">Data Stream</label>
+                                  <label className="text-[8px] md:text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1.5 md:mb-2 px-1">{t({ en: 'File', hi: 'फाइल' })}</label>
                                   <div className="relative">
                                     <input
                                       type="file"
@@ -678,7 +680,7 @@ const NurseAssignments = () => {
                                       className="w-full text-[9px] md:text-[10px] font-bold dark:text-slate-400 file:mr-3 md:file:mr-4 file:py-1.5 md:file:py-2 file:px-3 md:file:px-4 file:rounded-xl file:border-0 file:text-[8px] md:file:text-[9px] file:font-black file:uppercase file:bg-slate-900 dark:file:bg-white file:text-white dark:file:text-slate-900 hover:file:opacity-80 transition-all cursor-pointer"
                                     />
                                   </div>
-                                  {item.file && <p className="text-[8px] md:text-[9px] font-black text-emerald-500 mt-1.5 md:mt-2 truncate italic px-1">Linked: {item.file.name}</p>}
+                                  {item.file && <p className="text-[8px] md:text-[9px] font-black text-emerald-500 mt-1.5 md:mt-2 truncate italic px-1">{t({ en: 'Linked', hi: 'जुड़ा' })}: {item.file.name}</p>}
                                 </div>
                               </div>
                             </div>
@@ -692,14 +694,14 @@ const NurseAssignments = () => {
                         disabled={submitting}
                         className="flex-1 py-4 md:py-5 bg-emerald-600 text-white rounded-[1.5rem] md:rounded-[2rem] font-black text-[10px] md:text-[11px] uppercase tracking-widest shadow-2xl shadow-emerald-500/30 active:scale-95 transition-all disabled:opacity-50 hover:bg-emerald-700 hover:-translate-y-1"
                       >
-                        {submitting ? 'Transmitting...' : 'Finalize & Transmit'}
+                        {submitting ? t({ en: 'Submitting...', hi: 'भेजा जा रहा है...' }) : t({ en: 'Submit', hi: 'सबमिट करें' })}
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowCompletionForm(false)}
                         className="flex-1 py-4 md:py-5 bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 rounded-[1.5rem] md:rounded-[2rem] font-black text-[10px] md:text-[11px] uppercase tracking-widest active:scale-95 transition-all border border-slate-100 dark:border-slate-800"
                       >
-                        Abort
+                        {t({ en: 'Cancel', hi: 'रद्द करें' })}
                       </button>
                     </div>
                   </form>

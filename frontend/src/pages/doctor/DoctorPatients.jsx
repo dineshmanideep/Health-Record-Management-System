@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
+import { useLanguage } from '../../context/LanguageContext';
 import { doctorService } from '../../services/api';
 
 const DoctorPatients = () => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const { t } = useLanguage();
 
   useEffect(() => {
     doctorService.getMyPatients()
@@ -23,7 +25,7 @@ const DoctorPatients = () => {
   });
 
   return (
-    <DashboardLayout title="Clinical Intelligence">
+    <DashboardLayout title={t({ en: 'Patient Directory', hi: 'मरीज सूची' })}>
       <div className="pb-20">
         {/* Search & Stats Header */}
         <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 mb-10 transition-all">
@@ -31,11 +33,11 @@ const DoctorPatients = () => {
             <div>
               <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase flex items-center gap-4">
                 <span className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-emerald-100/50 dark:border-emerald-800/30">👥</span>
-                Subject Directory
+                {t({ en: 'Patient Directory', hi: 'मरीज सूची' })}
               </h2>
               <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-3 ml-16 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 
-                {patients.length} Authenticated Synaptic Links
+                {patients.length} {t({ en: 'linked patients', hi: 'मरीज जुड़े हैं' })}
               </p>
             </div>
             <div className="relative w-full lg:w-96">
@@ -44,7 +46,7 @@ const DoctorPatients = () => {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Subject ID or Alias..."
+                placeholder={t({ en: 'Search patient name or email...', hi: 'मरीज का नाम या ईमेल खोजें...' })}
                 className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-[2rem] text-sm font-black dark:text-white placeholder:text-slate-400 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all outline-none uppercase tracking-widest"
               />
             </div>
@@ -54,13 +56,13 @@ const DoctorPatients = () => {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-40 animate-pulse">
              <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-             <p className="mt-8 text-slate-400 font-black tracking-[0.3em] uppercase text-[10px]">Scanning Subject Registry...</p>
+             <p className="mt-8 text-slate-400 font-black tracking-[0.3em] uppercase text-[10px]">{t({ en: 'Loading patients...', hi: 'मरीज लोड हो रहे हैं...' })}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white dark:bg-slate-900 p-32 rounded-[3.5rem] shadow-sm text-center border border-slate-200/50 dark:border-slate-800">
             <p className="text-8xl mb-10 grayscale opacity-10">👥</p>
-            <p className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.4em] text-[11px] mb-4">Registry Null</p>
-            <p className="text-slate-400 dark:text-slate-600 text-sm font-bold max-w-xs mx-auto leading-relaxed">No subjects discovered matching the search vector.</p>
+            <p className="text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.4em] text-[11px] mb-4">{t({ en: 'No Results', hi: 'कोई परिणाम नहीं' })}</p>
+            <p className="text-slate-400 dark:text-slate-600 text-sm font-bold max-w-xs mx-auto leading-relaxed">{t({ en: 'No patients match your search.', hi: 'आपकी खोज से कोई मरीज नहीं मिला।' })}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
@@ -76,13 +78,13 @@ const DoctorPatients = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 
-                       Subject_{item.patient?.patientId?.substring(0, 8)}
+                       {t({ en: 'Patient', hi: 'मरीज' })}_{item.patient?.patientId?.substring(0, 8)}
                     </p>
                     <h3 className="font-black text-slate-900 dark:text-white text-2xl uppercase tracking-tight truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mb-2">
-                      {item.patient?.name || 'Anonymous Subject'}
+                      {item.patient?.name || t({ en: 'Anonymous Patient', hi: 'अज्ञात मरीज' })}
                     </h3>
                     <p className="text-[11px] font-bold text-slate-400 dark:text-slate-600 truncate italic">
-                      {item.patient?.email || 'Unauthorized Data Access'}
+                      {item.patient?.email || t({ en: 'No email', hi: 'ईमेल नहीं' })}
                     </p>
                   </div>
                   <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${
@@ -90,20 +92,20 @@ const DoctorPatients = () => {
                       ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/30' 
                       : 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800/30'
                   }`}>
-                    {item.isActive ? 'Active' : 'Revoked'}
+                    {item.isActive ? t({ en: 'Active', hi: 'सक्रिय' }) : t({ en: 'Revoked', hi: 'हटा दिया' })}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-8 relative z-10">
                   {item.patient?.gender && (
                     <div className="bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5 italic">Genotype</p>
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5 italic">{t({ en: 'Gender', hi: 'लिंग' })}</p>
                       <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase">{item.patient.gender}</p>
                     </div>
                   )}
                   {item.patient?.bloodGroup && (
                     <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-4 rounded-2xl border border-emerald-100/50 dark:border-emerald-800/20">
-                      <p className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-1.5 italic">Blood Type</p>
+                      <p className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-1.5 italic">{t({ en: 'Blood Group', hi: 'ब्लड ग्रुप' })}</p>
                       <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase">{item.patient.bloodGroup}</p>
                     </div>
                   )}
@@ -119,21 +121,21 @@ const DoctorPatients = () => {
                   {item.lastVisitDate && (
                     <div className="flex items-center gap-3 text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest bg-emerald-50/30 dark:bg-emerald-900/10 px-4 py-2 rounded-xl border border-emerald-100/50 dark:border-emerald-800/20">
                       <span className="text-sm">📅</span> 
-                      <span>Last Synchronization: {new Date(item.lastVisitDate).toLocaleDateString()}</span>
+                      <span>{t({ en: 'Last Visit', hi: 'आख़िरी विज़िट' })}: {new Date(item.lastVisitDate).toLocaleDateString()}</span>
                     </div>
                   )}
                 </div>
 
                 <div className="flex items-center justify-between text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em] mb-10 border-t dark:border-slate-800 pt-6 relative z-10 italic">
-                  <span>VECTOR: {item.accessMethod?.toUpperCase() || 'OTP'}</span>
-                  <span>EST: {new Date(item.grantedAt).toLocaleDateString()}</span>
+                  <span>{t({ en: 'METHOD', hi: 'तरीका' })}: {item.accessMethod?.toUpperCase() || 'OTP'}</span>
+                  <span>{t({ en: 'EST', hi: 'तारीख' })}: {new Date(item.grantedAt).toLocaleDateString()}</span>
                 </div>
 
                 <Link
                   to={`/doctor/patient-records/${item.patient?._id}`}
                   className="w-full block text-center py-4.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all no-underline hover:-translate-y-1 active:scale-95"
                 >
-                  Access Medical Vault
+                  {t({ en: 'View Records', hi: 'रिकॉर्ड देखें' })}
                 </Link>
               </div>
             ))}

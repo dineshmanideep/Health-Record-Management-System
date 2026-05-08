@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import LoadingScreen from '../../components/LoadingScreen';
 import toast from 'react-hot-toast';
+import { useLanguage } from '../../context/LanguageContext';
 import { profileService } from '../../services/api';
 
-const InfoRow = ({ label, value, icon }) => (
+const InfoRow = ({ label, value, icon, emptyLabel }) => (
   <div className="flex items-center gap-5 py-6 border-b border-slate-100 dark:border-slate-800/50 last:border-0 group">
     <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-xl group-hover:scale-110 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-all shadow-sm border border-slate-100 dark:border-slate-800 shrink-0">
       {icon}
     </div>
     <div className="flex-1 min-w-0">
       <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-1.5">{label}</p>
-      <p className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest truncate">{value || 'Not Provided'}</p>
+      <p className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest truncate">{value || emptyLabel}</p>
     </div>
   </div>
 );
@@ -19,6 +20,7 @@ const InfoRow = ({ label, value, icon }) => (
 const inputCls = "w-full px-6 py-4 rounded-[1.5rem] bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-black dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all";
 
 const PatientProfile = () => {
+  const { t } = useLanguage();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editProfile, setEditProfile] = useState(false);
@@ -50,7 +52,7 @@ const PatientProfile = () => {
           syncForms(res.data);
         }
       })
-      .catch(() => toast.error('Failed to retrieve medical identity record'))
+      .catch(() => toast.error(t({ en: 'Failed to retrieve medical identity record', hi: 'मेडिकल पहचान रिकॉर्ड नहीं मिला' })))
       .finally(() => setLoading(false));
   }, []);
 
@@ -64,10 +66,10 @@ const PatientProfile = () => {
         setProfile(res.data);
         syncForms(res.data);
         setEditProfile(false);
-        toast.success('Medical identity updated successfully');
+        toast.success(t({ en: 'Medical identity updated successfully', hi: 'मेडिकल पहचान सफलतापूर्वक अपडेट हुई' }));
       }
     } catch {
-      toast.error('Identity update synchronization failed');
+      toast.error(t({ en: 'Identity update synchronization failed', hi: 'पहचान अपडेट नहीं हो सका' }));
     }
 
     setSaving(false);
@@ -83,23 +85,23 @@ const PatientProfile = () => {
         setProfile(res.data);
         syncForms(res.data);
         setEditEmergency(false);
-        toast.success('Emergency protocol updated');
+        toast.success(t({ en: 'Emergency contact updated', hi: 'इमरजेंसी संपर्क अपडेट हुआ' }));
       }
     } catch {
-      toast.error('Emergency contact synchronization failed');
+      toast.error(t({ en: 'Emergency contact synchronization failed', hi: 'इमरजेंसी संपर्क अपडेट नहीं हो सका' }));
     }
 
     setSaving(false);
   };
 
   const formatDate = (value) =>
-    value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase() : 'NOT PROVIDED';
+    value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase() : t({ en: 'NOT PROVIDED', hi: 'उपलब्ध नहीं' });
 
   return (
-    <DashboardLayout title="My Profile">
+    <DashboardLayout title={t({ en: 'My Profile', hi: 'मेरी प्रोफाइल' })}>
       <div className="max-w-6xl mx-auto space-y-10 pb-24">
         {loading ? (
-          <LoadingScreen message="Accessing Medical Identity Profile" />
+          <LoadingScreen message={t({ en: 'Accessing Medical Identity Profile', hi: 'मेडिकल पहचान प्रोफाइल खुल रही है' })} />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-fadeIn">
             <div className="lg:col-span-4 space-y-8">
@@ -111,17 +113,17 @@ const PatientProfile = () => {
                   </div>
                   <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight uppercase mb-1">{profile.name}</h2>
                   <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 mb-8 uppercase tracking-[0.3em]">
-                    Patient ID: {profile.patientId}
+                    {t({ en: 'Patient ID', hi: 'मरीज आईडी' })}: {profile.patientId}
                   </p>
 
                   <div className="grid grid-cols-2 gap-4 pb-2">
                     <div className="p-5 bg-slate-50 dark:bg-slate-950 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5 italic">Gender</p>
-                      <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{profile.gender || 'Not Set'}</p>
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5 italic">{t({ en: 'Gender', hi: 'लिंग' })}</p>
+                      <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{profile.gender || t({ en: 'Not Set', hi: 'सेट नहीं' })}</p>
                     </div>
                     <div className="p-5 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-[2rem] border border-emerald-100/50 dark:border-emerald-800/20">
-                      <p className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-1.5 italic">Blood Group</p>
-                      <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{profile.bloodGroup || 'Not Set'}</p>
+                      <p className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-1.5 italic">{t({ en: 'Blood Group', hi: 'ब्लड ग्रुप' })}</p>
+                      <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{profile.bloodGroup || t({ en: 'Not Set', hi: 'सेट नहीं' })}</p>
                     </div>
                   </div>
                 </div>
@@ -130,16 +132,16 @@ const PatientProfile = () => {
               <div className="bg-white dark:bg-slate-900 p-10 rounded-[3.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
                 <h3 className="text-[10px] font-black text-slate-950 dark:text-white mb-8 uppercase tracking-[0.3em] flex items-center gap-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Account Status
+                  {t({ en: 'Account Status', hi: 'अकाउंट स्थिति' })}
                 </h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Record Access</span>
-                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Protected</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{t({ en: 'Record Access', hi: 'रिकॉर्ड एक्सेस' })}</span>
+                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{t({ en: 'Protected', hi: 'सुरक्षित' })}</span>
                   </div>
                   <div className="flex justify-between items-center p-5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Account</span>
-                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Verified</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{t({ en: 'Account', hi: 'अकाउंट' })}</span>
+                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">{t({ en: 'Verified', hi: 'वेरिफाइड' })}</span>
                   </div>
                 </div>
               </div>
@@ -149,15 +151,15 @@ const PatientProfile = () => {
               <div className="bg-white dark:bg-slate-900 p-10 sm:p-14 rounded-[4rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
                   <div>
-                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Personal Details</h2>
+                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">{t({ en: 'Personal Details', hi: 'व्यक्तिगत विवरण' })}</h2>
                     <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mt-3 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Basic patient information
+                      {t({ en: 'Basic patient information', hi: 'मरीज की मूल जानकारी' })}
                     </p>
                   </div>
                   {!editProfile && (
                     <button onClick={() => setEditProfile(true)} className="px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all active:scale-95 hover:-translate-y-1">
-                      Edit Profile
+                      {t({ en: 'Edit Profile', hi: 'प्रोफाइल संपादित करें' })}
                     </button>
                   )}
                 </div>
@@ -166,49 +168,49 @@ const PatientProfile = () => {
                   <form onSubmit={handleProfileSave} className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Full Name</label>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">{t({ en: 'Full Name', hi: 'पूरा नाम' })}</label>
                         <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Phone Number</label>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">{t({ en: 'Phone Number', hi: 'फोन नंबर' })}</label>
                         <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91-0000000000" className={inputCls} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Date of Birth</label>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">{t({ en: 'Date of Birth', hi: 'जन्म तारीख' })}</label>
                         <input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} className={inputCls} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Gender</label>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">{t({ en: 'Gender', hi: 'लिंग' })}</label>
                         <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className={inputCls}>
-                          <option value="">Select Gender</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                          <option value="other">Other</option>
+                          <option value="">{t({ en: 'Select Gender', hi: 'लिंग चुनें' })}</option>
+                          <option value="male">{t({ en: 'Male', hi: 'पुरुष' })}</option>
+                          <option value="female">{t({ en: 'Female', hi: 'महिला' })}</option>
+                          <option value="other">{t({ en: 'Other', hi: 'अन्य' })}</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Blood Group</label>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">{t({ en: 'Blood Group', hi: 'ब्लड ग्रुप' })}</label>
                         <select value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} className={inputCls}>
-                          <option value="">Select Blood Group</option>
+                          <option value="">{t({ en: 'Select Blood Group', hi: 'ब्लड ग्रुप चुनें' })}</option>
                           {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map((group) => <option key={group} value={group}>{group}</option>)}
                         </select>
                       </div>
                     </div>
                     <div className="flex gap-4 pt-10 border-t border-slate-100 dark:border-slate-800">
                       <button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50">
-                        {saving ? 'Saving...' : 'Save Changes'}
+                        {saving ? t({ en: 'Saving...', hi: 'सेव हो रहा है...' }) : t({ en: 'Save Changes', hi: 'बदलाव सेव करें' })}
                       </button>
                       <button type="button" onClick={() => { setEditProfile(false); syncForms(profile); }} className="bg-slate-50 dark:bg-slate-950 text-slate-400 px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all border border-slate-100 dark:border-slate-800">
-                        Cancel
+                        {t({ en: 'Cancel', hi: 'रद्द करें' })}
                       </button>
                     </div>
                   </form>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 px-2">
-                    <InfoRow label="Email" value={profile.email} icon="📧" />
-                    <InfoRow label="Phone" value={profile.phone} icon="📞" />
-                    <InfoRow label="Date of Birth" value={formatDate(profile.dateOfBirth)} icon="🎂" />
-                    <InfoRow label="Gender" value={profile.gender ? profile.gender.toUpperCase() : null} icon="🧬" />
+                    <InfoRow label={t({ en: 'Email', hi: 'ईमेल' })} value={profile.email} icon="📧" emptyLabel={t({ en: 'Not Provided', hi: 'उपलब्ध नहीं' })} />
+                    <InfoRow label={t({ en: 'Phone', hi: 'फोन' })} value={profile.phone} icon="📞" emptyLabel={t({ en: 'Not Provided', hi: 'उपलब्ध नहीं' })} />
+                    <InfoRow label={t({ en: 'Date of Birth', hi: 'जन्म तारीख' })} value={formatDate(profile.dateOfBirth)} icon="🎂" emptyLabel={t({ en: 'Not Provided', hi: 'उपलब्ध नहीं' })} />
+                    <InfoRow label={t({ en: 'Gender', hi: 'लिंग' })} value={profile.gender ? profile.gender.toUpperCase() : null} icon="🧬" emptyLabel={t({ en: 'Not Provided', hi: 'उपलब्ध नहीं' })} />
                   </div>
                 )}
               </div>
@@ -216,15 +218,15 @@ const PatientProfile = () => {
               <div className="bg-white dark:bg-slate-900 p-10 sm:p-14 rounded-[4rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
                   <div>
-                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Emergency Contact</h2>
+                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight uppercase">{t({ en: 'Emergency Contact', hi: 'इमरजेंसी संपर्क' })}</h2>
                     <p className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mt-3 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                      Person to contact in an emergency
+                      {t({ en: 'Person to contact in an emergency', hi: 'आपात स्थिति में संपर्क करें' })}
                     </p>
                   </div>
                   {!editEmergency && (
                     <button onClick={() => setEditEmergency(true)} className="px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl transition-all active:scale-95 hover:-translate-y-1">
-                      {profile.emergencyContact?.name ? 'Edit Contact' : 'Add Contact'}
+                      {profile.emergencyContact?.name ? t({ en: 'Edit Contact', hi: 'संपर्क बदलें' }) : t({ en: 'Add Contact', hi: 'संपर्क जोड़ें' })}
                     </button>
                   )}
                 </div>
@@ -233,32 +235,32 @@ const PatientProfile = () => {
                   <form onSubmit={handleEmergencySave} className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Contact Name</label>
-                        <input type="text" value={ecForm.name} onChange={(e) => setEcForm({ ...ecForm, name: e.target.value })} placeholder="Full Name" className={inputCls} />
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">{t({ en: 'Contact Name', hi: 'संपर्क का नाम' })}</label>
+                        <input type="text" value={ecForm.name} onChange={(e) => setEcForm({ ...ecForm, name: e.target.value })} placeholder={t({ en: 'Full Name', hi: 'पूरा नाम' })} className={inputCls} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Relationship</label>
-                        <input type="text" value={ecForm.relationship} onChange={(e) => setEcForm({ ...ecForm, relationship: e.target.value })} placeholder="Parent, Spouse, Sibling" className={inputCls} />
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">{t({ en: 'Relationship', hi: 'रिश्ता' })}</label>
+                        <input type="text" value={ecForm.relationship} onChange={(e) => setEcForm({ ...ecForm, relationship: e.target.value })} placeholder={t({ en: 'Parent, Spouse, Sibling', hi: 'माता-पिता, पति/पत्नी, भाई/बहन' })} className={inputCls} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">Phone Number</label>
+                        <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-3 italic">{t({ en: 'Phone Number', hi: 'फोन नंबर' })}</label>
                         <input type="text" value={ecForm.phone} onChange={(e) => setEcForm({ ...ecForm, phone: e.target.value })} placeholder="+91-0000000000" className={inputCls} />
                       </div>
                     </div>
                     <div className="flex gap-4 pt-10 border-t border-slate-100 dark:border-slate-800">
                       <button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50">
-                        {saving ? 'Saving...' : 'Save Contact'}
+                        {saving ? t({ en: 'Saving...', hi: 'सेव हो रहा है...' }) : t({ en: 'Save Contact', hi: 'संपर्क सेव करें' })}
                       </button>
                       <button type="button" onClick={() => { setEditEmergency(false); syncForms(profile); }} className="bg-slate-50 dark:bg-slate-950 text-slate-400 px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all border border-slate-100 dark:border-slate-800">
-                        Cancel
+                        {t({ en: 'Cancel', hi: 'रद्द करें' })}
                       </button>
                     </div>
                   </form>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-x-12 px-2">
-                    <InfoRow label="Name" value={profile.emergencyContact?.name} icon="🤝" />
-                    <InfoRow label="Relationship" value={profile.emergencyContact?.relationship} icon="🔗" />
-                    <InfoRow label="Phone" value={profile.emergencyContact?.phone} icon="🚨" />
+                    <InfoRow label={t({ en: 'Name', hi: 'नाम' })} value={profile.emergencyContact?.name} icon="🤝" emptyLabel={t({ en: 'Not Provided', hi: 'उपलब्ध नहीं' })} />
+                    <InfoRow label={t({ en: 'Relationship', hi: 'रिश्ता' })} value={profile.emergencyContact?.relationship} icon="🔗" emptyLabel={t({ en: 'Not Provided', hi: 'उपलब्ध नहीं' })} />
+                    <InfoRow label={t({ en: 'Phone', hi: 'फोन' })} value={profile.emergencyContact?.phone} icon="🚨" emptyLabel={t({ en: 'Not Provided', hi: 'उपलब्ध नहीं' })} />
                   </div>
                 )}
               </div>

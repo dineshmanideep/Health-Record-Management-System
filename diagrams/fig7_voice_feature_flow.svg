@@ -1,0 +1,63 @@
+<svg width="100%" viewBox="0 0 760 740" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>Voice Accessibility Feature High-Level Flow</title>
+  <desc>Concise flowchart of accessibility context, route-aware help, error detection, and speech guidance.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="760" height="740" fill="#141414"/>
+
+  <text x="380" y="34" text-anchor="middle" fill="#f5f5f5" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">Voice Accessibility Feature - High-Level Flow</text>
+  <text x="380" y="56" text-anchor="middle" fill="#bdbdbd" font-family="Segoe UI, Arial, sans-serif" font-size="12">Context-aware spoken guidance with validation-aware recovery</text>
+
+  <rect x="240" y="86" width="280" height="56" rx="10" fill="#3c3489" stroke="#afa9ec" stroke-width="1"/>
+  <text x="380" y="110" text-anchor="middle" fill="#cecbf6" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">AccessibilityProvider Initialized</text>
+  <text x="380" y="128" text-anchor="middle" fill="#afa9ec" font-family="Segoe UI, Arial, sans-serif" font-size="12">Load profile and expose a11y state/actions</text>
+
+  <line x1="380" y1="142" x2="380" y2="174" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <rect x="240" y="174" width="280" height="56" rx="10" fill="#633806" stroke="#ef9f27" stroke-width="1"/>
+  <text x="380" y="198" text-anchor="middle" fill="#fac775" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Apply Accessibility Settings</text>
+  <text x="380" y="216" text-anchor="middle" fill="#ef9f27" font-family="Segoe UI, Arial, sans-serif" font-size="12">Root dataset/classes, local save, optional API sync</text>
+
+  <line x1="380" y1="230" x2="380" y2="262" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <rect x="240" y="262" width="280" height="56" rx="10" fill="#085041" stroke="#5dcaa5" stroke-width="1"/>
+  <text x="380" y="286" text-anchor="middle" fill="#9fe1cb" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Voice Help Triggered</text>
+  <text x="380" y="304" text-anchor="middle" fill="#5dcaa5" font-family="Segoe UI, Arial, sans-serif" font-size="12">Route-aware content from voice help map</text>
+
+  <line x1="380" y1="318" x2="380" y2="350" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <rect x="240" y="350" width="280" height="56" rx="10" fill="#633806" stroke="#ef9f27" stroke-width="1"/>
+  <text x="380" y="374" text-anchor="middle" fill="#fac775" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Collect Live Form Signals</text>
+  <text x="380" y="392" text-anchor="middle" fill="#ef9f27" font-family="Segoe UI, Arial, sans-serif" font-size="12">Missing required fields + inline/context errors</text>
+
+  <line x1="380" y1="406" x2="380" y2="438" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <polygon points="380,438 500,486 380,534 260,486" fill="#262624" stroke="#599130" stroke-width="1.6"/>
+  <text x="380" y="486" text-anchor="middle" dominant-baseline="central" fill="#faf9f5" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Error Context Present?</text>
+
+  <line x1="260" y1="486" x2="140" y2="486" stroke="#cd5c58" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="204" y="478" text-anchor="middle" fill="#c2c0b6" font-family="Segoe UI, Arial, sans-serif" font-size="12">YES</text>
+  <rect x="20" y="462" width="120" height="48" rx="8" fill="#791f1f" stroke="#f09595" stroke-width="1"/>
+  <text x="80" y="482" text-anchor="middle" fill="#f7c1c1" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Error/Recover</text>
+  <text x="80" y="498" text-anchor="middle" fill="#f09595" font-family="Segoe UI, Arial, sans-serif" font-size="11">Guided fix voice</text>
+
+  <line x1="140" y1="486" x2="140" y2="574" stroke="#599130" stroke-width="1.6"/>
+  <line x1="140" y1="574" x2="240" y2="574" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <line x1="380" y1="534" x2="380" y2="574" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="394" y="558" fill="#c2c0b6" font-family="Segoe UI, Arial, sans-serif" font-size="12">NO</text>
+
+  <rect x="240" y="574" width="280" height="56" rx="10" fill="#085041" stroke="#5dcaa5" stroke-width="1"/>
+  <text x="380" y="598" text-anchor="middle" fill="#9fe1cb" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Speak + Highlight Targets</text>
+  <text x="380" y="616" text-anchor="middle" fill="#5dcaa5" font-family="Segoe UI, Arial, sans-serif" font-size="12">Select clear voice, narrate concise next actions</text>
+
+  <line x1="380" y1="630" x2="380" y2="672" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <rect x="210" y="672" width="340" height="30" rx="8" fill="#085041" stroke="#5dcaa5" stroke-width="1"/>
+  <text x="380" y="691" text-anchor="middle" fill="#5dcaa5" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">User completes action or presses Stop to cancel speech and highlights</text>
+</svg>

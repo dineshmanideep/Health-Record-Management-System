@@ -1,0 +1,69 @@
+<svg width="100%" viewBox="0 0 760 760" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>AI Document Feature High-Level Flow</title>
+  <desc>Concise flowchart of upload to AI extraction, validation, normalization, and saved structured output.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="760" height="760" fill="#141414"/>
+
+  <text x="380" y="34" text-anchor="middle" fill="#f5f5f5" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">AI Document Feature - High-Level Flow</text>
+  <text x="380" y="56" text-anchor="middle" fill="#bdbdbd" font-family="Segoe UI, Arial, sans-serif" font-size="12">Upload, extract, validate, normalize, and persist structured medical data</text>
+
+  <rect x="250" y="86" width="260" height="56" rx="10" fill="#3c3489" stroke="#afa9ec" stroke-width="1"/>
+  <text x="380" y="110" text-anchor="middle" fill="#cecbf6" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Documents Uploaded or Reprocess</text>
+  <text x="380" y="128" text-anchor="middle" fill="#afa9ec" font-family="Segoe UI, Arial, sans-serif" font-size="12">Patient or Nurse triggers processing</text>
+
+  <line x1="380" y1="142" x2="380" y2="174" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <rect x="250" y="174" width="260" height="56" rx="10" fill="#633806" stroke="#ef9f27" stroke-width="1"/>
+  <text x="380" y="198" text-anchor="middle" fill="#fac775" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Build Sources + Prompt</text>
+  <text x="380" y="216" text-anchor="middle" fill="#ef9f27" font-family="Segoe UI, Arial, sans-serif" font-size="12">Text extraction first, image fallback if needed</text>
+
+  <line x1="380" y1="230" x2="380" y2="262" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <rect x="250" y="262" width="260" height="56" rx="10" fill="#085041" stroke="#5dcaa5" stroke-width="1"/>
+  <text x="380" y="286" text-anchor="middle" fill="#9fe1cb" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">LLM Call with Provider Chain</text>
+  <text x="380" y="304" text-anchor="middle" fill="#5dcaa5" font-family="Segoe UI, Arial, sans-serif" font-size="12">Primary provider with optional failover</text>
+
+  <line x1="380" y1="318" x2="380" y2="350" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <polygon points="380,350 500,398 380,446 260,398" fill="#262624" stroke="#599130" stroke-width="1.6"/>
+  <text x="380" y="398" text-anchor="middle" dominant-baseline="central" fill="#faf9f5" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Valid JSON Output?</text>
+
+  <line x1="260" y1="398" x2="150" y2="398" stroke="#cd5c58" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="206" y="390" text-anchor="middle" fill="#c2c0b6" font-family="Segoe UI, Arial, sans-serif" font-size="12">NO</text>
+  <rect x="20" y="374" width="130" height="48" rx="8" fill="#791f1f" stroke="#f09595" stroke-width="1"/>
+  <text x="85" y="394" text-anchor="middle" fill="#f7c1c1" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Repair / Retry</text>
+  <text x="85" y="410" text-anchor="middle" fill="#f09595" font-family="Segoe UI, Arial, sans-serif" font-size="11">Self-healing step</text>
+
+  <line x1="150" y1="398" x2="150" y2="486" stroke="#599130" stroke-width="1.6"/>
+  <line x1="150" y1="486" x2="250" y2="486" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <line x1="380" y1="446" x2="380" y2="486" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="394" y="470" fill="#c2c0b6" font-family="Segoe UI, Arial, sans-serif" font-size="12">YES</text>
+
+  <rect x="250" y="486" width="260" height="56" rx="10" fill="#085041" stroke="#5dcaa5" stroke-width="1"/>
+  <text x="380" y="510" text-anchor="middle" fill="#9fe1cb" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Normalize Clinical Fields</text>
+  <text x="380" y="528" text-anchor="middle" fill="#5dcaa5" font-family="Segoe UI, Arial, sans-serif" font-size="12">Canonical metrics, meds, dates, ambiguities</text>
+
+  <line x1="380" y1="542" x2="380" y2="574" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <polygon points="380,574 500,622 380,670 260,622" fill="#262624" stroke="#599130" stroke-width="1.6"/>
+  <text x="380" y="622" text-anchor="middle" dominant-baseline="central" fill="#faf9f5" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Needs Clarification?</text>
+
+  <line x1="500" y1="622" x2="620" y2="622" stroke="#cd5c58" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="558" y="614" text-anchor="middle" fill="#c2c0b6" font-family="Segoe UI, Arial, sans-serif" font-size="12">YES</text>
+  <rect x="620" y="598" width="120" height="48" rx="8" fill="#791f1f" stroke="#f09595" stroke-width="1"/>
+  <text x="680" y="618" text-anchor="middle" fill="#f7c1c1" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Clarification</text>
+  <text x="680" y="634" text-anchor="middle" fill="#f09595" font-family="Segoe UI, Arial, sans-serif" font-size="11">Nurse review loop</text>
+
+  <line x1="380" y1="670" x2="380" y2="714" stroke="#599130" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="394" y="694" fill="#c2c0b6" font-family="Segoe UI, Arial, sans-serif" font-size="12">NO</text>
+
+  <rect x="220" y="714" width="320" height="30" rx="8" fill="#085041" stroke="#5dcaa5" stroke-width="1"/>
+  <text x="380" y="733" text-anchor="middle" fill="#5dcaa5" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600">Persist structured data + summaries to records and dashboards</text>
+</svg>

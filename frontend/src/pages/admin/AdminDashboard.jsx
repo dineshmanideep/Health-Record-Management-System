@@ -47,7 +47,7 @@ const AdminDashboard = () => {
   );
 
   return (
-    <DashboardLayout title="Universal Governance">
+    <DashboardLayout title="Admin Dashboard">
       <div className="max-w-7xl mx-auto space-y-8 pb-20 px-4 sm:px-0">
         
         {/* KPI Grid */}
@@ -114,7 +114,7 @@ const AdminDashboard = () => {
                   </div>
                 )}
                 actions={(d) => (
-                  <ActionBtn color="indigo" loading={loadingId === d._id} onClick={() => handleAction(adminService.verifyDoctor, d._id)}>Validate License</ActionBtn>
+                  <ActionBtn color="indigo" loading={loadingId === d._id} onClick={() => handleAction(adminService.verifyDoctor, d._id)}>Authorize</ActionBtn>
                 )}
               />
             )}
@@ -129,17 +129,17 @@ const AdminDashboard = () => {
                   </div>
                 )}
                 actions={(n) => (
-                  <ActionBtn color="teal" loading={loadingId === n._id} onClick={() => handleAction(adminService.verifyNurse, n._id)}>Validate Credentials</ActionBtn>
+                  <ActionBtn color="teal" loading={loadingId === n._id} onClick={() => handleAction(adminService.verifyNurse, n._id)}>Authorize</ActionBtn>
                 )}
               />
             )}
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
+        {/* <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
           <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">System Genesis</h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Administrator {user?.name} acknowledged. You maintain ultimate oversight of hospital credentialing and clinical staff validation within the Health Record Management System.</p>
-        </div>
+        </div> */}
 
       </div>
     </DashboardLayout>

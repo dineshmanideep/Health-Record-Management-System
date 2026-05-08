@@ -16,7 +16,7 @@ const AI_RUNTIME_CONFIG = {
 };
 
 const OLLAMA_CONFIG = {
-  model: process.env.OLLAMA_MODEL || 'qwen2.5vl:7b',
+  model: process.env.OLLAMA_MODEL || 'qwen2.5vl:3b',
   generateUrl: process.env.OLLAMA_GENERATE_URL || 'http://localhost:11434/api/generate',
   timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS || process.env.AI_TIMEOUT_MS || 600000),
   numCtx: Number(process.env.OLLAMA_NUM_CTX || process.env.AI_OLLAMA_NUM_CTX || 8192)

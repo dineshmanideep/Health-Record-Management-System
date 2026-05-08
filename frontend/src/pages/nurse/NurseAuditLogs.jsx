@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+import { useLanguage } from '../../context/LanguageContext';
 import { nurseService } from '../../services/api';
 
 const NurseAuditLogs = () => {
@@ -7,6 +8,7 @@ const NurseAuditLogs = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
 
   useEffect(() => {
     let isActive = true;
@@ -36,26 +38,26 @@ const NurseAuditLogs = () => {
 
   if (loading) {
     return (
-      <DashboardLayout title="Audit Logs">
+      <DashboardLayout title={t({ en: 'Audit Logs', hi: 'ऑडिट लॉग' })}>
         <div className="flex flex-col items-center justify-center py-20 animate-pulse">
            <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-           <p className="mt-4 text-slate-500 font-medium tracking-widest uppercase text-[10px]">Loading logs...</p>
+           <p className="mt-4 text-slate-500 font-medium tracking-widest uppercase text-[10px]">{t({ en: 'Loading logs...', hi: 'लॉग लोड हो रहे हैं...' })}</p>
         </div>
       </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout title="Audit Logs">
+    <DashboardLayout title={t({ en: 'Audit Logs', hi: 'ऑडिट लॉग' })}>
       {logs.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 p-20 rounded-[3rem] shadow-sm border border-slate-200/50 dark:border-slate-800 text-center opacity-40 grayscale transition-all">
           <p className="text-6xl mb-6">📂</p>
-          <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">No logs found</p>
+          <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">{t({ en: 'No logs found', hi: 'कोई लॉग नहीं मिले' })}</p>
         </div>
       ) : (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800">
-            <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight mb-8">Recent Activity</h2>
+            <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight mb-8">{t({ en: 'Recent Activity', hi: 'हाल की गतिविधि' })}</h2>
             <div className="space-y-3">
               {logs.map((log) => (
                 <div key={log._id} className="bg-slate-50 dark:bg-slate-800/50 border border-transparent dark:border-slate-700 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:shadow-lg transition-all group/log">
@@ -68,10 +70,10 @@ const NurseAuditLogs = () => {
                     {log.action?.replace(/_/g, ' ') || 'SYSTEM_LOG'}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-slate-800 dark:text-slate-200 font-bold text-sm truncate uppercase tracking-tight">{log.details || 'LOG_ENTRY_NULL'}</p>
+                    <p className="text-slate-800 dark:text-slate-200 font-bold text-sm truncate uppercase tracking-tight">{log.details || t({ en: 'No details', hi: 'कोई विवरण नहीं' })}</p>
                     <div className="flex items-center gap-3 mt-1 opacity-60">
                        {log.patient?.name && (
-                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 truncate">Sbj: {log.patient.name}</p>
+                         <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 truncate">{t({ en: 'Patient', hi: 'मरीज' })}: {log.patient.name}</p>
                        )}
                        <span className="text-slate-300 dark:text-slate-700 text-[10px]">|</span>
                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{formatDate(log.createdAt)}</p>
@@ -91,10 +93,10 @@ const NurseAuditLogs = () => {
                   onClick={() => setPage(page - 1)} 
                   className="px-6 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-30 hover:bg-indigo-600 hover:text-white transition-all active:scale-95"
                 >
-                  ← Previous
+                  ← {t({ en: 'Previous', hi: 'पिछला' })}
                 </button>
                 <div className="flex flex-col items-center">
-                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sequence</span>
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t({ en: 'Page', hi: 'पेज' })}</span>
                    <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{page} / {totalPages}</span>
                 </div>
                 <button 
@@ -102,7 +104,7 @@ const NurseAuditLogs = () => {
                   onClick={() => setPage(page + 1)} 
                   className="px-6 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-30 hover:bg-indigo-600 hover:text-white transition-all active:scale-95"
                 >
-                  Next →
+                  {t({ en: 'Next', hi: 'अगला' })} →
                 </button>
               </div>
             )}
