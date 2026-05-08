@@ -55,6 +55,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import ContextVoiceHelpButton from './components/ContextVoiceHelpButton';
 import FloatingNav from './components/FloatingNav';
 import AccessibilityTools from './components/AccessibilityTools';
+import GestureNavigation from './components/GestureNavigation';
 
 function App() {
   return (
@@ -335,6 +336,7 @@ function App() {
         <ContextVoiceHelpButton />
         <AccessibilityTools />
         <FloatingNav />
+        <GestureNavigation />
         <Toaster 
           position="top-right"
           toastOptions={{
